@@ -59,3 +59,6 @@ File: Code
 ```
 npx skills add supabase/agent-skills
 ```
+
+5.
+merge everything to main, I want to make main the default branch
