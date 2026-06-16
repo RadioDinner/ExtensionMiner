@@ -1,0 +1,97 @@
+SESSION 2 — HANDOFF LOG
+=======================
+Date: 2026-06-16
+Branch: claude/serene-curie-e0cp9y (designated for this web session; all work
+        pushed here, NOT main — per the harness branch assignment this session).
+Parallelism: the user is running the Python SCRAPER locally in a PowerShell
+        session (writes to Supabase). This WEB session did DASHBOARD work only
+        (reads from Supabase). The two run cleanly in parallel — they meet only
+        at Supabase (writer vs. reader, no conflict) and at git (different
+        branch; fetch+rebase before push).
+
+================================================================================
+PROMPT 1 — "work on the dashboard here while the powershell runs the python"
+================================================================================
+Answered: YES, parallel is fine (and ideal). Scraper must run locally anyway
+(Chrome Web Store is HTTP 403 in the web env); dashboard only reads Supabase.
+
+Asked the user (AskUserQuestion) what to focus on. They chose:
+  => "Visual polish & charts."
+
+WORK DONE — dependency-free, server-rendered inline-SVG charts + CSS polish.
+Chose inline SVG (no chart library) so: no new npm dep, no client JS, the page
+stays a server component, build stays lean/green. Confirmed: route "/" is still
+ƒ (Dynamic) at 138 B page JS — charts add ZERO client-side weight.
+
+Files created:
+  dashboard/app/charts.js
+      Two pure server components (no "use client"):
+      - RatingHistogram({points}): half-star buckets 1.0–5.0; bars sized by
+        count; the 2.5–3.5★ zone buckets highlighted gold; count labels;
+        <title> tooltips. maxCount floored at 1 (no /0).
+      - OpportunityScatter({points}): THE strategy chart. x = rating (1–5),
+        y = install_count on a LOG scale; the 2.5–3.5★ opportunity zone shaded
+        gold; dots sized by sqrt(rating_count) (∝ # ratings); zone dots drawn
+        last (on top) + gold; <title> tooltips ("Name — 2.7★, 500k installs,
+        1.2k ratings"). Guards: filters install_count>0 (log defined),
+        span = hiL-loL || 1 (no /0), rating clamped 1–5.
+      Theme hex colors are inlined (CSS var() does NOT resolve inside SVG
+      presentation attributes) — kept in sync with globals.css; fmtCompact()
+      formats 500000 -> "500k", 2e6 -> "2M".
+
+Files modified:
+  dashboard/lib/queries.js
+      Added a capped `points` query (POINT_COLS = ext_id,name,rating,
+      rating_count,install_count,store_category; POINT_LIMIT = 1500; rating not
+      null; order by install_count desc). Added to the Promise.all, the
+      first-error check, EMPTY, and the return. Powers both charts from ONE
+      fetch.
+  dashboard/app/page.js
+      Imported the charts; added a "charts-section" with two .card panels
+      (Rating distribution + Rating vs. installs) and a .legend (gold = zone,
+      accent = else, "dot size ∝ # ratings · hover for details"). Header now has
+      a .kicker eyebrow; the opportunity-zone stat card got the .zone class.
+  dashboard/app/globals.css
+      Polish: header bottom-border + gradient-text h1 + .kicker; .stat.zone
+      (gold number + gold-tinted border); .charts responsive grid (2-col ->
+      1-col @720px); .card / .chart / .legend / .dot styles; tbody row hover.
+
+VALIDATION (in the web env):
+  * `npm run build` => "Compiled successfully"; route "/" = ƒ Dynamic, 138 B.
+    Build does NOT need Supabase creds (force-dynamic preserved).
+  * Started the prod server + curled "/": renders end-to-end; empty/unconfigured
+    state shows (no Supabase in this env) with both chart cards present.
+  * Rendered a THROWAWAY dev route (app/charttest, since DELETED) with 6
+    synthetic points: HTTP 200, NaN count = 0, 9 <rect> (8 bars + 1 zone band),
+    6 <circle> (6 points), zone band opacity 0.08 present, tooltip correct
+    ("Alpha — 2.7★, 500k installs, 1.2k ratings"). Temp route removed; git
+    status clean (only charts.js + the three edits + this Session 2 log).
+  * NOT yet rendered against LIVE Supabase data here (env not configured in the
+    web session) — but the empty-state and synthetic-data paths both verified.
+
+================================================================================
+OPEN ITEMS / NEXT STEPS
+================================================================================
+  1. See the charts with REAL data: once the local scrape has populated
+     extensions (rating, install_count, rating_count), open the dashboard
+     (Vercel once deployed, or `npm run dev` in dashboard/ with SUPABASE_URL +
+     SUPABASE_SERVICE_ROLE_KEY in dashboard/.env.local). The scatter is the
+     money chart — gold dots in the shaded band = targets.
+  2. Still-open infra from Session 1 (unchanged): VERCEL Root Directory =
+     `dashboard` + the two SUPABASE_* env vars (deploy not yet confirmed green);
+     run `python -m analysis.run` (ANTHROPIC_API_KEY) to fill `opportunities`
+     once data exists.
+  3. Possible next dashboard work (offered, not chosen this session): per-
+     extension drill-down (review clusters + Claude brief + verbatim "I'd pay
+     if…" quotes) to make the GO/NO-GO call from the dashboard; filtering/sort/
+     search.
+
+================================================================================
+CURRENT STATE
+================================================================================
+Dashboard gained two server-rendered SVG charts (rating histogram + rating-vs-
+installs scatter with the opportunity zone shaded) plus visual polish, with zero
+new dependencies and zero added client JS. Build green; all paths verified
+short of a live-data render. Pipeline otherwise unchanged from Session 1 (schema
+applied, scraper + ranker code-complete, dashboard Next.js app). Working branch
+this session: claude/serene-curie-e0cp9y. No PR opened (none requested).

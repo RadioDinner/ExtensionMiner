@@ -1,0 +1,1 @@
+1. Let's kick off a new session. Is it possible to have you work on the dashboard here while the powershell chat is going on? The powershell is running the python script
