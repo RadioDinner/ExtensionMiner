@@ -1,0 +1,85 @@
+SESSION 1 — HANDOFF LOG
+=======================
+Date: 2026-06-16
+Branch: claude/optimistic-babbage-bt680w  (this session's designated feature branch)
+
+--------------------------------------------------------------------------------
+PURPOSE OF THIS SESSION
+--------------------------------------------------------------------------------
+Bootstrap the repository. Two things were requested:
+  1. Save the user's "new session instructions" into CLAUDE.md AND the repo, and
+     make that protocol run at the start of every new session.
+  2. Establish the repo as the home of a project that scrapes the Chrome Web
+     Store, categorizes extensions, logs every review, and surfaces competitive
+     opportunities through an interactive dashboard.
+
+--------------------------------------------------------------------------------
+CHANGES MADE (files created)
+--------------------------------------------------------------------------------
+  NEW_SESSION_INSTRUCTIONS.md   Verbatim copy of the user's session protocol
+                                (canonical, user-authored reference).
+  CLAUDE.md                     Project memory (auto-loaded each session):
+                                vision, tech stack, repo layout, data model,
+                                session protocol summary, migration numbering,
+                                git workflow.
+  README.md                     Human-facing project overview.
+  .gitignore                    Python + Node/Next.js + secrets + data caches.
+  .claude/settings.json         Registers the SessionStart hook.
+  .claude/hooks/session-start.sh  SessionStart hook (executable). Injects the
+                                session protocol into context every session and
+                                surfaces the most recent session_log.txt; it is
+                                source-aware (startup/clear create a new session
+                                folder; resume/compact continue the current one)
+                                and pre-computes the next session number.
+  scraper/README.md             Placeholder for the Python crawler.
+  analysis/README.md            Placeholder for categorization / review mining /
+                                opportunity scoring (Python).
+  dashboard/README.md           Placeholder for the Next.js dashboard (Vercel).
+  supabase/README.md            DB overview + migration-numbering rules.
+  supabase/migrations/.gitkeep  Empty migrations dir (first migration: 999_*).
+  data/.gitkeep                 Placeholder for local data (raw/cache gitignored).
+  Session log/Session 1/prompt_history.txt   This session's verbatim prompts.
+  Session log/Session 1/session_log.txt      This file.
+
+--------------------------------------------------------------------------------
+DIRECTIONAL DECISIONS
+--------------------------------------------------------------------------------
+  * Scraper + analysis: Python.
+  * Database: Supabase (Postgres). All scraped data lives there.
+  * Dashboard: Next.js on Vercel (chosen as the canonical Vercel framework,
+    since the user said "whatever is best to use to host on vercel"). Revisit if
+    a lighter static-export setup is preferred.
+  * "Occur at the start of every session" is implemented two ways: (a) CLAUDE.md
+    is auto-loaded every session, and (b) a SessionStart hook injects the
+    protocol + latest handoff as additionalContext.
+  * Strategic focus captured in CLAUDE.md/README: target ~3-star, high-install
+    extensions with recurring complaints and "I'd pay if X worked" review
+    signals — the competitive sweet spot.
+  * Migration numbering: counts DOWN from 999 (999 = oldest). Documented in
+    CLAUDE.md and supabase/README.md.
+
+--------------------------------------------------------------------------------
+OPEN ITEMS / NEXT STEPS
+--------------------------------------------------------------------------------
+  1. Confirm dashboard framework (Next.js assumed) and whether a lighter setup
+     is wanted.
+  2. Design the Supabase schema and write the foundational migration 999_*.sql
+     (extensions, reviews, categories, rating_snapshots, opportunities).
+  3. Decide the Chrome Web Store scraping approach (sitemap/category crawl vs.
+     internal API endpoints), and how to enumerate the full library + paginate
+     reviews. Confirm rate-limiting / ToS posture.
+  4. Add .env.example for Supabase credentials and wire the Python Supabase
+     client.
+  5. Build the scraper, then the analysis/opportunity scoring, then the
+     dashboard.
+
+NOTE FOR NEXT SESSION: The SessionStart hook only takes effect for future
+sessions once this branch is merged into the repo's default branch. Until then,
+follow the protocol in CLAUDE.md / NEW_SESSION_INSTRUCTIONS.md manually.
+
+--------------------------------------------------------------------------------
+CURRENT STATE
+--------------------------------------------------------------------------------
+Scaffolding only — no scraper, schema, analysis, or dashboard code yet. The
+session protocol, project memory, directory skeleton, and SessionStart hook are
+in place and validated (hook emits valid JSON for startup/resume sources).
