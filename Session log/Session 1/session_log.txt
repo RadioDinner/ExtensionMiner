@@ -272,40 +272,103 @@ Model note: defaulted to claude-opus-4-8 per the claude-api skill; configurable
 via ANTHROPIC_MODEL / --model.
 
 ================================================================================
+PART F — GO-LIVE SETUP (prompts 8-11)
+================================================================================
+The pipeline is code-complete; this stretch was the user wiring up live infra.
+Mostly config/settings the user owns — NO code changes except prompt logging.
+
+DONE (user, confirmed):
+  * Local Claude Code installed on Windows (v2.1.178); PATH fixed (~\.local\bin
+    added to the User PATH).
+  * Supabase MCP authenticated locally (`claude /mcp` -> "Connected to supabase").
+  * APPLIED supabase/migrations/999_initial_schema.sql to the Supabase project
+    (ref jagtupajcgdvehqfltom) — THE TABLES ARE LIVE.
+  * Fixed branches: main is now the GitHub DEFAULT branch.
+  * Cloned the repo locally to C:\Users\derrick.wengerd\Downloads\ExtensionMiner
+    (note: the typo'd URL 'ExtnesionMiner' 404'd first); started env setup
+    (`py -m venv .venv` + `pip install -r requirements.txt`).
+
+IN PROGRESS / WATCH:
+  * Local Python is 3.14.4 (very new). pip install was running when we wrapped.
+    If it fails on lxml / pydantic-core / pandas (missing wheels): use Python 3.12
+    (`py -3.12 -m venv .venv`) OR drop pandas from requirements.txt (it is unused
+    in the code so far).
+  * VERCEL still failing: "No Next.js version detected." FIX = set the Vercel
+    project's ROOT DIRECTORY = `dashboard` (package.json with next lives there,
+    not at repo root), clear any leftover `vite build` build-command override, add
+    env vars SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, redeploy. dashboard/
+    package.json is correct (next 14.2.35) and builds clean in the web env; not
+    yet confirmed green by the user.
+
+COORDINATION: there are now TWO Claude Codes on this repo — the user's LOCAL
+session (in Downloads\ExtensionMiner, doing the scrape/setup; it follows the same
+SessionStart hook so it will open its own Session log/Session 2) and the WEB
+session (this one = Session 1, used for schema/ranker/git). When pushing, fetch +
+rebase first so the two don't clobber each other.
+
+================================================================================
 OPEN ITEMS / NEXT STEPS
 ================================================================================
-  0. DEFAULT BRANCH: user to set main as default in GitHub Settings (I can't via
-     available tools). After that, the stale claude/optimistic-babbage-bt680w can
-     be deleted. Also set Vercel Production Branch = main.
-  1. SCHEMA: 999_initial_schema.sql written + grammar-validated, NOT yet applied
-     to a live Supabase project. USER ACTION: create the Supabase project and
-     apply it (CLI or SQL editor); put SUPABASE_URL + SERVICE_ROLE_KEY in .env.
-  2. SCRAPER: built + tested. USER ACTION: run locally — `pip install -r
-     requirements.txt`, `playwright install chromium`, then
-     `python -m scraper.run --max-extensions 2 --no-db --no-headless` to sanity
-     check, tune scraper/selectors.py against the cached HTML, then a real run.
-     (Likely needs a selector tweak on first run — built to make that a 5-min,
-     single-file edit.)
-  3. RANKING LAYER (Phase 3): BUILT + unit-tested (analysis/). Remaining: run it
-     against real scraped data with the user's ANTHROPIC_API_KEY (a live call has
-     not been exercised yet). Tune the scoring weights against real outcomes.
-  4. DASHBOARD: SCAFFOLDED + builds clean (Next.js in dashboard/). Pending: the
-     Vercel settings above, real data, and richer UI (filters, per-extension
-     drill-down with review timeline). Reads extensions/reviews/opportunities.
-  5. Optional: wire SessionStart hook to `pip install -r requirements.txt` for
-     web sessions (kept light for now).
-  6. Confirm the actual 1–3 starting categories (default: productivity,
-     developer-tools) and verify the live category-URL taxonomy in selectors.py.
+  DONE since earlier: schema APPLIED to Supabase; main is the GitHub DEFAULT
+  branch; Supabase MCP authenticated locally; repo cloned locally. Remaining:
+
+  1. LOCAL ENV (in progress): finish `pip install -r requirements.txt` (Python
+     3.14 wheel risk — fall back to 3.12 or drop pandas if it fails); then
+     `playwright install chromium`; copy .env.example -> .env and set
+     SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (+ ANTHROPIC_API_KEY for a local
+     ranker run).
+  2. SCRAPE (run LOCALLY — store is HTTP 403 in the web env): dry run
+     `python -m scraper.run --max-extensions 2 --no-db --no-headless`, inspect the
+     cached HTML under data/cache/, and TUNE scraper/selectors.py if the
+     review/detail fields are off (expected on first run — selectors were written
+     without live-store access; built as a one-file edit). Then a real run to
+     populate extensions + reviews.
+  3. RANK (can run in the WEB env once data exists): `python -m analysis.run` with
+     ANTHROPIC_API_KEY to fill the opportunities table. Then tune the scoring
+     weights in analysis/rank.py against real results. A live Claude call has NOT
+     been exercised yet.
+  4. VERCEL: Root Directory = `dashboard`, clear any `vite build` override, add the
+     two SUPABASE_* env vars, redeploy; confirm the dashboard shows data.
+  5. PICK ONE target (roadmap Phase 4 = the finish line): read the actual reviews,
+     install the incumbent, confirm the complaint is real/current, apply the
+     GO/NO-GO bar, then stop and build it. Don't over-build the miner.
+  6. Optional: delete the stale claude/optimistic-babbage-bt680w branch; decide
+     whether to wire the SessionStart hook to pip-install deps in web sessions;
+     confirm the 1-3 starting categories (default productivity, developer-tools)
+     and the live category-URL taxonomy in scraper/selectors.py.
 
 ================================================================================
 CURRENT STATE
 ================================================================================
-Phases 0-3 BUILT. Phase 1 (schema + Python project), Phase 2 (scraper), Phase 3
-(Claude ranking layer), and the Next.js dashboard are all implemented; pytest 43
-passing. The whole pipeline exists in code. What remains is OPERATIONAL, not
-build: (a) user sets main as GitHub default + Vercel Production Branch; (b) apply
-999_initial_schema.sql to Supabase (project jagtupajcgdvehqfltom); (c) run the
-scraper locally (store 403-blocked in web env) and tune scraper/selectors.py on
-first run; (d) run analysis/run.py with the user's ANTHROPIC_API_KEY to populate
-opportunities (this CAN run in the web env once data exists). Working branch:
-main. No live Anthropic call or live scrape exercised yet.
+CODE COMPLETE across the whole pipeline: Supabase schema (now APPLIED to the live
+project), DIY Playwright scraper, Claude ranking layer (default claude-opus-4-8),
+and the Next.js dashboard. pytest 43 passing; the build is essentially done.
+
+Live infra mostly wired: Supabase project jagtupajcgdvehqfltom has the tables;
+main is the GitHub default; Supabase MCP is authenticated in the user's local
+Claude Code; repo cloned to Downloads\ExtensionMiner with env setup underway
+(Python 3.14.4 — watch wheels). NOT yet done: a real scrape (run locally), a live
+ranking run, and the Vercel Root-Directory fix. No live Anthropic call or live
+scrape has been exercised yet. Working branch: main (web session = Session 1).
+
+Git on main at wrap: bootstrap -> Phase 1 (schema/setup) -> Phase 2 (scraper) ->
+dashboard+MCP -> Phase 3 (ranker) -> prompt logs, plus the user's GitHub PR
+merges. No PR opened by the assistant (none requested).
+
+================================================================================
+NEXT SESSION — START HERE
+================================================================================
+1. Read this file top-to-bottom. The BUILD is done; the remaining work is GO-LIVE,
+   not coding.
+2. Fastest path to value:
+   - If the user has scraped data in Supabase already: run `python -m analysis.run`
+     (needs ANTHROPIC_API_KEY) to populate `opportunities`, then review the
+     dashboard. The Anthropic API is reachable from the web env.
+   - If not: help finish local env setup (Python 3.14 -> fall back to 3.12 if pip
+     fails) and the scraper dry run + a selectors.py tune (scraper/selectors.py).
+     The scraper must run LOCALLY (Chrome Web Store is 403 in the web env).
+3. Unblock Vercel: Root Directory = `dashboard` + the two SUPABASE_* env vars.
+4. End goal (roadmap docs/ROADMAP.md): pick ONE validated target and STOP — the
+   miner is time-boxed research infrastructure, not the product.
+5. Watch for the user's LOCAL Claude Code also pushing to main (it will keep its
+   own Session log/Session 2) — fetch + rebase before pushing.
