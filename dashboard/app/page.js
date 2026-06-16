@@ -101,6 +101,18 @@ export default async function Page() {
         </div>
       )}
 
+      {d.configured && !d.error && d.counts.extensions === 0 && (
+        <div className="banner">
+          <strong>Connected, no errors — but 0 rows.</strong> If you know the tables have
+          data, it's almost always one of two things:{" "}
+          <strong>(1)</strong> <code>SUPABASE_SERVICE_ROLE_KEY</code> is set to the{" "}
+          <em>anon / publishable</em> key instead of the <em>service_role</em> secret — RLS
+          is enabled with no policies, so the wrong key returns nothing with no error; or{" "}
+          <strong>(2)</strong> <code>SUPABASE_URL</code> points at a different project than
+          the scraper writes to. Fix the value in your host and redeploy.
+        </div>
+      )}
+
       <div className="stats">
         <div className="stat"><div className="n">{fmt(d.counts.extensions)}</div><div className="l">extensions</div></div>
         <div className="stat"><div className="n">{fmt(d.counts.reviews)}</div><div className="l">reviews</div></div>
