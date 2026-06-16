@@ -30,6 +30,7 @@ class Settings:
     supabase_service_role_key: str = ""
     # Anthropic Claude API (ranking layer).
     anthropic_api_key: str = ""
+    anthropic_model: str = "claude-opus-4-8"
     # Scraper politeness.
     rate_limit_seconds: float = 3.0
     cache_dir: str = "data/cache"
@@ -45,6 +46,7 @@ class Settings:
             supabase_url=os.environ.get("SUPABASE_URL", ""),
             supabase_service_role_key=os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
             anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
+            anthropic_model=os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8"),
             rate_limit_seconds=float(os.environ.get("SCRAPER_RATE_LIMIT_SECONDS", "3") or 3),
             cache_dir=os.environ.get("SCRAPER_CACHE_DIR", "data/cache"),
             user_agent=os.environ.get("SCRAPER_USER_AGENT", "ExtensionMiner/0.1 (research)"),

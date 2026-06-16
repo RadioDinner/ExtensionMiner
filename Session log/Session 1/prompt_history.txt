@@ -93,3 +93,6 @@ At line:1 char:1
     + FullyQualifiedErrorId : CommandNotFoundException
 
 PS C:\WINDOWS\system32> cd
+
+7.
+now what

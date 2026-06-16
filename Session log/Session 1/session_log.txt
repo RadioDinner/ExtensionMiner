@@ -215,8 +215,68 @@ USER ACTIONS still required for Vercel/Supabase:
     MCP server once authenticated, or the SQL editor / CLI).
 
 ================================================================================
+PART E — GIT CONSOLIDATION, LOCAL CLI, RANKING LAYER (prompts 5-7)
+================================================================================
+Prompt 5 ("merge everything to main, make main the default branch"):
+  * Everything was already on main (feature branch is a strict ancestor — nothing
+    to merge). Confirmed there is NO GitHub MCP tool (and no gh/API access) to
+    change a repo's DEFAULT BRANCH — told the user to flip it in GitHub Settings
+    (or `gh repo edit --default-branch main`); offered to delete the stale branch
+    afterward. User then merged PRs #1/#2 on GitHub; reconciled by rebasing the
+    prompt-log commit onto origin/main and pushing. (Also fixed a push-retry bug:
+    `git push | tail -1` masked the exit code — now checks it properly.)
+
+Prompt 6 (Windows: `claude` not recognized after install): pure support — the
+  install succeeded but ~/.local/bin wasn't on PATH (and the open shell wouldn't
+  see it anyway). Gave the PATH fix (immediate + permanent PowerShell). No repo
+  change. NOTE: the Supabase MCP server connected in-session and exposed
+  authenticate tools — offered to authenticate Supabase from the web env (would
+  let me apply the schema directly); user has not taken that up yet.
+
+Prompt 7 ("now what"): built the CLAUDE RANKING LAYER (Phase 3 — the valuable
+  part). Consulted the claude-api skill first for correct SDK usage.
+
+Files created (analysis/):
+  schema.py   Pydantic structured-output schema: ReviewCluster (complaint,
+              complaint_type, fixable yes/no/maybe, independent_reviewers,
+              wtp_quotes[]) + ExtensionAnalysis (clusters, overall_just_bad,
+              needs_heavy_backend, build_effort, brief).
+  prompt.py   System + per-extension user prompt ("love the idea, hate the
+              execution"; quote WTP verbatim; flag just-bad as anti-signal).
+  rank.py     analyze_extension() = ONE Claude call via client.messages.parse
+              (model claude-opus-4-8, adaptive thinking, output_format=schema);
+              score_opportunity() = PURE, fully-tested rubric (demand intensity
+              heaviest + WTP + fixability + market size + ~3star zone bonus −
+              penalties for just-bad / heavy-backend); to_opportunity_row();
+              rank_all() orchestration (read Supabase → Claude → upsert
+              opportunities; per-extension try/except).
+  run.py      CLI: python -m analysis.run (--limit/--min-reviews/--max-reviews/
+              --model/--no-db).
+Files modified:
+  common/config.py  Added anthropic_model (env ANTHROPIC_MODEL, default
+                    claude-opus-4-8).
+  common/db.py      Added fetch_extensions_for_analysis, fetch_reviews_for_
+                    extension, upsert_opportunity.
+  requirements.txt  Added pydantic.  .env.example: added ANTHROPIC_MODEL.
+  README.md         Status: scraper + ranking layer + dashboard all built.
+  analysis/README.md  Pipeline + run instructions + rubric.
+
+Validation: pytest 43 passed (was 36; +7 analysis: scoring rubric incl. just-bad
+penalty / zone bonus / no-fixable-cluster, row mapping, prompt building, and the
+Claude call wired via a FAKE client — no network/key needed). analysis.* imports
+without anthropic/supabase installed (both lazy). NOT yet run against the live
+Anthropic API (needs the user's key + scraped data in Supabase), but the API IS
+reachable from the web env, so a real run can happen here once data exists.
+
+Model note: defaulted to claude-opus-4-8 per the claude-api skill; configurable
+via ANTHROPIC_MODEL / --model.
+
+================================================================================
 OPEN ITEMS / NEXT STEPS
 ================================================================================
+  0. DEFAULT BRANCH: user to set main as default in GitHub Settings (I can't via
+     available tools). After that, the stale claude/optimistic-babbage-bt680w can
+     be deleted. Also set Vercel Production Branch = main.
   1. SCHEMA: 999_initial_schema.sql written + grammar-validated, NOT yet applied
      to a live Supabase project. USER ACTION: create the Supabase project and
      apply it (CLI or SQL editor); put SUPABASE_URL + SERVICE_ROLE_KEY in .env.
@@ -226,10 +286,9 @@ OPEN ITEMS / NEXT STEPS
      check, tune scraper/selectors.py against the cached HTML, then a real run.
      (Likely needs a selector tweak on first run — built to make that a 5-min,
      single-file edit.)
-  3. RANKING LAYER (Phase 3): Claude API — structured JSON per review cluster
-     (complaint, fixable yes/no/maybe, WTP quotes, type), aggregate to a score,
-     write `opportunities` + one-paragraph briefs. Buildable/testable in web env
-     (Anthropic API reachable). NEXT BUILD CANDIDATE here.
+  3. RANKING LAYER (Phase 3): BUILT + unit-tested (analysis/). Remaining: run it
+     against real scraped data with the user's ANTHROPIC_API_KEY (a live call has
+     not been exercised yet). Tune the scoring weights against real outcomes.
   4. DASHBOARD: SCAFFOLDED + builds clean (Next.js in dashboard/). Pending: the
      Vercel settings above, real data, and richer UI (filters, per-extension
      drill-down with review timeline). Reads extensions/reviews/opportunities.
@@ -241,9 +300,12 @@ OPEN ITEMS / NEXT STEPS
 ================================================================================
 CURRENT STATE
 ================================================================================
-Phase 0 (decide) DONE. Phase 1 (schema + Python project) DONE. Phase 2 (scraper)
-BUILT + unit-tested (36 passing); awaiting a local run against the live store
-(403-blocked here) and likely a one-file selector tune. Dashboard SCAFFOLDED +
-builds clean on Next.js 14.2.35; Supabase MCP wired in .mcp.json; Supabase
-project jagtupajcgdvehqfltom exists (schema not yet applied). Next build to do IN
-the web env: the Claude ranking layer (Phase 3). Working branch: main.
+Phases 0-3 BUILT. Phase 1 (schema + Python project), Phase 2 (scraper), Phase 3
+(Claude ranking layer), and the Next.js dashboard are all implemented; pytest 43
+passing. The whole pipeline exists in code. What remains is OPERATIONAL, not
+build: (a) user sets main as GitHub default + Vercel Production Branch; (b) apply
+999_initial_schema.sql to Supabase (project jagtupajcgdvehqfltom); (c) run the
+scraper locally (store 403-blocked in web env) and tune scraper/selectors.py on
+first run; (d) run analysis/run.py with the user's ANTHROPIC_API_KEY to populate
+opportunities (this CAN run in the web env once data exists). Working branch:
+main. No live Anthropic call or live scrape exercised yet.

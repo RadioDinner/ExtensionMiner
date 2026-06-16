@@ -18,6 +18,7 @@ supabase               # Supabase (Postgres) client
 
 # --- Analysis / ranking layer ---
 anthropic              # Claude API
+pydantic               # structured-output schema for the ranker
 pandas                 # slicing / scoring
 
 # --- Dev ---

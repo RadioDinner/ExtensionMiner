@@ -53,11 +53,12 @@ session.
 
 ## Status
 
-Foundation in place: the Supabase schema
-(`supabase/migrations/999_initial_schema.sql`), a shared Python config/db layer,
-and a passing test suite. The scraper crawl, the Claude ranking layer, and the
-dashboard are next. See the latest file under `Session log/` for current state
-and next steps.
+Built so far: the Supabase schema (`supabase/migrations/999_initial_schema.sql`),
+the DIY Playwright **scraper** (`scraper/`), the Claude **ranking layer**
+(`analysis/`), and the Next.js **dashboard** (`dashboard/`) — with a passing test
+suite (43). What's left is operational: run the scraper locally (the store is
+egress-blocked in the web env), apply the schema to Supabase, and point Vercel at
+`main`. See the latest file under `Session log/` for current state and next steps.
 
 > Strategy is governed by [`docs/ROADMAP.md`](./docs/ROADMAP.md): the miner is
 > research infrastructure, time-boxed to ~20 hours, with one goal — **pick ONE
