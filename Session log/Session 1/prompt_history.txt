@@ -96,3 +96,39 @@ PS C:\WINDOWS\system32> cd
 
 7.
 now what
+
+8.
+PS C:\Users\derrick.wengerd\.local\bin> claude /mcp
+╭─── Claude Code v2.1.178 ─────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting started                                        │
+│                Welcome back Derrick!               │ Run /init to create a CLAUDE.md file with instructions for Cla… │
+│                                                    │ ─────────────────────────────────────────────────────────────── │
+│                       ▐▛███▜▌                      │ What's new                                                      │
+│                      ▝▜█████▛▘                     │ Added `Tool(param:value)` syntax for permission rules to match… │
+│                        ▘▘ ▝▝                       │ Skills in nested `.claude/skills` directories now load when wo… │
+│      Opus 4.8 (1M context) · Claude Max ·          │ Nested `.claude/` directories: the agent, workflow, and output… │
+│      derricktwengerd@gmail.com's Organization      │ /release-notes for more                                         │
+│                    ~\.local\bin                    │                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+   Claude Fable 5 is currently unavailable. Please use Opus 4.8 or another available model. Learn more:
+   https://www.anthropic.com/news/fable-mythos-access
+
+ ▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+
+> /mcp                                                                                                                    ⎿  Authentication successful. Connected to supabase.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ? for shortcuts · ← for agents
+
+This is what my powershell looks like currently. What do I do?
+
+9.
+I applied 999 migratino and fixed the branches
+
+Also, my vercel deployment says
+
+Build Failed
+No Next.js version detected. Make sure your package.json has "next" in either "dependencies" or "devDependencies". Also check your Root Directory setting matches the directory of your package.json file.
