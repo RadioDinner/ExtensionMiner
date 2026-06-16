@@ -1,85 +1,124 @@
 SESSION 1 — HANDOFF LOG
 =======================
 Date: 2026-06-16
-Branch: claude/optimistic-babbage-bt680w  (this session's designated feature branch)
+Branches: started on claude/optimistic-babbage-bt680w (Session 1 bootstrap);
+          user then directed "merge to main and commit to main for the
+          remainder of this session." main was created and is now the working
+          branch. The feature branch remains at the bootstrap commit.
 
---------------------------------------------------------------------------------
-PURPOSE OF THIS SESSION
---------------------------------------------------------------------------------
-Bootstrap the repository. Two things were requested:
-  1. Save the user's "new session instructions" into CLAUDE.md AND the repo, and
-     make that protocol run at the start of every new session.
-  2. Establish the repo as the home of a project that scrapes the Chrome Web
-     Store, categorizes extensions, logs every review, and surfaces competitive
-     opportunities through an interactive dashboard.
+NOTE: This session was resumed (SessionStart source=resume), so per protocol all
+logs stayed under "Session 1" rather than opening a "Session 2" folder.
 
---------------------------------------------------------------------------------
-CHANGES MADE (files created)
---------------------------------------------------------------------------------
-  NEW_SESSION_INSTRUCTIONS.md   Verbatim copy of the user's session protocol
-                                (canonical, user-authored reference).
-  CLAUDE.md                     Project memory (auto-loaded each session):
-                                vision, tech stack, repo layout, data model,
-                                session protocol summary, migration numbering,
-                                git workflow.
-  README.md                     Human-facing project overview.
+================================================================================
+PART A — BOOTSTRAP (prompt 1)
+================================================================================
+Saved the user's "new session instructions" so the protocol runs every session,
+and stood up the repo skeleton for the Chrome Web Store project.
+
+Files created:
+  NEW_SESSION_INSTRUCTIONS.md   Verbatim session protocol (user-authored).
+  CLAUDE.md                     Project memory (auto-loaded each session).
+  README.md                     Human-facing overview.
   .gitignore                    Python + Node/Next.js + secrets + data caches.
   .claude/settings.json         Registers the SessionStart hook.
-  .claude/hooks/session-start.sh  SessionStart hook (executable). Injects the
-                                session protocol into context every session and
-                                surfaces the most recent session_log.txt; it is
-                                source-aware (startup/clear create a new session
-                                folder; resume/compact continue the current one)
-                                and pre-computes the next session number.
-  scraper/README.md             Placeholder for the Python crawler.
-  analysis/README.md            Placeholder for categorization / review mining /
-                                opportunity scoring (Python).
-  dashboard/README.md           Placeholder for the Next.js dashboard (Vercel).
-  supabase/README.md            DB overview + migration-numbering rules.
-  supabase/migrations/.gitkeep  Empty migrations dir (first migration: 999_*).
-  data/.gitkeep                 Placeholder for local data (raw/cache gitignored).
-  Session log/Session 1/prompt_history.txt   This session's verbatim prompts.
-  Session log/Session 1/session_log.txt      This file.
+  .claude/hooks/session-start.sh  SessionStart hook (validated): injects the
+                                protocol + most recent handoff log; source-aware
+                                (startup/clear -> new session folder;
+                                resume/compact -> continue current); pre-computes
+                                next session number.
+  scraper/ analysis/ dashboard/ supabase/ READMEs + dirs; data/.gitkeep.
+  Session log/Session 1/prompt_history.txt + session_log.txt.
 
---------------------------------------------------------------------------------
-DIRECTIONAL DECISIONS
---------------------------------------------------------------------------------
-  * Scraper + analysis: Python.
-  * Database: Supabase (Postgres). All scraped data lives there.
-  * Dashboard: Next.js on Vercel (chosen as the canonical Vercel framework,
-    since the user said "whatever is best to use to host on vercel"). Revisit if
-    a lighter static-export setup is preferred.
-  * "Occur at the start of every session" is implemented two ways: (a) CLAUDE.md
-    is auto-loaded every session, and (b) a SessionStart hook injects the
-    protocol + latest handoff as additionalContext.
-  * Strategic focus captured in CLAUDE.md/README: target ~3-star, high-install
-    extensions with recurring complaints and "I'd pay if X worked" review
-    signals — the competitive sweet spot.
-  * Migration numbering: counts DOWN from 999 (999 = oldest). Documented in
-    CLAUDE.md and supabase/README.md.
+================================================================================
+PART B — DIRECTION SET + PHASE 1 FOUNDATION (prompt 2)
+================================================================================
+User added docs/ROADMAP.md content (the review-miner roadmap) and asked where to
+start ("should the data miner come first?").
 
---------------------------------------------------------------------------------
+Decisions (confirmed via AskUserQuestion):
+  * DIRECTION: "Lean now, product foundation" — start with 1–3 categories and the
+    goal of picking ONE fix-and-flip target, but build on Supabase + Next.js so
+    it can scale to the full-catalog vision. Time-boxed ~20 hrs per the roadmap.
+  * DATA SOURCE: DIY Python scraper (Playwright), run politely. (Apify offered;
+    user chose self-contained / no per-use cost.)
+  * STORAGE: Supabase (Postgres), not SQLite — so the Vercel dashboard reads it.
+  * RANKING LAYER: Claude API (Anthropic) — the valuable part.
+
+Key sequencing insight (the answer to "should the miner come first?"): the miner
+is infrastructure, NOT where the time/value goes. Order = thin data slice ->
+ranking layer (the edge) -> validate -> pick ONE. The DATA FOUNDATION (schema)
+comes before the miner because both the scraper (writes) and dashboard (reads)
+depend on it. So Phase 1 (schema + project setup) was built first.
+
+ENVIRONMENT CONSTRAINT (important): in Claude-Code-on-the-web, the Chrome Web
+Store is egress-blocked — HTTP 403 for google.com / chromewebstore.google.com.
+PyPI and api.anthropic.com ARE reachable. => The SCRAPER must run locally (or in
+an env with a wider network policy); the schema + ranking layer + tests run fine
+in the web env.
+
+Files created (Phase 1):
+  docs/ROADMAP.md                         Canonical strategy doc (verbatim
+                                          roadmap + a "Session 2 decisions"
+                                          addendum recording the choices above).
+  supabase/migrations/999_initial_schema.sql  Foundational schema (the spine):
+        - categories, extensions, reviews (stars 1–5 / body / reviewed_at),
+          rating_snapshots, opportunities (Claude ranking output).
+        - Indexes incl. extensions(rating, install_count) for the opportunity
+          zone; reviews(extension_id/stars/reviewed_at); opportunities(score).
+        - updated_at trigger on extensions + opportunities.
+        - RLS ENABLED with NO policies on all tables => service_role only
+          (keeps scraped reviews internal by default).
+        - Validated: parses cleanly via pglast (libpg_query) — 25 statements OK.
+  .env.example                            Supabase (service role) + Anthropic
+                                          keys + scraper politeness + categories.
+  requirements.txt                        python-dotenv, tenacity, playwright,
+                                          beautifulsoup4, lxml, supabase,
+                                          anthropic, pandas, pytest.
+  common/__init__.py, common/config.py    Shared Settings (env-driven, import-
+                                          safe; require_supabase/require_anthropic
+                                          guards).
+  common/db.py                            Supabase client factory + upsert helpers
+                                          (lazy import; import-safe for tests).
+  scraper/__init__.py, analysis/__init__.py
+  tests/__init__.py, tests/test_config.py  3 tests — ALL PASSING (pytest green in
+                                          a local .venv with pytest+python-dotenv).
+
+Files modified:
+  CLAUDE.md   Added "Current direction (Session 2)" block; stack table now lists
+              the Playwright DIY scraper + Claude ranking layer; repo-structure
+              tree updated (docs/, common/, tests/, requirements.txt,
+              .env.example, 999_initial_schema.sql); data-model section marked as
+              implemented; env constraint noted.
+  README.md   Status updated (foundation in place) + roadmap pointer.
+
+Git this session: pushed bootstrap to claude/optimistic-babbage-bt680w; created
++ pushed main; subsequent commits go to main. No PR opened (none requested).
+
+================================================================================
 OPEN ITEMS / NEXT STEPS
---------------------------------------------------------------------------------
-  1. Confirm dashboard framework (Next.js assumed) and whether a lighter setup
-     is wanted.
-  2. Design the Supabase schema and write the foundational migration 999_*.sql
-     (extensions, reviews, categories, rating_snapshots, opportunities).
-  3. Decide the Chrome Web Store scraping approach (sitemap/category crawl vs.
-     internal API endpoints), and how to enumerate the full library + paginate
-     reviews. Confirm rate-limiting / ToS posture.
-  4. Add .env.example for Supabase credentials and wire the Python Supabase
-     client.
-  5. Build the scraper, then the analysis/opportunity scoring, then the
-     dashboard.
+================================================================================
+  1. SCHEMA: 999_initial_schema.sql is written + grammar-validated but NOT yet
+     applied to a live Supabase project (no creds in this env). User needs to
+     create a Supabase project and apply it (Supabase CLI or SQL editor).
+  2. SCRAPER (Phase 2): build the Playwright crawl — enumerate target categories,
+     list extensions, pull metadata + paginate reviews (weight 1–3 star/recent),
+     cache raw responses, rate-limit, respect robots.txt, upsert to Supabase.
+     MUST be run locally / in a CWS-reachable env (web env is 403-blocked).
+  3. RANKING LAYER (Phase 3): Claude API — structured JSON per review cluster
+     (complaint, fixable yes/no/maybe, WTP quotes, type), aggregate to a score,
+     write opportunities + one-paragraph briefs. Buildable/testable in web env.
+  4. DASHBOARD (Phase 5-ish, but foundation): Next.js on Vercel reading Supabase
+     (server-side / service role) — ranked highest/lowest + opportunity zone.
+  5. Decide whether to wire the SessionStart hook to `pip install -r
+     requirements.txt` for web sessions (currently it only injects the protocol;
+     kept light because the scraper can't run here anyway).
+  6. Pick the actual 1–3 starting categories (default seeded: productivity,
+     developer-tools).
 
-NOTE FOR NEXT SESSION: The SessionStart hook only takes effect for future
-sessions once this branch is merged into the repo's default branch. Until then,
-follow the protocol in CLAUDE.md / NEW_SESSION_INSTRUCTIONS.md manually.
-
---------------------------------------------------------------------------------
+================================================================================
 CURRENT STATE
---------------------------------------------------------------------------------
-Scaffolding only — no scraper, schema, analysis, or dashboard code yet. The
-session protocol, project memory, directory skeleton, and SessionStart hook are
-in place and validated (hook emits valid JSON for startup/resume sources).
+================================================================================
+Phase 0 (decide) DONE. Phase 1 (schema + Python project setup) DONE and
+validated (SQL grammar-parses; pytest green). Next concrete build: the scraper
+(run locally) and/or the Claude ranking layer (build/test in web env). No live
+Supabase project yet. Working branch: main.

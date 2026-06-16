@@ -53,9 +53,15 @@ session.
 
 ## Status
 
-Early scaffolding. Scraper, schema, analysis, and dashboard are not yet
-implemented — see the latest file under `Session log/` for current state and
-next steps.
+Foundation in place: the Supabase schema
+(`supabase/migrations/999_initial_schema.sql`), a shared Python config/db layer,
+and a passing test suite. The scraper crawl, the Claude ranking layer, and the
+dashboard are next. See the latest file under `Session log/` for current state
+and next steps.
+
+> Strategy is governed by [`docs/ROADMAP.md`](./docs/ROADMAP.md): the miner is
+> research infrastructure, time-boxed to ~20 hours, with one goal — **pick ONE
+> validated extension to build a competitor against.**
 
 > ⚠️ Scrape responsibly: respect the Chrome Web Store's terms and rate limits,
 > back off on errors, and keep all secrets (Supabase keys) in environment

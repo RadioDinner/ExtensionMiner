@@ -21,6 +21,24 @@ but unhappy users, where reviews say things like *"if X worked, I'd pay for
 this."* These mid-rated, high-volume extensions are the gold the dashboard is
 built to surface.
 
+### Current direction (decided Session 2 — see [`docs/ROADMAP.md`](./docs/ROADMAP.md))
+The canonical strategy doc is `docs/ROADMAP.md`. It frames the miner as
+**research infrastructure, not the product** — the product is the fixed
+extension built afterward — and time-boxes the miner to **~20 hours** with one
+success condition: **pick ONE validated target to build.** Active decisions:
+- **Scope:** *lean now, product foundation* — start with **1–3 categories** and
+  the goal of picking ONE target, but build on Supabase + Next.js so it can
+  scale to the full-catalog vision later.
+- **Data source:** **DIY Python scraper** (Playwright), run politely.
+- **Storage:** **Supabase (Postgres)** (not SQLite — so the Vercel dashboard
+  reads from it directly).
+- **Ranking layer:** **Claude API** — the valuable part; mine reviews for
+  fixable complaints + "I'd pay if…" signals.
+- **Env constraint:** the Chrome Web Store is **egress-blocked (HTTP 403) in the
+  Claude-Code-on-the-web environment**, so the **scraper must run locally** (or
+  in an env with a wider network policy). The schema, ranking layer, and tests
+  run fine in the web env (PyPI + the Anthropic API are reachable).
+
 ### Core capabilities
 - **Scrape the entire extension library** — metadata for every extension we can
   reach (name, developer, category, install count, rating, rating count,
@@ -40,10 +58,11 @@ built to surface.
 
 | Layer | Choice | Notes |
 |-------|--------|-------|
-| Scraper | **Python** | Crawls the Chrome Web Store; writes to Supabase. |
-| Data analysis / categorization | **Python** | Pandas + NLP for review mining, clustering, opportunity scoring. |
-| Database | **Supabase (Postgres)** | All scraped data lives here. Schema managed via `supabase/migrations/`. |
-| Dashboard | **Next.js (React) on Vercel** | Default choice for Vercel hosting; reads from Supabase. Renders the interactive HTML dashboard. |
+| Scraper | **Python (Playwright, DIY)** | Crawls the Chrome Web Store politely (rate-limited, cached). Writes to Supabase. Must run where the store is reachable. |
+| Ranking layer | **Claude API (Anthropic)** | Mines reviews for fixable complaints + "I'd pay if…" signals; writes scored `opportunities`. The valuable part. |
+| Data analysis / categorization | **Python** | Pandas for slicing, scoring, clustering. |
+| Database | **Supabase (Postgres)** | All scraped data lives here. Schema in `supabase/migrations/` (numbered DOWN from 999). |
+| Dashboard | **Next.js (React) on Vercel** | Reads from Supabase. Renders the interactive dashboard. |
 | Hosting | **Vercel** | Dashboard deployment target. |
 
 > The dashboard framework was left to "whatever is best for Vercel" — **Next.js**
@@ -56,19 +75,26 @@ ExtensionMiner/
 ├── CLAUDE.md                     # This file — project memory (auto-loaded)
 ├── NEW_SESSION_INSTRUCTIONS.md   # Canonical session protocol (user-authored)
 ├── README.md                     # Human-facing project overview
+├── requirements.txt              # Python dependencies (scraper + analysis)
+├── .env.example                  # Env template (Supabase + Anthropic keys)
+├── docs/
+│   └── ROADMAP.md                # Canonical strategy doc (review-miner roadmap)
 ├── .claude/
 │   ├── settings.json             # Registers the SessionStart hook
 │   └── hooks/session-start.sh    # Injects session protocol + latest handoff
-├── scraper/                      # Python: Chrome Web Store crawler
-├── analysis/                     # Python: categorization, review mining, scoring
+├── common/                       # Python: shared config + Supabase client
+├── scraper/                      # Python: Chrome Web Store crawler (Playwright)
+├── analysis/                     # Python: categorization, review mining, ranking
+├── tests/                        # Pytest suite
 ├── dashboard/                    # Next.js app deployed to Vercel
 ├── supabase/
 │   └── migrations/               # SQL migrations (numbered DOWN from 999)
+│       └── 999_initial_schema.sql
 └── Session log/
     └── Session N/                # Per-session prompt_history.txt + session_log.txt
 ```
 
-### Proposed data model (to refine when schema is built)
+### Data model (implemented in `supabase/migrations/999_initial_schema.sql`)
 - `extensions` — one row per extension (store id, name, developer, category,
   rating avg, rating count, install count, version, last_updated, description,
   permissions, urls, first_seen, last_scraped).

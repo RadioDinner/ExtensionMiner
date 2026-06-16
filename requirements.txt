@@ -1,0 +1,23 @@
+# ExtensionMiner — Python dependencies (scraper + analysis).
+# Pin versions before relying on this in CI; left open here for early dev.
+
+# --- Core ---
+python-dotenv          # load .env
+tenacity               # retries/backoff for polite scraping
+
+# --- Scraper (DIY) ---
+# Chrome Web Store is a JS-heavy SPA whose reviews load via XHR, so a headless
+# browser is the reliable path. After install, run: playwright install chromium
+playwright
+beautifulsoup4
+lxml
+
+# --- Storage ---
+supabase               # Supabase (Postgres) client
+
+# --- Analysis / ranking layer ---
+anthropic              # Claude API
+pandas                 # slicing / scoring
+
+# --- Dev ---
+pytest
