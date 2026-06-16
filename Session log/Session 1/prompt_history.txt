@@ -138,3 +138,6 @@ No Next.js version detected. Make sure your package.json has "next" in either "d
 
 11.
 wrap this session and write a handoff
+
+12.
+we're done here
