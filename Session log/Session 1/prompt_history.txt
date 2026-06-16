@@ -5,3 +5,8 @@ SESSION 1 — PROMPT HISTORY
 @"/root/.claude/uploads/dc9aa550-c8ef-5f64-9e60-658fcac44113/6c485609-new_session_instructions" Save this set of "new session instructions" to the CLAUDE.md and the repo. I want this to occur on the start of every new session.
 
 This repo is going to contain a project that will scrape data from the Chrome Web Extension store. I want to scrape the entire extension library, and I want the project to categorize it and build an interactive HTML dashboard with the data. I want every review logged with the details of when, what and how many stars were given. I want my dashboard to be able to select highest ranked extensions and lowest ranked extensions. This is where the real magic happens, I am targeting extensions that I could build competitors and over take them. I'm looking for extensions that are in the 3 star range, where people are saying "if x would work, I'd pay to use it" or stuff like that. I want the scraper and data analysis to be written in python, and the interactive dashboard can be written in whatever is best to use to host on vercel. Data from the scraper will live in supabase.
+
+2.
+@"/root/.claude/uploads/dc9aa550-c8ef-5f64-9e60-658fcac44113/d1481686-reviewminerroadmap.md" merge to main and commit to main for the remainder of this session. Also, here is a document to add to your context.
+
+I want to start whereever is best. Should the data miner come first?
