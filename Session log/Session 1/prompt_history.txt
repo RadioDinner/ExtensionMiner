@@ -10,3 +10,6 @@ This repo is going to contain a project that will scrape data from the Chrome We
 @"/root/.claude/uploads/dc9aa550-c8ef-5f64-9e60-658fcac44113/d1481686-reviewminerroadmap.md" merge to main and commit to main for the remainder of this session. Also, here is a document to add to your context.
 
 I want to start whereever is best. Should the data miner come first?
+
+3.
+write the scraper while I setup supabase and vercel

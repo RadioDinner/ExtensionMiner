@@ -37,3 +37,9 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
         .execute()
     )
     return len(res.data or [])
+
+
+def insert_rating_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    """Append a point-in-time rating/install snapshot for trajectory tracking."""
+    res = get_client().table("rating_snapshots").insert(row).execute()
+    return res.data[0] if res.data else {}

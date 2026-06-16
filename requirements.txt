@@ -4,6 +4,7 @@
 # --- Core ---
 python-dotenv          # load .env
 tenacity               # retries/backoff for polite scraping
+python-dateutil        # robust parsing of store/review dates
 
 # --- Scraper (DIY) ---
 # Chrome Web Store is a JS-heavy SPA whose reviews load via XHR, so a headless

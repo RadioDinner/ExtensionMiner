@@ -95,30 +95,93 @@ Git this session: pushed bootstrap to claude/optimistic-babbage-bt680w; created
 + pushed main; subsequent commits go to main. No PR opened (none requested).
 
 ================================================================================
+PART C — SCRAPER (Phase 2) (prompt 3: "write the scraper while I setup supabase
+and vercel")
+================================================================================
+Built the DIY Playwright scraper. User is setting up Supabase + Vercel in
+parallel. Designed so the deterministic pieces are fully unit-tested even though
+this env can't reach the live store (403); the DOM selectors are a best-effort
+starting point centralized for a quick local tweak.
+
+Files created (scraper/):
+  selectors.py  Centralized URLs + CSS selectors (THE one file to tune against
+                the live DOM). Numbers/dates are parsed from visible text, so
+                they need no selector.
+  parse.py      Pure parsers — parse_install_count ('10,000+ users'->10000),
+                parse_rating, parse_rating_count, parse_star_label, parse_version,
+                parse_date (absolute via dateutil + relative 'N weeks ago'),
+                extract_extension_ids (regex on /detail/.../[a-p]{32}),
+                detail_url/category_url; plus DOM parsers parse_detail() and
+                parse_reviews() -> Extension/Review.
+  models.py     Extension + Review dataclasses with to_row() -> Supabase rows
+                (dates->ISO). Review.dedupe_uid(): store id if present, else a
+                content hash of (author,date,body) so re-runs upsert instead of
+                duplicating (matches the reviews unique index).
+  ratelimit.py  Thread-safe min-interval limiter (injectable clock/sleep).
+  cache.py      On-disk raw-response cache (sha256-sharded; .key sidecar).
+  robots.py     robots.txt checker (make_checker) + fetch_robots (lazy requests).
+  browser.py    Playwright fetcher (lazy import): isolated context, custom UA,
+                rate-limit + cache + robots, scroll-to-load; returns (html,text).
+  crawl.py      Orchestration: categories -> ids -> detail+reviews -> upsert;
+                per-page try/except so one bad page can't kill the run; writes a
+                rating_snapshot per extension. CrawlOptions dataclass.
+  run.py        CLI: `python -m scraper.run` with --categories, --max-extensions,
+                --no-db (dry run), --no-headless, --refresh, --no-robots,
+                --category-scrolls/--review-scrolls, --log-level.
+
+Files modified:
+  common/db.py        Added insert_rating_snapshot(); upsert helpers already
+                      present (upsert_extension returns row incl. id;
+                      upsert_reviews dedupes on extension_id,review_uid).
+  requirements.txt    Added python-dateutil.
+  scraper/README.md   Full local-run + selector-tuning instructions + ToS note.
+
+Validation (in web env):
+  * pytest: 36 passed (test_config 3, test_parse 16-ish, test_scraper_util incl.
+    rate limiter w/ injected clock, cache roundtrip, robots allow/deny, model
+    to_row + synthetic uid).
+  * `import scraper.crawl, scraper.run` works WITHOUT playwright/supabase
+    installed (both lazy-imported). `python -m scraper.run --help` works.
+  * NOT run against the live store (403 here) — that's the user's local step.
+
+Design notes / rationale:
+  * Playwright (not requests) because CWS is a JS SPA and reviews load via
+    XHR/scroll. Lazy-imported so tests/CLI import without it.
+  * Robust-by-text strategy: numeric/labeled fields come from page inner_text via
+    regex (stable); only structural bits (name, description, review cards) use
+    CSS selectors, all in selectors.py for a one-file tune.
+  * Politeness baked in: 3s default rate limit, raw cache (never re-fetch),
+    robots respected by default, identifying UA, isolated context.
+
+================================================================================
 OPEN ITEMS / NEXT STEPS
 ================================================================================
-  1. SCHEMA: 999_initial_schema.sql is written + grammar-validated but NOT yet
-     applied to a live Supabase project (no creds in this env). User needs to
-     create a Supabase project and apply it (Supabase CLI or SQL editor).
-  2. SCRAPER (Phase 2): build the Playwright crawl — enumerate target categories,
-     list extensions, pull metadata + paginate reviews (weight 1–3 star/recent),
-     cache raw responses, rate-limit, respect robots.txt, upsert to Supabase.
-     MUST be run locally / in a CWS-reachable env (web env is 403-blocked).
+  1. SCHEMA: 999_initial_schema.sql written + grammar-validated, NOT yet applied
+     to a live Supabase project. USER ACTION: create the Supabase project and
+     apply it (CLI or SQL editor); put SUPABASE_URL + SERVICE_ROLE_KEY in .env.
+  2. SCRAPER: built + tested. USER ACTION: run locally — `pip install -r
+     requirements.txt`, `playwright install chromium`, then
+     `python -m scraper.run --max-extensions 2 --no-db --no-headless` to sanity
+     check, tune scraper/selectors.py against the cached HTML, then a real run.
+     (Likely needs a selector tweak on first run — built to make that a 5-min,
+     single-file edit.)
   3. RANKING LAYER (Phase 3): Claude API — structured JSON per review cluster
      (complaint, fixable yes/no/maybe, WTP quotes, type), aggregate to a score,
-     write opportunities + one-paragraph briefs. Buildable/testable in web env.
-  4. DASHBOARD (Phase 5-ish, but foundation): Next.js on Vercel reading Supabase
-     (server-side / service role) — ranked highest/lowest + opportunity zone.
-  5. Decide whether to wire the SessionStart hook to `pip install -r
-     requirements.txt` for web sessions (currently it only injects the protocol;
-     kept light because the scraper can't run here anyway).
-  6. Pick the actual 1–3 starting categories (default seeded: productivity,
-     developer-tools).
+     write `opportunities` + one-paragraph briefs. Buildable/testable in web env
+     (Anthropic API reachable). NEXT BUILD CANDIDATE here.
+  4. DASHBOARD: Next.js on Vercel reading Supabase (server-side/service role) —
+     ranked highest/lowest + the mid-rated opportunity zone. User is setting up
+     Vercel now.
+  5. Optional: wire SessionStart hook to `pip install -r requirements.txt` for
+     web sessions (kept light for now).
+  6. Confirm the actual 1–3 starting categories (default: productivity,
+     developer-tools) and verify the live category-URL taxonomy in selectors.py.
 
 ================================================================================
 CURRENT STATE
 ================================================================================
-Phase 0 (decide) DONE. Phase 1 (schema + Python project setup) DONE and
-validated (SQL grammar-parses; pytest green). Next concrete build: the scraper
-(run locally) and/or the Claude ranking layer (build/test in web env). No live
-Supabase project yet. Working branch: main.
+Phase 0 (decide) DONE. Phase 1 (schema + Python project) DONE. Phase 2 (scraper)
+BUILT + unit-tested (36 passing); awaiting a local run against the live store
+(403-blocked here) and likely a one-file selector tune. Next build to do IN the
+web env: the Claude ranking layer (Phase 3). No live Supabase project yet (user
+provisioning it). Working branch: main.
