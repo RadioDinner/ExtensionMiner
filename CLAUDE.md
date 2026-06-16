@@ -69,6 +69,16 @@ success condition: **pick ONE validated target to build.** Active decisions:
 > is the canonical Vercel framework and the working assumption. Revisit if the
 > user prefers something lighter (e.g. static export + a charting lib).
 
+### Live infrastructure (provisioned Session 1)
+- **Supabase project:** ref `jagtupajcgdvehqfltom`. The Supabase MCP server is
+  configured project-scoped in `.mcp.json` (HTTP transport); each user must
+  authenticate it locally via `claude` → `/mcp` (OAuth — not committed).
+- **Dashboard (Vercel):** the Next.js app lives in `dashboard/`. Vercel must be
+  set with **Root Directory = `dashboard`**, **Framework = Next.js**, **Production
+  Branch = `main`**, and env vars `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+  (server-side; RLS is locked to the service role). The build is request-time
+  (`force-dynamic`) so it succeeds even before Supabase is wired.
+
 ### Intended repo structure
 ```
 ExtensionMiner/

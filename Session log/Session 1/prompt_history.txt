@@ -13,3 +13,49 @@ I want to start whereever is best. Should the data miner come first?
 
 3.
 write the scraper while I setup supabase and vercel
+
+4.
+my vercel build failed
+
+Running build in Washington, D.C., USA (East) – iad1 (Turbo Build Machine)
+Build machine configuration: 30 cores, 60 GB
+Cloning github.com/RadioDinner/ExtensionMiner (Branch: claude/optimistic-babbage-bt680w, Commit: 4ad59dc)
+Previous build caches not available.
+Cloning completed: 215.000ms
+Running "vercel build"
+Vercel CLI 54.14.0
+sh: line 1: vite: command not found
+Error: Command "vite build" exited with 127
+
+then, follow the following instructions
+
+1. Add MCP server
+Add the MCP server to your project config using the command line.
+Code:
+File: Code
+
+```
+claude mcp add --scope project --transport http supabase "https://mcp.supabase.com/mcp?project_ref=jagtupajcgdvehqfltom"
+```
+
+2. Authenticate
+After configuring the MCP server, you need to authenticate. In a regular terminal (not the IDE extension) run:
+Details:
+Select the supabase server, then Authenticate to begin the flow.
+Code:
+File: Code
+
+```
+claude /mcp
+```
+
+3. Install Agent Skills (Optional)
+Agent Skills give AI coding tools ready-made instructions, scripts, and resources for working with Supabase more accurately and efficiently.
+Details:
+npx skills add supabase/agent-skills
+Code:
+File: Code
+
+```
+npx skills add supabase/agent-skills
+```
