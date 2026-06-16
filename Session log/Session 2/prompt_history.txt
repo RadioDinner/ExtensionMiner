@@ -1,3 +1,14 @@
 1. Let's kick off a new session. Is it possible to have you work on the dashboard here while the powershell chat is going on? The powershell is running the python script
 
 2. where we at?
+
+3. is there any way to avoid the yes/no prompts like this
+
+" Command modifies environment variables
+
+ Do you want to proceed?
+ > 1. Yes
+   2. Yes, and don't ask again for: Remove-Item *
+   3. No"
+
+in the powershell session? considering setting a macro to press enter every 60 seconds
