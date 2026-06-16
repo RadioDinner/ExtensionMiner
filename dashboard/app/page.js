@@ -1,4 +1,5 @@
 import { getDashboardData } from "../lib/queries";
+import { RatingHistogram, OpportunityScatter } from "./charts";
 
 // Always render at request time so the build never needs Supabase credentials.
 export const dynamic = "force-dynamic";
@@ -78,8 +79,9 @@ export default async function Page() {
   return (
     <main className="wrap">
       <header>
+        <span className="kicker">Chrome Web Store · opportunity miner</span>
         <h1>ExtensionMiner</h1>
-        <p>Chrome Web Store extensions worth building a competitor against — the ~3★ opportunity zone.</p>
+        <p>Extensions worth building a competitor against — the ~3★ opportunity zone.</p>
       </header>
 
       {!d.configured && (
@@ -102,8 +104,28 @@ export default async function Page() {
       <div className="stats">
         <div className="stat"><div className="n">{fmt(d.counts.extensions)}</div><div className="l">extensions</div></div>
         <div className="stat"><div className="n">{fmt(d.counts.reviews)}</div><div className="l">reviews</div></div>
-        <div className="stat"><div className="n">{fmt(d.opportunityZone.length)}</div><div className="l">in the opportunity zone</div></div>
+        <div className="stat zone"><div className="n">{fmt(d.opportunityZone.length)}</div><div className="l">in the opportunity zone</div></div>
       </div>
+
+      <section className="charts-section">
+        <div className="charts">
+          <div className="card">
+            <h3>Rating distribution</h3>
+            <p className="sub">Where the catalog sits. Gold bars are the 2.5–3.5★ zone.</p>
+            <div className="chart"><RatingHistogram points={d.points} /></div>
+          </div>
+          <div className="card">
+            <h3>Rating vs. installs</h3>
+            <p className="sub">Demand (installs, log) against satisfaction (rating). Gold dots in the shaded band are the targets.</p>
+            <div className="chart"><OpportunityScatter points={d.points} /></div>
+          </div>
+        </div>
+        <div className="legend">
+          <span><span className="dot gold" /> Opportunity zone (2.5–3.5★)</span>
+          <span><span className="dot accent" /> Everything else</span>
+          <span className="legend-note">Dot size ∝ number of ratings · hover for details</span>
+        </div>
+      </section>
 
       <section className="zone">
         <h2>★ Opportunity zone (2.5–3.5★, by installs)</h2>

@@ -8,7 +8,12 @@ const EMPTY = {
   lowest: [],
   highest: [],
   opportunities: [],
+  points: [],
 };
+
+// Lightweight columns for the charts; capped so a large catalog stays cheap.
+const POINT_COLS = "ext_id,name,rating,rating_count,install_count,store_category";
+const POINT_LIMIT = 1500;
 
 const EXT_COLS = "ext_id,name,store_category,rating,rating_count,install_count,listing_url";
 
@@ -21,7 +26,7 @@ export async function getDashboardData() {
   if (!supabase) return EMPTY;
 
   try {
-    const [zone, lowest, highest, opps, extCount, revCount] = await Promise.all([
+    const [zone, lowest, highest, opps, points, extCount, revCount] = await Promise.all([
       supabase
         .from("extensions")
         .select(EXT_COLS)
@@ -47,12 +52,18 @@ export async function getDashboardData() {
         .select("score,top_complaint,complaint_type,fixable,brief,extensions(name,rating,install_count,listing_url)")
         .order("score", { ascending: false, nullsFirst: false })
         .limit(25),
+      supabase
+        .from("extensions")
+        .select(POINT_COLS)
+        .not("rating", "is", null)
+        .order("install_count", { ascending: false, nullsFirst: false })
+        .limit(POINT_LIMIT),
       supabase.from("extensions").select("*", { count: "exact", head: true }),
       supabase.from("reviews").select("*", { count: "exact", head: true }),
     ]);
 
     // Surface the first real error (e.g. schema not applied yet) without crashing.
-    const firstError = [zone, lowest, highest, opps, extCount, revCount]
+    const firstError = [zone, lowest, highest, opps, points, extCount, revCount]
       .map((r) => r.error)
       .find(Boolean);
 
@@ -64,6 +75,7 @@ export async function getDashboardData() {
       lowest: lowest.data || [],
       highest: highest.data || [],
       opportunities: opps.data || [],
+      points: points.data || [],
     };
   } catch (err) {
     return { ...EMPTY, configured: true, error: String(err && err.message ? err.message : err) };
