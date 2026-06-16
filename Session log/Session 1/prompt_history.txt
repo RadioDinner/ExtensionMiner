@@ -62,3 +62,34 @@ npx skills add supabase/agent-skills
 
 5.
 merge everything to main, I want to make main the default branch
+
+6.
+PS C:\WINDOWS\system32> irm https://claude.ai/install.ps1 | iex
+Setting up Claude Code...
+
+√ Claude Code successfully installed!
+
+  Version: 2.1.178
+
+  Location: C:\Users\derrick.wengerd\.local\bin\claude.exe
+
+
+  Next: Run claude --help to get started
+
+‼ Setup notes:
+  ● Native installation exists but C:\Users\derrick.wengerd\.local\bin is not in your PATH. Add it by opening: System
+    Properties → Environment Variables → Edit User PATH → New → Add the path above. Then restart your terminal.
+
+
+✅ Installation complete!
+
+PS C:\WINDOWS\system32> claude --help
+claude : The term 'claude' is not recognized as the name of a cmdlet, function, script file, or operable program.
+Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:1
++ claude --help
++ ~~~~~~
+    + CategoryInfo          : ObjectNotFound: (claude:String) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\WINDOWS\system32> cd
