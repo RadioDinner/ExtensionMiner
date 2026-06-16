@@ -12,3 +12,5 @@
    3. No"
 
 in the powershell session? considering setting a macro to press enter every 60 seconds
+
+4. also, I have data in the tables but the dashboard isn't showing anything
