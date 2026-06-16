@@ -1,20 +1,44 @@
 # dashboard/
 
-Interactive dashboard, built with **Next.js** and deployed to **Vercel**.
-Reads scraped data from Supabase.
+Interactive dashboard — **Next.js (App Router)** deployed to **Vercel**, reading
+from Supabase. Ranks extensions (highest / lowest) and surfaces the **~3★
+opportunity zone** plus Claude-scored opportunities.
 
-Responsibilities:
-- Browse and filter the extension catalog.
-- Rank extensions: **highest-ranked**, **lowest-ranked**, and the
-  **mid-rated opportunity zone** (high installs + ~3 stars + recurring
-  complaints).
-- Drill into an extension: rating history, review timeline, complaint themes,
-  and "I'd pay if…" style demand signals.
+## Local dev
 
-Tech notes:
-- Next.js is the working assumption (canonical Vercel framework). Revisit if a
-  lighter setup (static export + charting lib) is preferred.
-- Use the Supabase JS client; read-only anon access for the public dashboard,
-  service-role keys only in server-side code / never shipped to the browser.
+```bash
+cd dashboard
+npm install
+cp .env.example .env.local          # fill SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+npm run dev                         # http://localhost:3000
+```
 
-_Not yet implemented — see the latest `Session log/` entry for status._
+The page renders fine with no credentials (it shows a setup banner), so the
+build never depends on Supabase being configured.
+
+## Deploy on Vercel  (this fixes the failed build)
+
+The earlier build failed because Vercel was pointed at the stale feature branch
+and tried to run `vite build`. Set the project up like this:
+
+1. **Root Directory:** `dashboard`  (Project → Settings → Build & Deployment).
+2. **Framework Preset:** Next.js (auto-detected once Root Directory is `dashboard`).
+3. **Build Command / Install Command:** leave as the Next.js defaults — **remove
+   any `vite build` override**.
+4. **Production Branch:** `main`  (Settings → Git) — *not* the `claude/...` branch.
+5. **Environment Variables** (server-side; do NOT prefix with `NEXT_PUBLIC_`):
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   (RLS is locked to the service role, so the dashboard reads with it server-side.)
+6. Redeploy.
+
+> If you used the Vercel ↔ Supabase integration, `SUPABASE_URL` /
+> `SUPABASE_SERVICE_ROLE_KEY` may already be present — just confirm they're set
+> for Production.
+
+## Data it reads
+
+`extensions` (rankings + opportunity zone), `reviews` (counts), and
+`opportunities` (Claude's scored shortlist). Apply
+`supabase/migrations/999_initial_schema.sql` first; rows appear once the scraper
+and ranking layer have run.
