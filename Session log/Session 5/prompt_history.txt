@@ -88,3 +88,7 @@ Is this what you were expecting to see for that command? [ran --all-categories -
 
 After you add the feature to the list, help me download a new copy of the scripts folder so I can run those new commands
 
+16. migration run, merge everything to main so I can delete stale branches
+
+16b. [AskUserQuestion answer] Delete stale branches? -> "Don't delete, I'll do it." (Confirmed both claude/great-cray-i6q77i and claude/intelligent-wozniak-gjt2g9 are 0 ahead of main; user will delete via GitHub.)
+
