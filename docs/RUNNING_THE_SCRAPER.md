@@ -41,6 +41,20 @@ flashing a traceback and vanishing.
 > **not** re-clone to run again. After the first setup it's just double-click →
 > run → quit, as often as you like, and the scheduled task does it daily.
 
+### Auto-update (always run the latest)
+On every run the launcher first does a `git pull` of the latest code (the `main`
+branch) before scraping, so you're always on the newest version without thinking
+about it. Your `.env`, the `.venv`, and the cache are **git-ignored**, so updating
+never touches them — that's why it *pulls* instead of re-cloning (a fresh clone
+would wipe your Supabase key and re-download Chromium every time). It's safe if
+you're offline (it logs a note and runs the local copy) and if `git` isn't
+installed (it skips the update). Turn it off by setting `AUTO_UPDATE=0` near the
+top of `scripts\run_scraper.cmd`; change `UPDATE_BRANCH` to track a different
+branch.
+
+> One-time bootstrap: to *get* this self-updating launcher the first time, run a
+> single `git pull` in your clone. After that it updates itself on every click.
+
 ### Make a Desktop button (optional, recommended)
 So you never have to open the repo folder, run **`scripts\create_desktop_shortcut.cmd`**
 once. It drops a **"Run ExtensionMiner Scraper"** icon on your Desktop that points
