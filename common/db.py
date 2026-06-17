@@ -69,6 +69,41 @@ def ext_ids_scraped_since(cutoff_iso: str) -> set[str]:
     return ids
 
 
+def fetch_extensions_for_matching() -> list[dict[str, Any]]:
+    """Every extension's id/ext_id/name/developer/website, for successor linking.
+
+    Paginated like existing_ext_ids() (PostgREST caps a single response).
+    """
+    client = get_client()
+    rows: list[dict[str, Any]] = []
+    start, page = 0, 1000
+    while True:
+        res = (
+            client.table("extensions")
+            .select("id,ext_id,name,developer,website")
+            .range(start, start + page - 1)
+            .execute()
+        )
+        batch = res.data or []
+        rows.extend(batch)
+        if len(batch) < page:
+            break
+        start += page
+    return rows
+
+
+def set_successor(ext_pk: int, predecessor_pk: int, points: list[str]) -> int:
+    """Record that extension ext_pk is the same product as the older predecessor_pk."""
+    res = (
+        get_client()
+        .table("extensions")
+        .update({"successor_of": predecessor_pk, "successor_points": points})
+        .eq("id", ext_pk)
+        .execute()
+    )
+    return len(res.data or [])
+
+
 def upsert_reviews(rows: list[dict[str, Any]]) -> int:
     """Upsert review rows, deduped on (extension_id, review_uid). Returns count."""
     if not rows:

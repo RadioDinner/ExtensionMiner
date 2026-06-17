@@ -39,10 +39,29 @@ python -m scraper.run --categories productivity developer-tools --max-extensions
 python -m scraper.run --preset daily --log-dir logs
 ```
 
-Useful flags: `--preset daily` (full refresh crawl), `--no-db` (dry run),
-`--no-headless` (watch it), `--refresh` (ignore cache), `--skip-existing`,
-`--refresh-after-days N`, `--log-dir DIR`, `--no-robots`, `--log-level DEBUG`,
-`--category-scrolls` / `--review-scrolls` (how hard to lazy-load).
+Useful flags: `--preset daily` (full refresh crawl of the **whole** taxonomy +
+related graph), `--all-categories` (discover & crawl every category from the
+store nav), `--follow-related` (graph-crawl past category pages via each
+extension's related links), `--max-total N` (cap total discovered),
+`--no-db` (dry run), `--no-headless` (watch it), `--refresh` (ignore cache),
+`--skip-existing`, `--refresh-after-days N`, `--log-dir DIR`, `--no-robots`,
+`--log-level DEBUG`, `--category-scrolls` (max passes to exhaust a category) /
+`--discovery-patience` (stop after N empty passes) / `--review-scrolls`.
+
+> Discovery: `--all-categories` reads the category list from the store's own nav
+> and scrolls each until no new extensions appear; `--follow-related` then turns
+> the crawl into a breadth-first graph walk over "related" links, which reaches
+> far more than category pages alone (those are capped and partly curated). There
+> is still no public index of *all* extensions, so 100% isn't guaranteed.
+
+> Reviews: the store caps each sort order at ~10 reviews, so by default the
+> crawler re-sorts the reviews page (Recent / Helpful / Highest / Lowest rating)
+> and merges to get ~25–30 distinct reviews/extension (`--no-multi-sort` to
+> disable). Selectors for the sort dropdown are confirmed against the live store.
+> Before each snapshot it also clicks every per-review **"See more"** toggle so
+> bodies are saved in full (`selectors.REVIEW_EXPAND_TEXTS`). Because **Recent**
+> is one of the sorts, running daily accumulates new reviews over time (upserts
+> dedupe on `extension_id + review_uid`), growing past the 10-per-sort cap.
 
 > Tip: never run `python scraper/run.py` directly — relative imports break.
 > Use `python -m scraper.run …` or the top-level `python run_scraper.py …`.
@@ -61,6 +80,31 @@ quick adjustment:
    selectors.
 3. Edit **`scraper/selectors.py`** only — every parser reads from there.
 4. Re-run with `--refresh` off (it reparses the cache for free).
+
+**Review sort control (for multi-sort):** open a reviews page, click the sort
+dropdown, and inspect it. Set `SEL_REVIEW_SORT_TRIGGER` (the dropdown button),
+`SEL_REVIEW_SORT_OPTION_ROLE` (the ARIA role of each choice, usually `option` or
+`menuitem`), and the visible `REVIEW_SORTS` labels in `scraper/selectors.py`. If
+these don't match, multi-sort silently falls back to one default-sort pass.
+
+## Extension identity / duplicates
+
+The Chrome `ext_id` is permanent and unique, so it's the primary key — a same-id
+name/website change is just an update, never a duplicate. The **secondary**
+multi-point matcher (`scraper/identity.py`) catches the one case `ext_id` can't:
+the *same product re-published under a different `ext_id`*. It links the newer
+listing to the older one (`successor_of`) when **≥2 of {name, developer,
+website}** agree — non-destructively (both rows kept). `--preset daily` runs the
+pass after each crawl; or run it on demand:
+
+```bash
+python -m scraper.successors            # link (needs migration 997 applied)
+python -m scraper.successors --dry-run  # just report candidates
+```
+
+> Requires `supabase/migrations/997_extension_successor_links.sql` to be applied
+> (adds `successor_of` + `successor_points`). If it isn't, the linking step logs
+> a note and is skipped — the crawl itself is unaffected.
 
 ## Layout
 

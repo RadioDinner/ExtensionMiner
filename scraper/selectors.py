@@ -19,6 +19,10 @@ from __future__ import annotations
 # --- URLs -------------------------------------------------------------------
 BASE_URL = "https://chromewebstore.google.com"
 ROBOTS_URL = f"{BASE_URL}/robots.txt"
+# The store homepage carries the full category nav. We read category slugs from
+# its links (parse.extract_category_slugs) rather than hardcoding the taxonomy,
+# so --all-categories follows the store's own menu and survives reorganizations.
+HOME_URL = BASE_URL + "/"
 # A category landing page. `category` may be a single slug ("productivity") or a
 # nested path ("productivity/tools") — verify the live taxonomy and set
 # TARGET_CATEGORIES accordingly.
@@ -58,3 +62,33 @@ SEL_REVIEW_DATE = "span.ydlbEf"
 SEL_REVIEW_BODY = ".fzDEpf"
 # Control that reveals the full review list / loads more.
 SEL_REVIEWS_MORE = "text=See all reviews"
+
+# --- Reviews sort control ---------------------------------------------------
+# The store shows only ~10 reviews per sort order, so to gather MORE we re-sort
+# the reviews page and merge the results. The default page sort is captured
+# before any of these are applied.
+#
+# Confirmed against the live reviews page (the new chromewebstore.google.com):
+# the sort control is a `<div role="combobox" aria-haspopup="listbox">` labelled
+# "Sort by", and each option is a `<li role="option" title="...">` inside a
+# `<ul role="listbox" aria-label="Sort by">`. We open the combobox and click the
+# option by its exact `title`. If the control can't be driven, the crawler
+# gracefully falls back to a single (default-sort) pass.
+SEL_REVIEW_SORT_TRIGGER = '[role="combobox"][aria-haspopup="listbox"]'
+SEL_REVIEW_SORT_OPTION = 'li[role="option"][title="{label}"]'
+# (key, exact option title). "Lowest to highest rating" is the strategic gold —
+# the 1-star "I'd pay if it worked" complaints surface first.
+REVIEW_SORTS = [
+    ("recent", "Recent"),
+    ("helpful", "Helpful"),
+    ("highest", "Highest to lowest rating"),
+    ("lowest", "Lowest to highest rating"),
+]
+
+# Per-review "See more" / "Show more" toggles that reveal the FULL review text.
+# We click these (matched by exact visible text, robust to class churn) after
+# scrolling and before snapshotting, so the saved body is the whole review, not a
+# truncated preview. Bonus: full, stable text keeps the content-hash review id
+# stable across daily runs, so re-scrapes de-dupe instead of duplicating.
+# "Show more" confirmed against the live store; others kept as fallbacks.
+REVIEW_EXPAND_TEXTS = ["Show more", "See more", "Read more"]

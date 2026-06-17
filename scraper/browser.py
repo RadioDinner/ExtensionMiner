@@ -10,7 +10,7 @@ on-disk raw cache so a page is never fetched twice.
 """
 from __future__ import annotations
 
-from typing import Callable, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from .cache import RawCache
 from .ratelimit import RateLimiter
@@ -103,3 +103,172 @@ class CWSBrowser:
         self.cache.put(key, html, "html")
         self.cache.put(key, text, "txt")
         return html, text
+
+    def _scroll_page(self, scrolls: int, scroll_pause_ms: int) -> None:
+        for _ in range(max(0, scrolls)):
+            self._page.mouse.wheel(0, 20_000)
+            self._page.wait_for_timeout(scroll_pause_ms)
+
+    def _expand_reviews(self, expand_texts: Optional[List[str]], max_clicks: int = 600) -> int:
+        """Click every per-review "See more"/"Show more" toggle so bodies aren't
+        truncated. Matched by exact visible text; clicking a toggle flips it to
+        "See less", so re-querying the same text naturally walks to the next
+        still-collapsed review. Defensive: any failure just stops early."""
+        clicked = 0
+        for text in expand_texts or []:
+            sel = f'text="{text}"'
+            while clicked < max_clicks:
+                try:
+                    el = self._page.query_selector(sel)
+                except Exception:
+                    break
+                if el is None:
+                    break
+                try:
+                    el.click(timeout=800)
+                    clicked += 1
+                    self._page.wait_for_timeout(60)
+                except Exception:
+                    break
+        return clicked
+
+    def _apply_review_sort(self, label: str, trigger_selector: str, option_selector: str) -> bool:
+        """Open the sort dropdown and pick the option titled ``label``.
+
+        Returns True if a sort option was clicked. Best-effort and defensive: any
+        failure (control absent / classes changed) returns False so the caller
+        falls back to whatever sort is already shown.
+        """
+        try:
+            trigger = self._page.query_selector(trigger_selector)
+            if trigger is None:
+                return False
+            trigger.click()
+            self._page.wait_for_timeout(500)
+        except Exception:
+            return False
+        # Prefer the exact title= CSS selector (precise); fall back to accessible
+        # name / visible text if the markup differs.
+        css = option_selector.format(label=label.replace('"', '\\"'))
+        for attempt in (
+            lambda: self._page.click(css, timeout=2_000),
+            lambda: self._page.get_by_role("option", name=label, exact=True).first.click(timeout=2_000),
+            lambda: self._page.get_by_text(label, exact=True).first.click(timeout=2_000),
+        ):
+            try:
+                attempt()
+                self._page.wait_for_timeout(1_000)  # let the list re-render
+                return True
+            except Exception:
+                continue
+        return False
+
+    def fetch_review_sorts(
+        self,
+        url: str,
+        sort_labels: List[str],
+        *,
+        trigger_selector: str,
+        option_selector: str,
+        expand_texts: Optional[List[str]] = None,
+        scrolls: int = 6,
+        scroll_pause_ms: int = 1_200,
+        wait_selector: Optional[str] = None,
+    ) -> List[str]:
+        """Snapshot a reviews page under several sort orders to gather more reviews.
+
+        Navigates once, scrolls the default sort and snapshots it, then for each
+        label re-sorts, scrolls, and snapshots again. Returns the list of HTML
+        snapshots (always at least the default one). The store caps each sort at
+        ~10 reviews, so merging snapshots is how we get past that ceiling. If the
+        sort control can't be driven, this degrades to a single snapshot.
+        """
+        if self.robots_allowed is not None and not self.robots_allowed(url):
+            raise RobotsDisallowed(url)
+
+        self.rate_limiter.wait()
+        self._page.goto(url, wait_until="domcontentloaded")
+        if wait_selector:
+            try:
+                self._page.wait_for_selector(wait_selector)
+            except Exception:
+                pass
+
+        snapshots: List[str] = []
+        self._scroll_page(scrolls, scroll_pause_ms)
+        self._expand_reviews(expand_texts)
+        snapshots.append(self._page.content())
+
+        for label in sort_labels:
+            if self._apply_review_sort(label, trigger_selector, option_selector):
+                self._scroll_page(scrolls, scroll_pause_ms)
+                self._expand_reviews(expand_texts)
+                snapshots.append(self._page.content())
+
+        try:
+            self.cache.put(url, self._page.content(), "html")
+            self.cache.put(url, self._page.inner_text("body"), "txt")
+        except Exception:
+            pass
+        return snapshots
+
+    def collect_scrolling(
+        self,
+        url: str,
+        extract: Callable[[str], List[str]],
+        *,
+        max_scrolls: int = 40,
+        patience: int = 3,
+        scroll_pause_ms: int = 1_200,
+        wait_selector: Optional[str] = None,
+    ) -> List[str]:
+        """Navigate once, then scroll progressively to exhaust a lazy-loading list.
+
+        After each scroll, ``extract`` is run on the live HTML and any new items
+        are accumulated (de-duped, first-seen order). Scrolling stops when
+        ``extract`` yields nothing new for ``patience`` consecutive scrolls, or
+        after ``max_scrolls``. Just ONE navigation happens (polite); this is how
+        we pull *every* extension a category page is willing to lazy-load, rather
+        than a fixed number of scrolls. The final HTML is cached for debugging.
+        """
+        if self.robots_allowed is not None and not self.robots_allowed(url):
+            raise RobotsDisallowed(url)
+
+        self.rate_limiter.wait()
+        self._page.goto(url, wait_until="domcontentloaded")
+        if wait_selector:
+            try:
+                self._page.wait_for_selector(wait_selector)
+            except Exception:
+                pass
+
+        seen: set = set()
+        ordered: List[str] = []
+
+        def harvest() -> int:
+            added = 0
+            for item in extract(self._page.content()):
+                if item not in seen:
+                    seen.add(item)
+                    ordered.append(item)
+                    added += 1
+            return added
+
+        harvest()  # whatever rendered before the first scroll
+        stale = 0
+        for _ in range(max(1, max_scrolls)):
+            self._page.mouse.wheel(0, 24_000)
+            self._page.wait_for_timeout(scroll_pause_ms)
+            if harvest() == 0:
+                stale += 1
+                if stale >= max(1, patience):
+                    break
+            else:
+                stale = 0
+
+        try:
+            self.cache.put(url, self._page.content(), "html")
+            self.cache.put(url, self._page.inner_text("body"), "txt")
+        except Exception:
+            pass
+        return ordered

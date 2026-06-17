@@ -21,6 +21,13 @@ REM --- Move to the repo root (this script lives in scripts\) ------------------
 cd /d "%~dp0.." || goto :fail
 set "REPO=%CD%"
 
+REM --- Sanity check: are we actually inside the ExtensionMiner repo? ----------
+REM  The launcher must live in the repo's scripts\ folder. If someone copies
+REM  just this .cmd somewhere else (e.g. Downloads), bail out NOW with a clear
+REM  message instead of half-building a venv in the wrong place.
+if not exist "%REPO%\requirements.txt" goto :norepo
+if not exist "%REPO%\scraper\run.py"   goto :norepo
+
 REM ===========================================================================
 REM  EDITABLE KNOBS - change RUN_ARGS if you want different behavior.
 REM  Default = the "daily" preset: a full refresh crawl of the categories in
@@ -85,6 +92,21 @@ if "%RC%"=="0" (
 
 if not defined UNATTENDED pause
 exit /b %RC%
+
+:norepo
+echo.
+echo [ERROR] This doesn't look like the ExtensionMiner repo.
+echo         I looked here:  %REPO%
+echo         ...but couldn't find requirements.txt and scraper\run.py.
+echo.
+echo         run_scraper.cmd has to stay INSIDE the repo's "scripts" folder.
+echo         If you copied just this file out (e.g. to Downloads), move it back
+echo         into your cloned ExtensionMiner\scripts\ folder - or pull the latest
+echo         branch so it's already there - then double-click it from there.
+echo.
+echo         (You can delete any stray ".venv" folder this left in %CD%.)
+if not defined UNATTENDED pause
+exit /b 1
 
 :fail
 echo.

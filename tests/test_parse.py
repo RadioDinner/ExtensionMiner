@@ -86,6 +86,23 @@ def test_url_builders():
     assert parse.category_url("productivity").endswith("/category/extensions/productivity")
 
 
+def test_extract_category_slugs():
+    html = (
+        '<a href="/category/extensions/productivity">P</a>'
+        '<a href="/category/extensions/productivity">dup</a>'
+        '<a href="/category/extensions/make_chrome_yours/accessibility">A</a>'
+        '<a href="/category/extensions/productivity/tools">sub</a>'
+        '<a href="/category/ext/old">old store, ignored</a>'
+        f'<a href="/detail/x/{"a" * 32}">not a category</a>'
+    )
+    assert parse.extract_category_slugs(html) == [
+        "productivity",
+        "make_chrome_yours/accessibility",
+        "productivity/tools",
+    ]
+    assert parse.extract_category_slugs("") == []
+
+
 DETAIL_HTML = """
 <html><body>
   <h1>Tab Manager Pro</h1>

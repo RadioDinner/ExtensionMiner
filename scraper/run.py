@@ -2,9 +2,12 @@
 
 Examples
 --------
-    # The daily scheduled run (full refresh crawl of your configured
-    # categories; upserts dedupe so only NEW reviews/ratings land):
+    # The daily scheduled run (full refresh crawl of the WHOLE store taxonomy;
+    # upserts dedupe so only NEW reviews/ratings land):
     python -m scraper.run --preset daily --log-dir logs
+
+    # Crawl every category once, capped at 50 each, into Supabase:
+    python -m scraper.run --all-categories --max-extensions 50
 
     # Dry run (no DB writes), just 2 extensions, keep the browser visible:
     python -m scraper.run --max-extensions 2 --no-db --no-headless
@@ -53,13 +56,38 @@ def build_parser() -> argparse.ArgumentParser:
                         "for the daily scheduled task.")
     p.add_argument("--categories", nargs="+", metavar="SLUG",
                    help="category slugs to crawl (default: TARGET_CATEGORIES from env)")
+    p.add_argument("--all-categories", action="store_true",
+                   help="discover and crawl the store's WHOLE category taxonomy (from its "
+                        "nav), not just --categories. Implied by --preset daily.")
     p.add_argument("--max-extensions", type=int, default=None,
                    help="max extensions per category (0 = no cap; default 25, or 0 under "
                         "--preset daily)")
-    p.add_argument("--category-scrolls", type=int, default=8,
-                   help="lazy-load scroll passes on a category page (default 8)")
+    p.add_argument("--category-scrolls", type=int, default=40,
+                   help="max scroll passes to exhaust a category's extension list "
+                        "(default 40; stops early once no new ids appear)")
+    p.add_argument("--discovery-patience", type=int, default=3,
+                   help="stop scrolling a category after this many passes surface no new "
+                        "extensions (default 3)")
     p.add_argument("--review-scrolls", type=int, default=6,
-                   help="lazy-load scroll passes on a detail page (default 6)")
+                   help="lazy-load scroll passes on a reviews page (default 6)")
+    p.add_argument("--no-multi-sort", dest="multi_sort", action="store_false",
+                   help="only scrape the default review sort; skip the recent/highest/"
+                        "lowest re-sort passes that gather past the store's ~10-per-sort cap")
+    p.set_defaults(multi_sort=True)
+    p.add_argument("--follow-related", action="store_true",
+                   help="graph-crawl: also enqueue each extension's 'related' links, "
+                        "reaching far more than category pages expose. Implied by "
+                        "--preset daily.")
+    p.add_argument("--max-total", type=int, default=0, metavar="N",
+                   help="stop after discovering N extensions total (0 = no cap). Handy to "
+                        "bound a --follow-related run while testing.")
+    p.add_argument("--link-successors", dest="link_successors", action="store_true",
+                   help="after crawling, link the same product re-published under a "
+                        "different ext_id (multi-point match; requires migration 997). "
+                        "Implied by --preset daily.")
+    p.add_argument("--no-link-successors", dest="link_successors", action="store_false",
+                   help="skip the post-crawl successor-linking pass")
+    p.set_defaults(link_successors=False)
     p.add_argument("--no-db", action="store_true",
                    help="dry run: fetch + parse + cache, but do not write to Supabase")
     p.add_argument("--no-headless", action="store_true",
@@ -111,23 +139,33 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
     """Turn parsed args (+ any preset) into CrawlOptions."""
     max_extensions = args.max_extensions
     refresh = args.refresh
+    all_categories = args.all_categories
+    follow_related = args.follow_related
 
     if args.preset == "daily":
-        # Full crawl of every configured category, re-checking everything for new
+        # Full crawl of the WHOLE store taxonomy, re-checking everything for new
         # reviews. Cache is bypassed so we actually see new reviews; upserts dedupe
         # so an already-stored extension just gains its new reviews and moves on.
+        # Follow related links so discovery reaches past the category pages.
         if max_extensions is None:
             max_extensions = 0  # no per-category cap
         refresh = True
+        all_categories = True
+        follow_related = True
 
     if max_extensions is None:
         max_extensions = 25  # the interactive default
 
     return CrawlOptions(
         categories=args.categories or [],
+        all_categories=all_categories,
         max_extensions=max_extensions,
         category_scrolls=args.category_scrolls,
+        discovery_patience=args.discovery_patience,
         review_scrolls=args.review_scrolls,
+        multi_sort=args.multi_sort,
+        follow_related=follow_related,
+        max_total=args.max_total,
         write_db=not args.no_db,
         headless=not args.no_headless,
         refresh=refresh,
@@ -193,8 +231,9 @@ def main(argv=None) -> int:
 
     if args.preset == "daily":
         log.info(
-            "preset 'daily': full refresh crawl (no cap, cache bypassed); "
-            "already-stored extensions only gain new reviews"
+            "preset 'daily': full refresh crawl of the WHOLE category taxonomy + "
+            "related-link graph (no cap, cache bypassed); already-stored extensions "
+            "only gain new reviews"
         )
 
     # Friendly preflight for the most common stumble: missing Supabase creds.
@@ -225,6 +264,16 @@ def main(argv=None) -> int:
             "Note: 0 extensions found. If you expected data, check your "
             "--categories / TARGET_CATEGORIES and that the store is reachable."
         )
+
+    # Post-crawl: link the same product re-published under a different ext_id.
+    if (args.link_successors or args.preset == "daily") and opts.write_db:
+        try:
+            from .successors import run as link_successors
+            link_stats = link_successors()
+            print(f"Successor links: {link_stats}")
+        except Exception as exc:  # never let linking sink an otherwise-good crawl
+            log.warning("successor linking skipped (%s)", exc)
+
     return EXIT_OK
 
 

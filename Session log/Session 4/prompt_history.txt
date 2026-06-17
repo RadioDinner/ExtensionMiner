@@ -31,3 +31,71 @@ No rows returned (see the verdict above for why).
 3. before we go any further, I need to clarify and fix this, this is session 4, not 3
 
 4. I said, but first, because I want to make some big changes to this program. I want to keep the dashboard written in the language that it is, and I want to keep the scraper in python, BUT I want to change how it runs. I want you to edit the python scraper code here, vs in terminal, and I want you to help me set up a way that I can just click a button, the scraper runs and saves the data to supabase, and then quits. Whenever I tried to run the scraper script in the terminal, it errored out and was gross. Furthermore, I want the scraper to be executable outside of powershell because I want to set it up on a schedule task, to run every day to check for new reviews
+
+5. In the dashboard, I want the link in the "opportunity zone" section to go to a list of the copied/saved reviews based off my data, not go to the extension page itself.
+
+6. This is what I got when I tried to run the scraper
+
+[setup] Creating a private virtual environment in .venv ...
+[setup] Installing Python dependencies (first run - a few minutes) ...
+Requirement already satisfied: pip in .\.venv\Lib\site-packages (26.0.1)
+Collecting pip
+  Using cached pip-26.1.2-py3-none-any.whl.metadata (4.6 kB)
+Using cached pip-26.1.2-py3-none-any.whl (1.8 MB)
+Installing collected packages: pip
+  Attempting uninstall: pip
+    Found existing installation: pip 26.0.1
+    Uninstalling pip-26.0.1:
+      Successfully uninstalled pip-26.0.1
+Successfully installed pip-26.1.2
+ERROR: Could not open requirements file: [Errno 2] No such file or directory: 'C:\\Users\\derrick.wengerd\\requirements.txt'
+
+[ERROR] Setup failed - see the message above.
+
+7. PS C:\Users\derrick.wengerd\Downloads\ExtensionMiner> git pull origin claude/great-cray-i6q77i
+remote: Enumerating objects: 66, done.
+remote: Counting objects: 100% (66/66), done.
+remote: Compressing objects: 100% (31/31), done.
+remote: Total 52 (delta 27), reused 40 (delta 15), pack-reused 0 (from 0)
+Unpacking objects: 100% (52/52), 22.07 KiB | 125.00 KiB/s, done.
+From https://github.com/RadioDinner/ExtensionMiner
+ * branch            claude/great-cray-i6q77i -> FETCH_HEAD
+   d05581e..eb83492  claude/great-cray-i6q77i -> origin/claude/great-cray-i6q77i
+Merge made by the 'ort' strategy.
+[git pull diffstat: 17 files changed, 826 insertions(+), 22 deletions(-); repo is at C:\Users\derrick.wengerd\Downloads\ExtensionMiner]
+
+8. [setup] Installing Python dependencies (first run - a few minutes) ...
+[...verbatim pip output: "Requirement already satisfied" for pip, python-dotenv, tenacity, python-dateutil, playwright 1.60.0, beautifulsoup4, lxml, requests, supabase 2.31.0, anthropic 0.109.2, pydantic, pandas, pytest, and all transitive deps...]
+[setup] Downloading the Chromium browser for Playwright ...
+
+[run] C:\Users\derrick.wengerd\Downloads\ExtensionMiner\.venv\Scripts\python.exe -m scraper.run --preset daily --log-dir logs
+
+2026-06-17 10:12:28,308 INFO logging to logs\scraper-20260617-101228.log
+2026-06-17 10:12:28,309 INFO preset 'daily': full refresh crawl (no cap, cache bypassed); already-stored extensions only gain new reviews
+
+this is what I get so far when I click the button on the desktop
+
+9. Ok, now we work on the scraper itself. Is it set up to get every extension on the google chrome web store
+
+[answer to my coverage question, verbatim]: "I want every, single, review. I will not mince my words. I don't care if I need to multi-thread the crawler, or run it all day and all night. I want every single one, and I want reviews checked daily"
+
+[answer to my Phase 2 question, verbatim]: "Build it now, I'll grab the selector"
+
+10. [uploaded logs/scraper-20260617-101228.log] "The scraper finished after only an hour or so, here is the log, I don't think it did much."
+    [+ "I'll get the sort control selector in a bit"]
+    Log summary: pre-Phase-1 code; categories productivity + developer-tools both
+    returned the SAME 57 ids (skipped:57), so done: categories=2 ids=114
+    extensions=57 reviews=567 (~10/ext) skipped=57. Writes to Supabase all 200/201.
+
+11. [pasted the live reviews-page sort control DOM] "open the drop down"
+    Real sort control: <div role="combobox" aria-haspopup="listbox"> labelled
+    "Sort by"; options are <li role="option" title="..."> in a <ul role="listbox"
+    aria-label="Sort by">. Real option labels/titles: "Recent" (data-value=2),
+    "Helpful" (1), "Highest to lowest rating" (4), "Lowest to highest rating" (3).
+    Also confirmed reviews link shape: ./detail/<slug>/<id>/reviews.
+
+12. I want it sorted by recent, can you confirm that? Recent sorted, when run daily, will begin catching more than 10 reviews across time.  I noticed some of the reviews have "see more" or something like that at the end of it, can the bot open that before saving?
+
+13. It's "Show more". As far as the dedupe processing, can you implement a multi point match system logic in the scraper algorithm? For example, if "save to pinterest" is named "save to pinterest", and has an id of 98 and has a home page of "url...wahtever" but the name changes, we'd check the other two points to see if they match and then override with changes, does this make sense?
+
+14. merge all branches to main
