@@ -11,30 +11,7 @@
 
 ---
 
-## 1. 🆕 Decline / complaint-trend detection — surface extensions getting WEAKER
-Have the ranking algorithm flag extensions that are **declining in quality** or
-showing an **uptick of complaints in recent reviews**, so the user can **target
-the weak ones and pick them off**.
-
-- Detect a **downward quality trajectory** — e.g. recent reviews trending lower
-  than the extension's historical baseline (rising share of 1–2★ over time, or a
-  falling rolling average).
-- Detect a **recent surge in complaints** — a spike in negative/complaint-type
-  reviews in the latest window vs. the prior period (not just absolute volume).
-- Surface these as a signal in the dashboard so declining/weakening extensions
-  rank as **prime competitive targets**.
-
-Rationale (from the user): a product that's getting *worse* over time — losing
-the room, accumulating fresh complaints — is an especially good one to build a
-competitor against and overtake.
-
-Implementation hints: reviews already store **per-review timestamp + stars**, so
-trend math (recent window vs. baseline, slope of rolling rating) can be computed
-without new scraping; `rating_snapshots` (aggregate rating over time) can back
-the store-level trajectory. Likely a new score/signal the ranker writes (e.g. a
-`trend`/`decline_score` field on `opportunities`) that the dashboard sorts on.
-
-## 2. 🆕 Sortable + filterable "Opportunity zone" card
+## 1. 🆕 Sortable + filterable "Opportunity zone" card
 Make the dashboard's **★ Opportunity zone** card interactive, like the "Scored
 opportunities" card already is:
 

@@ -59,6 +59,12 @@ export default async function ReviewsPage({ params }) {
   const whatItDoes = details.what_it_does || (opp && opp.brief) || null;
   const clusters = Array.isArray(details.clusters) ? details.clusters : [];
   const mon = d.monetization;
+  // Is the extension getting worse? (decline signal from the ranker)
+  const declining = opp && opp.decline_score != null && opp.decline_score >= 0.2;
+  const declineTitle = declining
+    ? `Recent ${opp.recent_rating ?? "?"}★ vs baseline ${opp.baseline_rating ?? "?"}★` +
+      (opp.complaint_trend ? ` · complaints +${Math.round(opp.complaint_trend * 100)}%` : "")
+    : "";
 
   // Deep-dive pool entry + (once run) its comprehensive research.
   const dd = d.deepDive;
@@ -194,11 +200,15 @@ export default async function ReviewsPage({ params }) {
 
       {d.configured && !d.notFound && !d.error && (whatItDoes || clusters.length > 0 || mon) && (
         <section className="digest">
-          <h2>Opportunity digest</h2>
+          <h2>
+            Opportunity digest{" "}
+            {declining ? <span className="trend-badge" title={declineTitle}>↓ Declining</span> : null}
+          </h2>
           <p className="sub">
             Built by the Claude ranking layer
             {opp && opp.score != null ? <> · opportunity score <strong>{Number(opp.score).toFixed(1)}</strong></> : null}
-            {opp && opp.build_effort ? <> · est. build <strong>{opp.build_effort}</strong></> : null}.
+            {opp && opp.build_effort ? <> · est. build <strong>{opp.build_effort}</strong></> : null}
+            {declining ? <> · <span className="trend-down" title={declineTitle}>quality trending down</span></> : null}.
           </p>
 
           {whatItDoes ? (

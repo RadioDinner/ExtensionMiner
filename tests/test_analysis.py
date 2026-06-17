@@ -4,11 +4,13 @@ from analysis import prompt
 from analysis.rank import (
     PENALTY_JUST_BAD,
     RECENCY_FLOOR,
+    W_DECLINE,
     analyze_extension,
     recency_factor,
     recency_weight,
     score_opportunity,
     to_opportunity_row,
+    trend_signal,
 )
 from analysis.schema import ExtensionAnalysis, ReviewCluster
 
@@ -167,6 +169,53 @@ def test_to_opportunity_row_threads_recency():
     ext = {"rating": 3.0, "install_count": 500_000}
     row = to_opportunity_row(7, ext, _analysis(clusters=[STRONG_CLUSTER]), model="m", recency=0.5)
     assert row["recency_weight"] == 0.5
+
+
+def test_trend_signal_detects_decline():
+    reviews = (
+        [{"stars": 1, "reviewed_at": _days_ago(30)} for _ in range(4)]    # recent: angry
+        + [{"stars": 5, "reviewed_at": _days_ago(300)} for _ in range(4)]  # prior: happy
+    )
+    t = trend_signal(reviews, now=NOW)
+    assert t["recent_rating"] == 1.0
+    assert t["baseline_rating"] == 5.0
+    assert t["complaint_trend"] == 1.0          # neg share went 0 -> 100%
+    assert t["decline_score"] == 1.0            # rating drop + surge, capped at 1
+
+
+def test_trend_signal_steady_and_improving_are_zero():
+    steady = [{"stars": 4, "reviewed_at": _days_ago(d)} for d in (20, 40, 60, 300, 360, 420)]
+    assert trend_signal(steady, now=NOW)["decline_score"] == 0.0
+    # Improving (recent better than prior) must not register as decline.
+    improving = (
+        [{"stars": 5, "reviewed_at": _days_ago(30)} for _ in range(3)]
+        + [{"stars": 2, "reviewed_at": _days_ago(300)} for _ in range(3)]
+    )
+    assert trend_signal(improving, now=NOW)["decline_score"] == 0.0
+
+
+def test_trend_signal_needs_enough_in_each_window():
+    thin = (
+        [{"stars": 1, "reviewed_at": _days_ago(30)} for _ in range(2)]   # only 2 recent
+        + [{"stars": 5, "reviewed_at": _days_ago(300)} for _ in range(5)]
+    )
+    t = trend_signal(thin, now=NOW)
+    assert t["decline_score"] == 0.0
+    assert t["recent_rating"] is None and t["baseline_rating"] is None
+
+
+def test_decline_bonus_raises_score_and_lands_in_row():
+    ext = {"rating": 3.0, "install_count": 500_000}
+    base = score_opportunity(ext, _analysis(clusters=[STRONG_CLUSTER]), decline=0.0)
+    worse = score_opportunity(ext, _analysis(clusters=[STRONG_CLUSTER]), decline=1.0)
+    assert worse["score"] == round(base["score"] + W_DECLINE, 1)
+    assert worse["decline_score"] == 1.0
+
+    trend = {"decline_score": 0.8, "recent_rating": 2.1, "baseline_rating": 3.4, "complaint_trend": 0.5}
+    row = to_opportunity_row(9, ext, _analysis(clusters=[STRONG_CLUSTER]), model="m", trend=trend)
+    assert row["decline_score"] == 0.8
+    assert row["recent_rating"] == 2.1 and row["baseline_rating"] == 3.4
+    assert row["complaint_trend"] == 0.5
 
 
 def test_build_user_prompt_includes_reviews():

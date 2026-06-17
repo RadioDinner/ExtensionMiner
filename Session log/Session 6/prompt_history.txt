@@ -35,3 +35,6 @@ build the next one
 
 11.
 migration run next feature
+
+12.
+build it

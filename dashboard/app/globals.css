@@ -89,6 +89,15 @@ a:hover { text-decoration: underline; }
 .muted { color: var(--muted); }
 .pill { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
 
+/* Decline / complaint-trend signal */
+.trend-down { color: #f87171; font-weight: 700; font-variant-numeric: tabular-nums; }
+.filters input[type="checkbox"] { vertical-align: -1px; }
+.trend-badge {
+  font-size: 12px; font-weight: 700; color: #f87171;
+  background: #3a1620; border: 1px solid #5c2230; border-radius: 6px;
+  padding: 2px 8px; vertical-align: middle; letter-spacing: .02em;
+}
+
 /* Diagnostics status pills + summary tint */
 .status { font-size: 11px; font-weight: 700; border-radius: 5px; padding: 1px 7px; letter-spacing: .03em; }
 .status.ok   { background: #123524; color: #4ade80; border: 1px solid #1c5238; }

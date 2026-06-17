@@ -65,7 +65,7 @@ export async function getDashboardData() {
         .limit(10),
       supabase
         .from("opportunities")
-        .select("score,top_complaint,complaint_type,fixable,recency_weight,brief,extensions(ext_id,name,rating,install_count,listing_url)")
+        .select("score,top_complaint,complaint_type,fixable,recency_weight,decline_score,recent_rating,baseline_rating,complaint_trend,brief,extensions(ext_id,name,rating,install_count,listing_url)")
         .order("score", { ascending: false, nullsFirst: false })
         .limit(200),
       supabase
@@ -132,7 +132,8 @@ const REVIEW_LIMIT = 1000;
 
 // The ranker's output for this extension: score + the structured analysis
 // (clusters + "what it does"), used for the detail page's digest.
-const OPP_DETAIL_COLS = "score,top_complaint,complaint_type,fixable,recency_weight,brief,build_effort,details";
+const OPP_DETAIL_COLS =
+  "score,top_complaint,complaint_type,fixable,recency_weight,decline_score,recent_rating,baseline_rating,complaint_trend,brief,build_effort,details";
 // Full monetization profile (every field) for the profitability breakdown.
 const MON_DETAIL_COLS =
   "pricing_model,makes_money,has_paid_tier,price_min_usd,price_max_usd,estimated_users," +

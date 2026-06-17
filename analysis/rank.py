@@ -50,6 +50,17 @@ RECENCY_FLOOR = 0.15  # older than 3 years
 # signal — so recency is judged from how fresh the complaints are.
 COMPLAINT_STARS_MAX = 3
 
+# --- Decline / complaint-trend detection (feature: target weakening products) -
+# A product whose reviews are getting WORSE — falling ratings or a fresh surge of
+# complaints — is an especially good target. We compare a recent window against a
+# prior one and score how much it's declining (0 = steady/improving, 1 = severe).
+W_DECLINE = 15.0          # score bonus, scaled by decline_score
+TREND_RECENT_DAYS = 180   # "recent": the last ~6 months
+TREND_PRIOR_DAYS = 540    # "prior" baseline: the ~6–18 month window before that
+TREND_MIN_WINDOW = 3      # need at least this many dated reviews in EACH window
+NEG_STARS_MAX = 2         # reviews at/below this are "negative" for the surge term
+_EMPTY_TREND = {"decline_score": 0.0, "recent_rating": None, "baseline_rating": None, "complaint_trend": 0.0}
+
 
 def _to_date(value: Any) -> Optional[_dt.date]:
     """Best-effort parse of a review timestamp (ISO str / date / datetime) -> date."""
@@ -111,6 +122,49 @@ def recency_factor(
     return round(sum(ws) / len(ws), 3)
 
 
+def trend_signal(reviews: List[Dict[str, Any]], *, now: Any = None) -> Dict[str, Any]:
+    """Is this extension getting WORSE? Compare a recent window vs. a prior one.
+
+    Returns ``decline_score`` in [0, 1] (0 = steady/improving, 1 = severe decline)
+    plus the supporting numbers: the recent vs. baseline average rating and the
+    rise in the negative-review share (the "complaint surge"). Needs at least
+    ``TREND_MIN_WINDOW`` dated reviews in each window, else an all-zero signal —
+    a quiet extension is never flagged as declining on thin evidence.
+    """
+    today = _to_date(now) or _dt.date.today()
+    recent: List[int] = []
+    prior: List[int] = []
+    for r in reviews:
+        d = _to_date(r.get("reviewed_at"))
+        s = r.get("stars")
+        if d is None or s is None:
+            continue
+        age = max(0, (today - d).days)
+        if age <= TREND_RECENT_DAYS:
+            recent.append(s)
+        elif age <= TREND_PRIOR_DAYS:
+            prior.append(s)
+
+    if len(recent) < TREND_MIN_WINDOW or len(prior) < TREND_MIN_WINDOW:
+        return dict(_EMPTY_TREND)
+
+    recent_avg = sum(recent) / len(recent)
+    prior_avg = sum(prior) / len(prior)
+    rating_drop = max(0.0, prior_avg - recent_avg)                  # stars lost since baseline
+    recent_neg = sum(1 for s in recent if s <= NEG_STARS_MAX) / len(recent)
+    prior_neg = sum(1 for s in prior if s <= NEG_STARS_MAX) / len(prior)
+    complaint_surge = max(0.0, recent_neg - prior_neg)             # 0..1 rise in negative share
+
+    # A 2-star drop maxes the rating term; weight ratings a bit over the surge.
+    decline = min(1.0, 0.6 * (rating_drop / 2.0) + 0.4 * complaint_surge)
+    return {
+        "decline_score": round(decline, 3),
+        "recent_rating": round(recent_avg, 2),
+        "baseline_rating": round(prior_avg, 2),
+        "complaint_trend": round(complaint_surge, 3),
+    }
+
+
 def _best_cluster(analysis: ExtensionAnalysis):
     """The most promising fixable cluster: WTP signal, then reviewer count, then fixable=yes."""
     fixable = [c for c in analysis.clusters if c.fixable in ("yes", "maybe")]
@@ -129,13 +183,17 @@ def _norm_log(value: Optional[int], cap: int) -> float:
 
 
 def score_opportunity(
-    ext: Dict[str, Any], analysis: ExtensionAnalysis, *, recency: float = 1.0
+    ext: Dict[str, Any], analysis: ExtensionAnalysis, *, recency: float = 1.0, decline: float = 0.0
 ) -> Dict[str, Any]:
     """Score an extension and return the fields for the `opportunities` row.
 
     ``recency`` (in [0, 1], default 1.0 = no discount) down-weights the demand
     term when the driving complaints are old — see ``recency_factor``. It scales
     demand only; market reach, the rating zone and WTP presence are not aged.
+
+    ``decline`` (in [0, 1], default 0.0) adds a bonus for an extension whose
+    reviews are getting worse — a weakening incumbent is a better target. See
+    ``trend_signal``.
     """
     best = _best_cluster(analysis)
     demand = best.independent_reviewers if best else 0
@@ -151,6 +209,7 @@ def score_opportunity(
         + W_FIXABLE * fixability
         + W_MARKET * _norm_log(ext.get("install_count"), INSTALL_CAP)
         + (ZONE_BONUS if in_zone else 0.0)
+        + W_DECLINE * decline
         - (PENALTY_JUST_BAD if analysis.overall_just_bad else 0.0)
         - (PENALTY_BACKEND if analysis.needs_heavy_backend else 0.0)
     )
@@ -162,6 +221,7 @@ def score_opportunity(
         "fixable": best.fixable if best else None,
         "demand_intensity": demand,
         "recency_weight": round(recency, 3),
+        "decline_score": round(decline, 3),
         "wtp_evidence": list(best.wtp_quotes) if best else [],
         "build_effort": analysis.build_effort,
         "brief": analysis.brief,
@@ -175,11 +235,18 @@ def to_opportunity_row(
     model: str,
     *,
     recency: float = 1.0,
+    trend: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    scored = score_opportunity(ext, analysis, recency=recency)
+    trend = trend or _EMPTY_TREND
+    scored = score_opportunity(
+        ext, analysis, recency=recency, decline=trend.get("decline_score", 0.0)
+    )
     return {
         "extension_id": extension_pk,
         **scored,
+        "recent_rating": trend.get("recent_rating"),
+        "baseline_rating": trend.get("baseline_rating"),
+        "complaint_trend": trend.get("complaint_trend", 0.0),
         "model": model,
         "details": analysis.model_dump(),
     }
@@ -235,12 +302,13 @@ def rank_all(
             log.exception("analysis failed for '%s': %s", ext.get("name"), exc)
             continue
         recency = recency_factor(reviews)
-        row = to_opportunity_row(ext["id"], ext, analysis, model, recency=recency)
+        trend = trend_signal(reviews)
+        row = to_opportunity_row(ext["id"], ext, analysis, model, recency=recency, trend=trend)
         if write_db:
             db.upsert_opportunity(row)
         rows.append(row)
         log.info(
-            "scored '%s' -> %.1f  (%s; recency x%.2f)",
-            ext.get("name"), row["score"], row["top_complaint"], recency,
+            "scored '%s' -> %.1f  (%s; recency x%.2f; decline %.2f)",
+            ext.get("name"), row["score"], row["top_complaint"], recency, trend["decline_score"],
         )
     return rows

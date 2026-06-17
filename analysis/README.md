@@ -108,3 +108,15 @@ per-review age-decay weight (`recency_weight`, buckets in `RECENCY_BUCKETS`:
 The multiplier is stored on `opportunities.recency_weight` (migration **994**)
 and shown as the dashboard's *Recency* column. Scoring only — every review is
 still stored regardless of age.
+
+### Decline / complaint-trend detection (target weakening products)
+
+A product whose reviews are getting **worse** is a better target. `trend_signal`
+compares a recent window (~6mo) against a prior one (~6–18mo) and computes a
+`decline_score` in [0, 1] from the **rating drop** plus the **rise in negative
+(≤2★) reviews** (the "complaint surge"), needing at least a few dated reviews in
+each window. It's stored on `opportunities` (with `recent_rating`,
+`baseline_rating`, `complaint_trend` — migration **992**), feeds a small `score`
+bonus (`W_DECLINE`), and surfaces on the dashboard as the *Trend* column +
+"Declining only" filter + "Declining fastest" sort. Computed from the per-review
+timestamps + stars already stored — no new scraping.

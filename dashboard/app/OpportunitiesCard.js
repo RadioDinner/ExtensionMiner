@@ -7,7 +7,23 @@ const COMPLAINT_TYPES = ["all", "bug", "missing_feature", "pricing", "abandonmen
 const SORTS = {
   "score-desc": { label: "Score (high → low)", cmp: (a, b) => (b.score ?? -1) - (a.score ?? -1) },
   "score-asc": { label: "Score (low → high)", cmp: (a, b) => (a.score ?? -1) - (b.score ?? -1) },
+  "decline-desc": { label: "Declining fastest", cmp: (a, b) => (b.decline_score ?? -1) - (a.decline_score ?? -1) },
 };
+
+// An extension is "declining" once its decline_score crosses this — a noticeable
+// rating drop and/or a fresh surge of complaints.
+const DECLINING_THRESHOLD = 0.2;
+
+// Render the decline signal as a compact, hover-explained cell.
+function trendCell(r) {
+  const d = r.decline_score;
+  if (d == null) return "—";
+  if (d < DECLINING_THRESHOLD) return <span className="muted" title="Steady or improving">steady</span>;
+  const title =
+    `Declining: recent ${r.recent_rating ?? "?"}★ vs baseline ${r.baseline_rating ?? "?"}★` +
+    (r.complaint_trend ? ` · complaints +${Math.round(r.complaint_trend * 100)}%` : "");
+  return <span className="trend-down" title={title}>↓ {d.toFixed(2)}</span>;
+}
 
 // Does the user pay? Derived from the monetization profile (may be absent).
 function moneyStatus(m) {
@@ -39,6 +55,7 @@ export default function OpportunitiesCard({ rows, monetization }) {
   const [type, setType] = useState("all");
   const [pricing, setPricing] = useState("all");
   const [sort, setSort] = useState("score-desc");
+  const [decliningOnly, setDecliningOnly] = useState(false);
 
   if (!rows || rows.length === 0) {
     return <p className="empty">No scored opportunities yet — run the Claude ranking layer after scraping.</p>;
@@ -48,6 +65,7 @@ export default function OpportunitiesCard({ rows, monetization }) {
   const filtered = rows
     .filter((r) => {
       if (type !== "all" && r.complaint_type !== type) return false;
+      if (decliningOnly && !(r.decline_score >= DECLINING_THRESHOLD)) return false;
       if (pricing !== "all") {
         const s = moneyStatus(money[r.extensions?.ext_id]);
         if (pricing === "paid" && s !== "paid") return false;
@@ -86,6 +104,10 @@ export default function OpportunitiesCard({ rows, monetization }) {
             ))}
           </select>
         </label>
+        <label title="Only show extensions whose reviews are getting worse">
+          <input type="checkbox" checked={decliningOnly} onChange={(e) => setDecliningOnly(e.target.checked)} />
+          {" "}Declining only
+        </label>
         <span className="filter-count">{filtered.length} of {rows.length}</span>
       </div>
 
@@ -101,6 +123,7 @@ export default function OpportunitiesCard({ rows, monetization }) {
               <th>Type</th>
               <th>Fixable</th>
               <th className="num" title="Recency of the complaints behind the score">Recency</th>
+              <th className="num" title="Is the extension getting worse? (recent reviews vs. baseline)">Trend</th>
               <th>Pricing</th>
             </tr>
           </thead>
@@ -115,6 +138,7 @@ export default function OpportunitiesCard({ rows, monetization }) {
                   <td><span className="pill">{r.complaint_type || "—"}</span></td>
                   <td>{r.fixable || "—"}</td>
                   <td className="num">{recencyCell(r.recency_weight)}</td>
+                  <td className="num">{trendCell(r)}</td>
                   <td>{m && m.pricing_model ? <span className="pill" title={m.monetization_summary || ""}>{m.pricing_model}</span> : "—"}</td>
                 </tr>
               );
