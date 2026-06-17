@@ -101,6 +101,15 @@ imports. Use `run_scraper.py` or the `-m scraper.run` form above.
 | `--log-dir logs` | Also write a timestamped log file. |
 | `--log-level DEBUG` | More verbose output. |
 
+## Troubleshooting
+
+**"This doesn't look like the ExtensionMiner repo" / `Could not open requirements
+file: ...\requirements.txt`** — you ran a copy of `run_scraper.cmd` that's *not*
+inside the repo. The launcher treats its own parent folder as the repo root, so
+it must live in `…\ExtensionMiner\scripts\`. Move it back there (or `git pull`
+the branch so it's already present) and run it from there. Delete any stray
+`.venv` folder a misplaced run created (e.g. in `C:\Users\<you>\.venv`).
+
 ### Exit codes
 `0` success · `2` missing Supabase config · `3` Chromium not installed ·
 `4` store unreachable · `1` other error. Task Scheduler shows this as the

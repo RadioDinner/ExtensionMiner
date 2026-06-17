@@ -33,3 +33,21 @@ No rows returned (see the verdict above for why).
 4. I said, but first, because I want to make some big changes to this program. I want to keep the dashboard written in the language that it is, and I want to keep the scraper in python, BUT I want to change how it runs. I want you to edit the python scraper code here, vs in terminal, and I want you to help me set up a way that I can just click a button, the scraper runs and saves the data to supabase, and then quits. Whenever I tried to run the scraper script in the terminal, it errored out and was gross. Furthermore, I want the scraper to be executable outside of powershell because I want to set it up on a schedule task, to run every day to check for new reviews
 
 5. In the dashboard, I want the link in the "opportunity zone" section to go to a list of the copied/saved reviews based off my data, not go to the extension page itself.
+
+6. This is what I got when I tried to run the scraper
+
+[setup] Creating a private virtual environment in .venv ...
+[setup] Installing Python dependencies (first run - a few minutes) ...
+Requirement already satisfied: pip in .\.venv\Lib\site-packages (26.0.1)
+Collecting pip
+  Using cached pip-26.1.2-py3-none-any.whl.metadata (4.6 kB)
+Using cached pip-26.1.2-py3-none-any.whl (1.8 MB)
+Installing collected packages: pip
+  Attempting uninstall: pip
+    Found existing installation: pip 26.0.1
+    Uninstalling pip-26.0.1:
+      Successfully uninstalled pip-26.0.1
+Successfully installed pip-26.1.2
+ERROR: Could not open requirements file: [Errno 2] No such file or directory: 'C:\\Users\\derrick.wengerd\\requirements.txt'
+
+[ERROR] Setup failed - see the message above.
