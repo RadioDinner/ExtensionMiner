@@ -32,6 +32,10 @@ class ReviewCluster(BaseModel):
 
 
 class ExtensionAnalysis(BaseModel):
+    what_it_does: str = Field(
+        description="Plain one- or two-sentence overview of what this extension is and does, "
+        "for someone who's never seen it. Describe its core function — not the complaints."
+    )
     clusters: List[ReviewCluster] = Field(default_factory=list)
     overall_just_bad: bool = Field(
         description="True if the product is fundamentally bad or abandoned with no salvageable demand — an anti-signal, not an opportunity."

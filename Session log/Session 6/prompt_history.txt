@@ -23,3 +23,6 @@ migration run
 
 7.
 next feature
+
+8.
+build it

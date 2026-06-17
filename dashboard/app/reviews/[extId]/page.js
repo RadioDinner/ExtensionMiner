@@ -18,6 +18,13 @@ function storeHref(ext) {
   if (!ext) return null;
   return ext.listing_url || (ext.ext_id ? `https://chromewebstore.google.com/detail/x/${ext.ext_id}` : null);
 }
+function usd(n) {
+  return n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+function range(lo, hi) {
+  if (lo == null && hi == null) return "—";
+  return `${usd(lo)} – ${usd(hi)}`;
+}
 
 function StarRow({ n }) {
   const filled = Math.max(0, Math.min(5, Math.round(Number(n) || 0)));
@@ -44,6 +51,13 @@ export default async function ReviewsPage({ params }) {
   // Reviews the community upvoted (surfaced under the store's "Helpful" sort) —
   // a lead on the complaints people agree with.
   const helpfulCount = d.reviews.filter((r) => r.helpful_ranked).length;
+
+  // The ranker's digest for this extension (present once the Claude layer ran).
+  const opp = d.opportunity;
+  const details = (opp && opp.details) || {};
+  const whatItDoes = details.what_it_does || (opp && opp.brief) || null;
+  const clusters = Array.isArray(details.clusters) ? details.clusters : [];
+  const mon = d.monetization;
 
   return (
     <main className="wrap">
@@ -90,6 +104,83 @@ export default async function ReviewsPage({ params }) {
           <strong>Query failed:</strong> {d.error}{" "}
           <strong><a href="/diagnostics">→ Run diagnostics</a></strong>
         </div>
+      )}
+
+      {d.configured && !d.notFound && !d.error && (whatItDoes || clusters.length > 0 || mon) && (
+        <section className="digest">
+          <h2>Opportunity digest</h2>
+          <p className="sub">
+            Built by the Claude ranking layer
+            {opp && opp.score != null ? <> · opportunity score <strong>{Number(opp.score).toFixed(1)}</strong></> : null}
+            {opp && opp.build_effort ? <> · est. build <strong>{opp.build_effort}</strong></> : null}.
+          </p>
+
+          {whatItDoes ? (
+            <div className="card digest-card">
+              <h3>What it does</h3>
+              <p className="digest-text">{whatItDoes}</p>
+            </div>
+          ) : null}
+
+          {clusters.length > 0 ? (
+            <div className="card digest-card">
+              <h3>User problems ({clusters.length} cluster{clusters.length === 1 ? "" : "s"})</h3>
+              <p className="sub">Recurring complaints, grouped — with how many distinct reviewers raised each.</p>
+              <ul className="clusters">
+                {clusters
+                  .slice()
+                  .sort((a, b) => (b.independent_reviewers || 0) - (a.independent_reviewers || 0))
+                  .map((c, i) => (
+                    <li key={i} className="cluster">
+                      <div className="cluster-head">
+                        <span className="reviewers" title="distinct reviewers who raised this">
+                          {fmt(c.independent_reviewers)} reviewer{c.independent_reviewers === 1 ? "" : "s"}
+                        </span>
+                        {c.complaint_type ? <span className="pill">{c.complaint_type}</span> : null}
+                        {c.fixable ? <span className="pill" title="fixable by a small competitor?">fixable: {c.fixable}</span> : null}
+                      </div>
+                      <p className="cluster-complaint">{c.complaint}</p>
+                      {Array.isArray(c.wtp_quotes) && c.wtp_quotes.length > 0 ? (
+                        <ul className="wtp">
+                          {c.wtp_quotes.map((q, j) => (
+                            <li key={j}>“{q}”</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {mon ? (
+            <div className="card digest-card">
+              <h3>Profitability</h3>
+              {mon.monetization_summary ? <p className="digest-text">{mon.monetization_summary}</p> : null}
+              <dl className="profit-grid">
+                <div><dt>Pricing model</dt><dd><span className="pill">{mon.pricing_model || "unknown"}</span></dd></div>
+                <div><dt>Paid tier</dt><dd>{mon.has_paid_tier ? "Yes" : "No"}</dd></div>
+                <div><dt>Price range</dt><dd>{range(mon.price_min_usd, mon.price_max_usd)}</dd></div>
+                <div><dt>Est. users</dt><dd>{fmt(mon.estimated_users)}</dd></div>
+                <div><dt>Est. revenue / mo</dt><dd><strong>{usd(mon.estimated_monthly_revenue_usd)}</strong></dd></div>
+                <div><dt>Revenue range / mo</dt><dd>{range(mon.revenue_low_usd, mon.revenue_high_usd)}</dd></div>
+                <div><dt>Confidence</dt><dd>{mon.confidence || "—"}</dd></div>
+              </dl>
+              {mon.pricing_notes ? <p className="muted digest-notes">{mon.pricing_notes}</p> : null}
+              {Array.isArray(mon.sources) && mon.sources.length > 0 ? (
+                <p className="digest-sources">
+                  Sources:{" "}
+                  {mon.sources.slice(0, 6).map((s, i) => (
+                    <span key={i}>
+                      {i ? " · " : ""}
+                      <a href={s} target="_blank" rel="noreferrer">{i + 1}</a>
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
       )}
 
       {d.configured && !d.notFound && !d.error && (

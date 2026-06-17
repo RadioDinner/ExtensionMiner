@@ -21,6 +21,7 @@ def _days_ago(n: int) -> str:
 
 def _analysis(**kw):
     base = dict(
+        what_it_does="A tab manager that groups open tabs.",
         clusters=[],
         overall_just_bad=False,
         needs_heavy_backend=False,
@@ -92,6 +93,19 @@ def test_to_opportunity_row_shape():
     assert row["complaint_type"] in ("missing_feature", "bug", "pricing", "abandonment", "other")
     assert isinstance(row["wtp_evidence"], list)
     assert isinstance(row["details"], dict) and "clusters" in row["details"]
+    # The "what it does" overview rides along in details for the detail page.
+    assert row["details"]["what_it_does"] == "A tab manager that groups open tabs."
+
+
+def test_what_it_does_is_required():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ExtensionAnalysis(
+            clusters=[], overall_just_bad=False, needs_heavy_backend=False,
+            build_effort="x", brief="y",
+        )
 
 
 def test_recency_weight_follows_the_decay_curve():

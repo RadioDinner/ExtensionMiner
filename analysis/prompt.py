@@ -30,8 +30,9 @@ def build_user_prompt(ext: Dict[str, Any], reviews: List[Dict[str, Any]]) -> str
         lines.append(f"- {r.get('stars')}★ | {r.get('reviewed_at') or '?'} | {body}")
     lines += [
         "",
-        "Identify the recurring FIXABLE complaints, how many independent reviewers raise "
-        "each, and any verbatim willingness-to-pay / switch signals. Then judge whether "
-        "this is a real opportunity or just a bad/abandoned product.",
+        "First, write a plain 'what it does' overview of the extension (its core function, "
+        "for someone who's never seen it). Then identify the recurring FIXABLE complaints, how "
+        "many independent reviewers raise each, and any verbatim willingness-to-pay / switch "
+        "signals. Then judge whether this is a real opportunity or just a bad/abandoned product.",
     ]
     return "\n".join(lines)

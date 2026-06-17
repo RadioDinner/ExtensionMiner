@@ -130,12 +130,38 @@ const EXT_DETAIL_COLS =
 const REVIEW_COLS = "stars,author,body,reviewed_at,helpful_count,language,helpful_ranked";
 const REVIEW_LIMIT = 1000;
 
+// The ranker's output for this extension: score + the structured analysis
+// (clusters + "what it does"), used for the detail page's digest.
+const OPP_DETAIL_COLS = "score,top_complaint,complaint_type,fixable,recency_weight,brief,build_effort,details";
+// Full monetization profile (every field) for the profitability breakdown.
+const MON_DETAIL_COLS =
+  "pricing_model,makes_money,has_paid_tier,price_min_usd,price_max_usd,estimated_users," +
+  "estimated_monthly_revenue_usd,revenue_low_usd,revenue_high_usd,confidence," +
+  "monetization_summary,pricing_notes,sources";
+
+// One row by extension_id, tolerating a missing table/column (e.g. the
+// opportunities/monetization migration not applied yet) by returning null
+// instead of throwing — the detail page just hides that section.
+async function maybeRowByExtension(supabase, table, cols, extensionId) {
+  try {
+    const { data, error } = await supabase
+      .from(table)
+      .select(cols)
+      .eq("extension_id", extensionId)
+      .maybeSingle();
+    return error ? null : data;
+  } catch {
+    return null;
+  }
+}
+
 // Fetch one extension (by its Chrome Web Store ext_id) plus the reviews we've
-// saved for it, most recent first. Returns a small, page-ready shape.
+// saved for it (most recent first), the ranker's analysis, and the monetization
+// profile. Returns a small, page-ready shape.
 export async function getExtensionReviews(extId) {
   const supabase = getServerClient();
   if (!supabase) {
-    return { configured: false, error: null, notFound: false, extension: null, reviews: [] };
+    return { configured: false, error: null, notFound: false, extension: null, reviews: [], opportunity: null, monetization: null };
   }
 
   try {
@@ -146,25 +172,31 @@ export async function getExtensionReviews(extId) {
       .maybeSingle();
 
     if (extErr) {
-      return { configured: true, error: extErr.message, notFound: false, extension: null, reviews: [] };
+      return { configured: true, error: extErr.message, notFound: false, extension: null, reviews: [], opportunity: null, monetization: null };
     }
     if (!ext) {
-      return { configured: true, error: null, notFound: true, extension: null, reviews: [] };
+      return { configured: true, error: null, notFound: true, extension: null, reviews: [], opportunity: null, monetization: null };
     }
 
-    const { data: reviews, error: revErr } = await supabase
-      .from("reviews")
-      .select(REVIEW_COLS)
-      .eq("extension_id", ext.id)
-      .order("reviewed_at", { ascending: false, nullsFirst: false })
-      .limit(REVIEW_LIMIT);
+    const [reviewsRes, opportunity, monetization] = await Promise.all([
+      supabase
+        .from("reviews")
+        .select(REVIEW_COLS)
+        .eq("extension_id", ext.id)
+        .order("reviewed_at", { ascending: false, nullsFirst: false })
+        .limit(REVIEW_LIMIT),
+      maybeRowByExtension(supabase, "opportunities", OPP_DETAIL_COLS, ext.id),
+      maybeRowByExtension(supabase, "monetization", MON_DETAIL_COLS, ext.id),
+    ]);
 
     return {
       configured: true,
-      error: revErr ? revErr.message : null,
+      error: reviewsRes.error ? reviewsRes.error.message : null,
       notFound: false,
       extension: ext,
-      reviews: reviews || [],
+      reviews: reviewsRes.data || [],
+      opportunity,
+      monetization,
     };
   } catch (err) {
     return {
@@ -173,6 +205,8 @@ export async function getExtensionReviews(extId) {
       notFound: false,
       extension: null,
       reviews: [],
+      opportunity: null,
+      monetization: null,
     };
   }
 }

@@ -10,7 +10,7 @@ extension, and writes the `opportunities` table the dashboard renders.
 extensions + reviews (Supabase)
         │
         ▼  one structured Claude call per extension (messages.parse)
-ExtensionAnalysis  (clusters, fixable?, WTP quotes, "just bad?" anti-signal)
+ExtensionAnalysis  (what-it-does, clusters, fixable?, WTP quotes, "just bad?" anti-signal)
         │
         ▼  deterministic, unit-tested scoring (rank.score_opportunity)
 opportunities  (score, top complaint, WTP evidence, brief)  → Supabase
@@ -38,6 +38,18 @@ python -m analysis.run --limit 25 --monetize      # rank AND research monetizati
 
 The dashboard's opportunity-zone table shows the pricing model + an estimated
 monthly revenue per extension once this has run.
+
+### Extension detail digest (`/reviews/<ext_id>`)
+
+The per-extension page renders an **opportunity digest** above the raw reviews:
+a plain **"what it does"** overview (the `what_it_does` field on
+`ExtensionAnalysis`, stored in `opportunities.details`), the **clustered user
+problems** (each complaint + how many distinct reviewers raised it + WTP
+quotes, from `opportunities.details.clusters`), and the **full profitability
+breakdown** (the complete `monetization` row — pricing tiers, est. users,
+revenue range, confidence, basis). Each section hides itself if that data
+isn't there yet, so the page still works before the ranking/monetization
+passes have run.
 
 ## Run
 

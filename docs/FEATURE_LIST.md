@@ -11,25 +11,7 @@
 
 ---
 
-## 1. 🆕 Richer extension detail page (problem clusters, "what it is", profitability)
-When you open an extension from a list to read its reviews (`/reviews/<ext_id>`),
-show more than the raw review list:
-
-- **Summary of user challenges/problems**, *clustered*, so you can see when
-  multiple people hit the **same** issue (the recurring complaint + how many
-  distinct reviewers raised it).
-- **Summary of what the extension is and does** (a plain "function overview").
-- **More detailed profitability numbers** on the details page (the full
-  monetization breakdown — pricing tiers, user estimate, revenue range,
-  confidence, basis — not just the dashboard's compact column).
-
-Implementation hints (from the user): the **ranking layer** builds the
-problems/ratings summary and the function summary; the **dashboard** then
-displays them. Likely reuses what's already there — `opportunities.details`
-(complaint clusters + counts) and the `monetization` table — plus a NEW
-"what it does" summary field added to the ranking output.
-
-## 2. 🆕 "Deep dive research" pool — hand-pick extensions for a comprehensive Claude deep dive
+## 1. 🆕 "Deep dive research" pool — hand-pick extensions for a comprehensive Claude deep dive
 Let the user curate a small pool of extensions to research deeply, instead of
 running expensive deep research on every extension (which burns tokens).
 
@@ -54,7 +36,7 @@ ranking/monetization passes) processes only flagged extensions and likely uses
 Claude with web search/fetch for competitor research, writing results to a new
 table the detail page can display.
 
-## 3. 🆕 Decline / complaint-trend detection — surface extensions getting WEAKER
+## 2. 🆕 Decline / complaint-trend detection — surface extensions getting WEAKER
 Have the ranking algorithm flag extensions that are **declining in quality** or
 showing an **uptick of complaints in recent reviews**, so the user can **target
 the weak ones and pick them off**.
