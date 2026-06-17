@@ -1,0 +1,123 @@
+SESSION 3 — HANDOFF LOG
+=======================
+Date: 2026-06-16 / 2026-06-17 (ran past midnight)
+Branch: main (committed + pushed directly to main, per project convention).
+Context: This was a LOCAL session (PowerShell on Windows). It did the full
+operational bring-up the earlier web sessions could not: ran the scraper against
+the live Chrome Web Store, populated Supabase, and ran the Claude ranker.
+
+================================================================================
+WHAT WAS DONE
+================================================================================
+SETUP
+- Cloned the repo (original URL had a typo: ExtnesionMiner -> ExtensionMiner).
+- Created .venv (Python 3.14.4), installed requirements + `playwright install
+  chromium`. Copied .env.example -> .env and filled it in.
+- FIXED A GLOBAL ENV BUG: a user-scope PYTHONPATH pointed at the Microsoft Store
+  Python 3.11 site-packages, leaking stale packages into every venv (broke
+  cffi/bs4/pandas). Removed it permanently
+  ([Environment]::SetEnvironmentVariable("PYTHONPATH",$null,"User")). NOTE: the
+  current shell still inherits the stale value; new terminals are clean. Until a
+  fresh terminal, run python with `$env:PYTHONPATH=""` prefixed.
+- .env verified live: SUPABASE_URL + SERVICE ROLE key (user first pasted the
+  publishable key by mistake; corrected to sb_secret_...), ANTHROPIC_API_KEY
+  works ($20 credit added).
+
+DATABASE
+- Applied 999_initial_schema.sql (5 tables) via the Supabase SQL Editor (MCP
+  token kept expiring all session — unreliable; SQL Editor was the workhorse).
+- Project ref: jagtupajcgdvehqfltom.
+- Added migration 998_reviews_unique_constraint.sql: the foundational schema's
+  PARTIAL unique index on reviews(extension_id, review_uid) cannot be a
+  PostgREST on_conflict target (error 42P10). Replaced it with a FULL unique
+  constraint `reviews_extension_uid_key`. review_uid is always populated
+  (models.Review.dedupe_uid synthesizes one), so semantics are unchanged.
+  Gotcha that cost time: the constraint had to be applied to the RIGHT project
+  via a fresh SQL-editor tab; a stale tab targeted a different project.
+
+SCRAPER FIXES (scraper/parse.py, selectors.py, crawl.py)
+- Descriptions were grabbing page chrome ("Switch to Chrome to install...").
+  Now parse description/summary/developer from the detail page's VISIBLE TEXT
+  via stable "Overview"/"Developer" anchors (extract_description/_developer/
+  _summary). Developer falls back to the publisher line under the title when the
+  Details block leads with a Website/Email field.
+- Reviews: the detail page exposes NONE; they live on /detail/<slug>/<id>/reviews.
+  Now fetch that page and parse one review per `section.T7rvce` card
+  (author span.LfYwpe, date span.ydlbEf, stars aria-label, body .fzDEpf —
+  body is a <p>, NOT a div; the dev-reply body .Iu8e1b/.fPNqW is excluded).
+  Generic fallback retained for the old test fixture.
+- requests added to requirements.txt (scraper/robots.py imported it; was missing).
+
+INCREMENTAL CRAWL (committed)
+- --skip-existing: skip ext_ids already in DB (db.existing_ext_ids, paginated);
+  also dedupes ids within a run across categories.
+- --refresh-after-days N: re-scrape rows whose last_scraped is older than N days,
+  skip fresher ones (db.ext_ids_scraped_since); implies cache bypass so
+  re-scraped pages fetch fresh HTML.
+- crawl stats gained a "skipped" counter.
+
+CRAWL RESULTS (live, in Supabase)
+- Discovered the REAL category taxonomy (16 slugs): productivity/{communication,
+  developer,education,tools,workflow}, lifestyle/{art,entertainment,fun,games,
+  household,news,shopping,social,travel,well}, make. ("developer-tools" is NOT a
+  valid slug — it silently returns the productivity default set.)
+- Ran a full 16-category overnight crawl (--max-extensions 0 --category-scrolls
+  30 --review-scrolls 8). FINAL: 481 extensions, 4,405 reviews (every review has
+  real body text), 619 rating_snapshots.
+
+RANKING LAYER (Claude)
+- Ran `python -m analysis.run --limit 25` (model claude-opus-4-8). 25
+  opportunities scored and written. ~$10-12 of the $20 credit used.
+- Top targets: Save to Pinterest (82.1, 3.5*, 5M installs, fixable bug),
+  Google Keep (69.6), Dark Reader (68.1, $10 paywall complaint), ColorZilla
+  (58.6, "update the UI = 5 stars"), EndNote Click (45.1).
+
+TESTS: 48 passing (added real-store description/review-card tests + flag tests).
+
+GIT: two commits pushed to main:
+  eafc8fc  scraper parsing fixes + migration 998
+  81090b8  --skip-existing + --refresh-after-days
+(Both rebased onto remote which had Session 1/2 dashboard + log commits.)
+
+================================================================================
+HARD LIMITS DISCOVERED (important for expectations)
+================================================================================
+- REVIEWS CAP: the public reviews page serves only ~10 reviews per extension,
+  even when scrolled 20+ times. Not a scraper limit — Google does not expose the
+  rest publicly. Logging into a Google account does NOT unlock more (and risks
+  account suspension + ToS) — declined.
+- CATEGORY CAP: each category grid plateaus at ~30 extensions. 481 total is the
+  breadth the category-browse path exposes.
+
+================================================================================
+OPEN ITEMS / NEXT STEPS
+================================================================================
+1. "ALL extensions" (user's top ask, UNFINISHED): blocked at session end by a
+   temporary platform outage (command-execution classifier for the model was
+   down). PLAN, ready to run: check robots.txt/sitemap on
+   chromewebstore.google.com for a bulk source of /detail/ IDs; add a keyword
+   SEARCH sweep; dedup; scrape with --skip-existing (resumable across nights).
+   Realistic reach: thousands-tens of thousands, NOT all ~250k (multi-week +
+   not fully enumerable). The sitemap/robots probe was never completed.
+2. Score the long tail (~456 unscored extensions) with a CHEAPER model to stay
+   in budget: `python -m analysis.run --limit 0/large --model claude-haiku-4-5-20251001`
+   (Opus on all 481 would be ~$190; Haiku covers everything for a few $).
+3. Dashboard (from Session 2) reads this same Supabase project and now has real
+   data (481 ext, opportunities) to render — `npm install` + run in dashboard/.
+4. Periodic freshness refresh: `--refresh-after-days 7` keeps ratings/reviews
+   current without re-scraping everything.
+
+================================================================================
+CURRENT STATE
+================================================================================
+Full pipeline works end-to-end: scrape -> Supabase -> Claude rank. 481
+extensions, 4,405 reviews, 25 scored opportunities live in project
+jagtupajcgdvehqfltom. All code committed + pushed to main; working tree was
+clean at the last push (only this Session 3 log added afterward). Tests green
+(48). Remaining work is breadth expansion (item 1) and scoring the long tail
+(item 2), both blocked only by the end-of-session execution outage.
+
+PROTOCOL NOTE: the SessionStart hook did not fire this session (started outside
+the repo), so prompt_history.txt was reconstructed at the end rather than logged
+live. These two Session 3 files still need to be COMMITTED + PUSHED once command
+execution is available (it was down when the session closed).

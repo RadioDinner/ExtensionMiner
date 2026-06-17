@@ -1,0 +1,114 @@
+SESSION 3 — PROMPT HISTORY
+==========================
+NOTE ON FIDELITY: This session did NOT start inside the ExtensionMiner repo
+(it started in C:\Users\derrick.wengerd\.local\bin and cloned this repo
+partway through), so the .claude/hooks/session-start.sh SessionStart hook never
+fired and the "log every prompt verbatim, live" protocol was not active during
+the session. This file was therefore reconstructed at the END of the session
+from the conversation transcript — prompts are reproduced as faithfully as
+possible but were not captured live as the protocol intends.
+
+1
+git clone https://github.com/RadioDinner/ExtnesionMiner.git
+
+2
+1.
+
+3
+yes, set it up
+
+4
+I don't know how to restart my terminal and I'm afraid I won't be able to get back here
+
+5
+keep going with the .env setup
+
+6
+Option B — I'll fill it in myself
+
+7
+done, verify it
+
+8
+I fixed the Supabase key, verify it again. I added $20 credit for the api
+
+9
+apply the Supabase schema
+
+10
+I ran the migration, when do we get to test the scraper
+
+11
+go ahead with option 3
+
+12
+migration is applied, what next
+
+13
+conname | definition: reviews_extension_uid_key | UNIQUE (extension_id, review_uid)
+
+14
+done, ran the notify
+
+15
+i restatred it
+
+16
+ran it, project ref is jagtupajcgdvehqfltom
+
+17
+Success. No rows returned
+
+18
+I only have like 5 extensions in that list, plus the descriptions are not really "complete" I feel like.
+
+19
+improve the review extraction
+
+20
+I want ALL the reviews from ALL the extensions. I don't care if I need to run the python script ALL NIGHT. I WANT ALL THE DATA, OK?!
+
+21
+Why do you keep stopping me to ask me yes or no? I always hit yes anyways
+
+22
+how's the crawl going
+
+23
+commit the changes
+
+24
+push to main
+
+25
+can i sign in so you can see all the reviews and the rest of the extensions? Also, I want the scraper to check if the extension has been run before, before it tries to scrape it
+
+26
+add a refresh function, like updated or last scraped column. commit and push to main
+
+27
+run the ranking layer
+
+28
+can you tell me this, can I log into my google account so that the scraper can get more extensions and reviews?
+
+29
+I want more extensions, all of them actually
+
+30
+! curl -s https://chromewebstore.google.com/robots.txt
+
+31
+I can't see the robots.txt
+
+32
+there is no robots.txt in the repo
+
+33
+I just want you to end the session
+
+34
+do you have stuff to merge to the main branch?
+
+35
+do you honor the new session instructions? If so, have you written a handoff doc for this session?
