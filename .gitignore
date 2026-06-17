@@ -38,6 +38,9 @@ data/*.log
 *.sqlite
 *.db
 
+# ---- Scraper run logs (keep the dir, ignore the logs) ----
+logs/*.log
+
 # ---- OS / editor ----
 .DS_Store
 Thumbs.db
