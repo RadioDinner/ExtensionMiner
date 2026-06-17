@@ -63,3 +63,14 @@ From https://github.com/RadioDinner/ExtensionMiner
    d05581e..eb83492  claude/great-cray-i6q77i -> origin/claude/great-cray-i6q77i
 Merge made by the 'ort' strategy.
 [git pull diffstat: 17 files changed, 826 insertions(+), 22 deletions(-); repo is at C:\Users\derrick.wengerd\Downloads\ExtensionMiner]
+
+8. [setup] Installing Python dependencies (first run - a few minutes) ...
+[...verbatim pip output: "Requirement already satisfied" for pip, python-dotenv, tenacity, python-dateutil, playwright 1.60.0, beautifulsoup4, lxml, requests, supabase 2.31.0, anthropic 0.109.2, pydantic, pandas, pytest, and all transitive deps...]
+[setup] Downloading the Chromium browser for Playwright ...
+
+[run] C:\Users\derrick.wengerd\Downloads\ExtensionMiner\.venv\Scripts\python.exe -m scraper.run --preset daily --log-dir logs
+
+2026-06-17 10:12:28,308 INFO logging to logs\scraper-20260617-101228.log
+2026-06-17 10:12:28,309 INFO preset 'daily': full refresh crawl (no cap, cache bypassed); already-stored extensions only gain new reviews
+
+this is what I get so far when I click the button on the desktop
