@@ -8,7 +8,15 @@ target categories, pulls metadata + reviews, and upserts them into Supabase.
 > (or an environment whose network policy can reach the store). The schema and
 > the ranking layer work fine in the web env.
 
-## Setup
+## Easiest path (Windows): one click
+
+Don't want to touch a terminal? Double-click **`scripts\run_scraper.cmd`** — it
+creates the venv, installs deps + Chromium on first run, crawls, writes to
+Supabase, and quits. Double-click **`scripts\install_daily_task.cmd`** once to
+run it automatically every day. Full guide:
+[`docs/RUNNING_THE_SCRAPER.md`](../docs/RUNNING_THE_SCRAPER.md).
+
+## Setup (manual / non-Windows)
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -25,11 +33,19 @@ python -m scraper.run --max-extensions 2 --no-db --no-headless
 
 # 2) Real run into Supabase for chosen categories.
 python -m scraper.run --categories productivity developer-tools --max-extensions 25
+
+# 3) The daily preset (full refresh crawl; only new reviews land). This is what
+#    the one-click launcher and the scheduled task run.
+python -m scraper.run --preset daily --log-dir logs
 ```
 
-Useful flags: `--no-db` (dry run), `--no-headless` (watch it), `--refresh`
-(ignore cache), `--no-robots`, `--log-level DEBUG`,
+Useful flags: `--preset daily` (full refresh crawl), `--no-db` (dry run),
+`--no-headless` (watch it), `--refresh` (ignore cache), `--skip-existing`,
+`--refresh-after-days N`, `--log-dir DIR`, `--no-robots`, `--log-level DEBUG`,
 `--category-scrolls` / `--review-scrolls` (how hard to lazy-load).
+
+> Tip: never run `python scraper/run.py` directly — relative imports break.
+> Use `python -m scraper.run …` or the top-level `python run_scraper.py …`.
 
 ## Tuning selectors (important on first run)
 

@@ -42,6 +42,19 @@ supabase/     SQL migrations (numbered DOWN from 999)
 Session log/  Per-session prompt history + handoff logs
 ```
 
+## Run the scraper (Windows: one click)
+
+The scraper runs **locally** (the Chrome Web Store is egress-blocked in the web
+env). On Windows you don't need a terminal:
+
+- **Run now:** double-click `scripts\run_scraper.cmd` — it bootstraps a venv,
+  installs deps + Chromium on first run, crawls, writes to Supabase, and quits.
+- **Run daily:** double-click `scripts\install_daily_task.cmd` once to register a
+  Windows scheduled task.
+
+Full guide (setup, `.env`, scheduling, troubleshooting):
+[`docs/RUNNING_THE_SCRAPER.md`](./docs/RUNNING_THE_SCRAPER.md).
+
 ## Working in this repo
 
 This project follows a per-session protocol (session logs, verbatim prompt
