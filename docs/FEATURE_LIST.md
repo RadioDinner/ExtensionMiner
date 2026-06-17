@@ -43,3 +43,28 @@ problems/ratings summary and the function summary; the **dashboard** then
 displays them. Likely reuses what's already there — `opportunities.details`
 (complaint clusters + counts) and the `monetization` table — plus a NEW
 "what it does" summary field added to the ranking output.
+
+## 3. 🆕 "Deep dive research" pool — hand-pick extensions for a comprehensive Claude deep dive
+Let the user curate a small pool of extensions to research deeply, instead of
+running expensive deep research on every extension (which burns tokens).
+
+- **On the extension detail page**, add a button to **add that extension to a
+  "Deep dive research" pool/list**. (Toggle to add/remove; the page shows
+  whether the extension is already queued.)
+- When the **Claude ranking layer** runs, build a **tool that iterates over that
+  pool** and does a **comprehensive deep dive per extension** — e.g. thorough
+  analysis of the reviews, the **competitors** that exist, and related signals —
+  rather than doing all of that for *every* extension.
+
+Rationale (from the user): the full deep dive (reviews + competitor research,
+etc.) is token-expensive, so it should only run on a **hand-picked pool**, not
+the whole catalog. The lightweight ranking/monetization passes still run across
+everything; this deep dive is opt-in per extension.
+
+Implementation hints: needs a way to flag/queue an extension (likely a new
+column/table, e.g. a `deep_dive` flag on `extensions` or a small
+`deep_dive_queue` table the dashboard writes to and the ranker reads). The
+dashboard button writes the flag; a new analysis task (sibling to the existing
+ranking/monetization passes) processes only flagged extensions and likely uses
+Claude with web search/fetch for competitor research, writing results to a new
+table the detail page can display.
