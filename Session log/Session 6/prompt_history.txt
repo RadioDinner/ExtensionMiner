@@ -8,3 +8,6 @@ Let's start a new session, are there open bugs/issues
 merge everything you have to main and delete the branches. Commit directly to main for the remainder of this session
 
 Add a feature to the list. When I click into an extension to explore it, I want a button on the detail page that I can click that would add that extension into a pool/list to do a "Deep dive research" with the claude ranking layer. Then, when the claude stuff runs, you can build a tool that would go through that list and do a comprehensive deep dive into the reviews and compeitors that exist, etc for that extension, rather than token burning to do all of that for each extension.
+
+3.
+Add a feature to the list. I want the ranking algorithm to check for extensions that are declining in quality or have an uptick of complaints in recent reviews. This way i can target the WEAK ONES and pick them off.
