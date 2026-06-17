@@ -69,7 +69,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="stop scrolling a category after this many passes surface no new "
                         "extensions (default 3)")
     p.add_argument("--review-scrolls", type=int, default=6,
-                   help="lazy-load scroll passes on a detail page (default 6)")
+                   help="lazy-load scroll passes on a reviews page (default 6)")
+    p.add_argument("--no-multi-sort", dest="multi_sort", action="store_false",
+                   help="only scrape the default review sort; skip the recent/highest/"
+                        "lowest re-sort passes that gather past the store's ~10-per-sort cap")
+    p.set_defaults(multi_sort=True)
     p.add_argument("--no-db", action="store_true",
                    help="dry run: fetch + parse + cache, but do not write to Supabase")
     p.add_argument("--no-headless", action="store_true",
@@ -142,6 +146,7 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
         category_scrolls=args.category_scrolls,
         discovery_patience=args.discovery_patience,
         review_scrolls=args.review_scrolls,
+        multi_sort=args.multi_sort,
         write_db=not args.no_db,
         headless=not args.no_headless,
         refresh=refresh,

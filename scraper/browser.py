@@ -104,6 +104,85 @@ class CWSBrowser:
         self.cache.put(key, text, "txt")
         return html, text
 
+    def _scroll_page(self, scrolls: int, scroll_pause_ms: int) -> None:
+        for _ in range(max(0, scrolls)):
+            self._page.mouse.wheel(0, 20_000)
+            self._page.wait_for_timeout(scroll_pause_ms)
+
+    def _apply_review_sort(self, label: str, trigger_selector: str, option_role: str) -> bool:
+        """Open the sort dropdown and pick the option named ``label``.
+
+        Returns True if a sort option was clicked. Best-effort and defensive: any
+        failure (control absent / classes changed) returns False so the caller
+        falls back to whatever sort is already shown.
+        """
+        try:
+            trigger = self._page.query_selector(trigger_selector)
+            if trigger is None:
+                return False
+            trigger.click()
+            self._page.wait_for_timeout(500)
+        except Exception:
+            return False
+        # Try a couple of ways to click the option by its visible/accessible name.
+        for attempt in (
+            lambda: self._page.get_by_role(option_role, name=label).first.click(timeout=2_000),
+            lambda: self._page.get_by_text(label, exact=False).first.click(timeout=2_000),
+        ):
+            try:
+                attempt()
+                self._page.wait_for_timeout(800)
+                return True
+            except Exception:
+                continue
+        return False
+
+    def fetch_review_sorts(
+        self,
+        url: str,
+        sort_labels: List[str],
+        *,
+        trigger_selector: str,
+        option_role: str = "option",
+        scrolls: int = 6,
+        scroll_pause_ms: int = 1_200,
+        wait_selector: Optional[str] = None,
+    ) -> List[str]:
+        """Snapshot a reviews page under several sort orders to gather more reviews.
+
+        Navigates once, scrolls the default sort and snapshots it, then for each
+        label re-sorts, scrolls, and snapshots again. Returns the list of HTML
+        snapshots (always at least the default one). The store caps each sort at
+        ~10 reviews, so merging snapshots is how we get past that ceiling. If the
+        sort control can't be driven, this degrades to a single snapshot.
+        """
+        if self.robots_allowed is not None and not self.robots_allowed(url):
+            raise RobotsDisallowed(url)
+
+        self.rate_limiter.wait()
+        self._page.goto(url, wait_until="domcontentloaded")
+        if wait_selector:
+            try:
+                self._page.wait_for_selector(wait_selector)
+            except Exception:
+                pass
+
+        snapshots: List[str] = []
+        self._scroll_page(scrolls, scroll_pause_ms)
+        snapshots.append(self._page.content())
+
+        for label in sort_labels:
+            if self._apply_review_sort(label, trigger_selector, option_role):
+                self._scroll_page(scrolls, scroll_pause_ms)
+                snapshots.append(self._page.content())
+
+        try:
+            self.cache.put(url, self._page.content(), "html")
+            self.cache.put(url, self._page.inner_text("body"), "txt")
+        except Exception:
+            pass
+        return snapshots
+
     def collect_scrolling(
         self,
         url: str,

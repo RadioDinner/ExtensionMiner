@@ -51,6 +51,12 @@ Useful flags: `--preset daily` (full refresh crawl of the **whole** taxonomy),
 > `--category-scrolls`). Coverage is bounded by what the store's category pages
 > lazy-load — there is no public index of *all* extensions.
 
+> Reviews: the store caps each sort order at ~10 reviews, so by default the
+> crawler re-sorts the reviews page (recent / highest / lowest) and merges the
+> results to get ~25–30 distinct reviews/extension (`--no-multi-sort` to disable).
+> The sort-dropdown selector is best-effort — see *Tuning selectors* below; if it
+> can't be driven, the crawl falls back to a single default-sort pass.
+
 > Tip: never run `python scraper/run.py` directly — relative imports break.
 > Use `python -m scraper.run …` or the top-level `python run_scraper.py …`.
 
@@ -68,6 +74,12 @@ quick adjustment:
    selectors.
 3. Edit **`scraper/selectors.py`** only — every parser reads from there.
 4. Re-run with `--refresh` off (it reparses the cache for free).
+
+**Review sort control (for multi-sort):** open a reviews page, click the sort
+dropdown, and inspect it. Set `SEL_REVIEW_SORT_TRIGGER` (the dropdown button),
+`SEL_REVIEW_SORT_OPTION_ROLE` (the ARIA role of each choice, usually `option` or
+`menuitem`), and the visible `REVIEW_SORTS` labels in `scraper/selectors.py`. If
+these don't match, multi-sort silently falls back to one default-sort pass.
 
 ## Layout
 

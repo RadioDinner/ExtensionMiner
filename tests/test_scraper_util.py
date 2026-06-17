@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 
 from scraper.cache import RawCache
-from scraper.crawl import CrawlOptions
+from scraper.crawl import CrawlOptions, merge_reviews
 from scraper.models import Extension, Review
 from scraper.ratelimit import RateLimiter
 from scraper.robots import make_checker
@@ -122,3 +122,25 @@ def test_discovery_scroll_knobs_default():
     opts = resolve_options(build_parser().parse_args([]))
     assert opts.category_scrolls == 40       # exhaust-scroll cap
     assert opts.discovery_patience == 3
+
+
+def test_multi_sort_flag_wires_through():
+    # on by default; --no-multi-sort turns it off
+    assert build_parser().parse_args([]).multi_sort is True
+    assert CrawlOptions().multi_sort is True
+    assert build_parser().parse_args(["--no-multi-sort"]).multi_sort is False
+    assert resolve_options(build_parser().parse_args(["--no-multi-sort"])).multi_sort is False
+
+
+def test_merge_reviews_dedupes_across_sorts():
+    # Same review under two sort orders must collapse to one (by store id, or by
+    # the synthetic content hash when there's no id).
+    a = Review(stars=1, author="A", body="needs sync")
+    b = Review(stars=5, review_uid="r2", body="great")
+    b_again = Review(stars=5, review_uid="r2", body="great")   # dup by store id
+    c = Review(stars=3, review_uid="r3", body="ok")
+    a_again = Review(stars=1, author="A", body="needs sync")   # dup by content hash
+
+    merged = merge_reviews([[a, b], [b_again, c, a_again]])
+    assert len(merged) == 3
+    assert {r.dedupe_uid() for r in merged} == {a.dedupe_uid(), "r2", "r3"}

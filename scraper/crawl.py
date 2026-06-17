@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 from common.config import Settings
 from common.config import settings as default_settings
@@ -31,6 +31,7 @@ class CrawlOptions:
     category_scrolls: int = 40        # max scroll passes to exhaust a category page
     discovery_patience: int = 3       # stop after N scrolls that surface no new ids
     review_scrolls: int = 6           # lazy-load passes on a detail page
+    multi_sort: bool = True           # re-sort reviews to gather past the ~10/sort cap
     write_db: bool = True
     headless: bool = True
     refresh: bool = False             # ignore cache, re-fetch
@@ -97,8 +98,27 @@ def collect_extension_ids(
     return ids[:max_extensions] if max_extensions else ids
 
 
+def merge_reviews(review_lists: Iterable[Iterable[Review]]) -> List[Review]:
+    """De-dupe reviews gathered across multiple sort passes, keyed by dedupe_uid.
+
+    The store id wins when present; otherwise a content hash of (author, date,
+    body) — the same key the DB unique index uses — so the same review seen under
+    two sort orders collapses to one row.
+    """
+    out: dict = {}
+    for lst in review_lists:
+        for r in lst:
+            out.setdefault(r.dedupe_uid(), r)
+    return list(out.values())
+
+
 def scrape_extension(
-    browser: CWSBrowser, ext_id: str, *, category: Optional[str] = None, review_scrolls: int = 6
+    browser: CWSBrowser,
+    ext_id: str,
+    *,
+    category: Optional[str] = None,
+    review_scrolls: int = 6,
+    multi_sort: bool = True,
 ) -> Tuple[Extension, List[Review]]:
     # Detail page: metadata + description. Reviews are NOT here.
     html, text = browser.fetch(
@@ -110,13 +130,28 @@ def scrape_extension(
     if category:
         ext.store_category = category
 
-    # Reviews live on a dedicated sub-page; scroll it to lazy-load more.
-    reviews_html, _ = browser.fetch(
-        parse.reviews_url(ext_id),
-        wait_selector=selectors.SEL_DETAIL_READY,
-        scrolls=review_scrolls,
-    )
-    return ext, parse.parse_reviews(reviews_html)
+    # Reviews live on a dedicated sub-page; the store caps each sort at ~10, so we
+    # re-sort (recent/highest/lowest) and merge to gather more. A non-refresh run
+    # reuses the cached snapshot.
+    reviews_url = parse.reviews_url(ext_id)
+    if not browser.refresh and browser.cache.has(reviews_url, "html"):
+        reviews = parse.parse_reviews(browser.cache.get(reviews_url, "html") or "")
+    elif multi_sort:
+        snapshots = browser.fetch_review_sorts(
+            reviews_url,
+            [label for _, label in selectors.REVIEW_SORTS],
+            trigger_selector=selectors.SEL_REVIEW_SORT_TRIGGER,
+            option_role=selectors.SEL_REVIEW_SORT_OPTION_ROLE,
+            scrolls=review_scrolls,
+            wait_selector=selectors.SEL_DETAIL_READY,
+        )
+        reviews = merge_reviews(parse.parse_reviews(h) for h in snapshots)
+    else:
+        reviews_html, _ = browser.fetch(
+            reviews_url, wait_selector=selectors.SEL_DETAIL_READY, scrolls=review_scrolls
+        )
+        reviews = parse.parse_reviews(reviews_html)
+    return ext, reviews
 
 
 def persist(ext: Extension, reviews: List[Review], *, write_db: bool) -> int:
@@ -195,7 +230,8 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
                 seen.add(ext_id)
                 try:
                     ext, reviews = scrape_extension(
-                        browser, ext_id, category=category, review_scrolls=opts.review_scrolls
+                        browser, ext_id, category=category,
+                        review_scrolls=opts.review_scrolls, multi_sort=opts.multi_sort,
                     )
                 except RobotsDisallowed:
                     log.warning("robots.txt disallows %s; skipping", ext_id)

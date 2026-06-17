@@ -62,3 +62,21 @@ SEL_REVIEW_DATE = "span.ydlbEf"
 SEL_REVIEW_BODY = ".fzDEpf"
 # Control that reveals the full review list / loads more.
 SEL_REVIEWS_MORE = "text=See all reviews"
+
+# --- Reviews sort control ---------------------------------------------------
+# The store shows only ~10 reviews per sort order, so to gather MORE we re-sort
+# the reviews page (recent / highest / lowest) and merge the results. The default
+# page sort ("Most relevant") is captured before any of these are applied.
+#
+# These are BEST-EFFORT and almost certainly need a quick tune against the live
+# reviews page — open it, find the sort dropdown button and its option items, and
+# set the two selectors + the option labels below. If the trigger isn't found,
+# the crawler gracefully falls back to a single (default-sort) pass.
+SEL_REVIEW_SORT_TRIGGER = "button[aria-label*='Sort' i], [aria-label*='Sort by' i]"
+SEL_REVIEW_SORT_OPTION_ROLE = "option"   # ARIA role of each sort choice
+# (key, visible label). Labels are matched against each option's accessible name.
+REVIEW_SORTS = [
+    ("recent", "Most recent"),
+    ("highest", "Highest rating"),
+    ("lowest", "Lowest rating"),
+]
