@@ -1,12 +1,17 @@
-# Running the Claude ranking layer (Windows)
+# Running the Claude analysis (Windows)
 
-The **ranking layer** is the valuable part: it reads the extensions + reviews
-you've scraped from Supabase, mines the reviews with Claude (fixable complaints,
-"I'd pay if…" signals), scores each one, and writes the **`opportunities`** table
-the dashboard's *Scored opportunities* card shows.
+The **"Run ExtensionMiner Ranking"** button runs **all the Claude analysis tasks**
+over the extensions + reviews you've scraped, in one click:
+
+1. **Ranking** — mines reviews for fixable complaints + "I'd pay if…" signals,
+   scores each extension, writes the **`opportunities`** table (the dashboard's
+   *Scored opportunities* card).
+2. **Monetization** — web-searches each extension's pricing and estimates monthly
+   revenue, writes the **`monetization`** table (the dashboard's *Pricing* +
+   *Est. /mo* columns).
 
 It's a separate step from scraping — run the **scraper first** so there are
-reviews to analyze, then run the ranker.
+reviews to analyze, then run this.
 
 > Why a desktop button and not a dashboard button? The ranker is Python and calls
 > the Anthropic API once per extension (slow), which can't run on Vercel. So it
@@ -27,19 +32,25 @@ Double-click **"Run ExtensionMiner Ranking"** on your Desktop (or
 and installs dependencies; after that it's quick. It also auto-updates the code
 (`git pull` of `main`) before each run, just like the scraper launcher.
 
-When it finishes, the `opportunities` table is updated and the dashboard's
-*Scored opportunities* card reflects the new scores.
+When it finishes, the `opportunities` **and** `monetization` tables are updated,
+and the dashboard reflects the new scores, pricing, and revenue estimates.
 
 ## What it does by default
-Scores the **top 25 extensions by install count** that have at least 5 saved
-reviews, and writes one `opportunities` row each. To change that, edit the
-`RUN_ARGS` line near the top of `scripts\run_ranker.cmd`, or run by hand:
+Runs **both** Claude tasks (ranking + monetization, via `--monetize`) over the
+**top 25 extensions by install count** — ranking covers those with at least 5
+saved reviews. To change that, edit the `RUN_ARGS` line near the top of
+`scripts\run_ranker.cmd`, or run by hand:
 
 ```bat
-.venv\Scripts\python.exe run_ranker.py --log-dir logs            :: the default
-.venv\Scripts\python.exe run_ranker.py --limit 50                :: score more
-.venv\Scripts\python.exe run_ranker.py --limit 5 --no-db         :: dry run, no writes
+.venv\Scripts\python.exe run_ranker.py --monetize --log-dir logs   :: the default (rank + monetize)
+.venv\Scripts\python.exe run_ranker.py --log-dir logs              :: ranking only (no web-search pass)
+.venv\Scripts\python.exe run_ranker.py --limit 50 --monetize       :: do more extensions
+.venv\Scripts\python.exe run_ranker.py --limit 5 --no-db --monetize :: dry run, no writes
 ```
+
+> Heads-up: `--monetize` web-searches per extension, so the full run costs more
+> and takes longer than ranking alone. Drop `--monetize` from `RUN_ARGS` if you
+> want the button to do ranking only.
 
 ### Handy flags
 | Flag | What it does |
@@ -52,21 +63,15 @@ reviews, and writes one `opportunities` row each. To change that, edit the
 | `--model NAME` | Anthropic model (default `ANTHROPIC_MODEL` or `claude-opus-4-8`). |
 | `--log-dir logs` | Also write a timestamped log file. |
 
-## Monetization research (pricing / revenue)
+## Monetization research (pricing / revenue) on its own
 
-To populate the dashboard's **Pricing** + **Est. /mo** columns, run the
-monetization researcher — it web-searches each extension for its pricing plans
-and estimates monthly revenue (needs migration **995** applied):
+The default button already runs monetization (it populates the dashboard's
+**Pricing** + **Est. /mo** columns; needs migration **995** applied). To run
+*only* the monetization pass — e.g. to refresh pricing without re-ranking:
 
 ```bat
-.venv\Scripts\python.exe -m analysis.monetize --limit 25      :: standalone
-.venv\Scripts\python.exe run_ranker.py --limit 25 --monetize  :: rank + monetize together
+.venv\Scripts\python.exe -m analysis.monetize --limit 25
 ```
-
-To make the **Run ExtensionMiner Ranking** Desktop button do both every time, add
-`--monetize` to the `RUN_ARGS` line near the top of `scripts\run_ranker.cmd`
-(e.g. `set "RUN_ARGS=--monetize --log-dir logs"`). Heads-up: web search runs per
-extension, so a monetize run costs more and takes longer than ranking alone.
 
 ### Exit codes
 `0` ok · `2` no `ANTHROPIC_API_KEY` · `3` missing Supabase env (real run) · `1` other error.

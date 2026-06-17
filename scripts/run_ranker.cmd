@@ -1,13 +1,16 @@
 @echo off
 setlocal EnableExtensions
 REM ===========================================================================
-REM  ExtensionMiner - one-click Claude RANKING-LAYER launcher (Windows)
+REM  ExtensionMiner - one-click Claude ANALYSIS launcher (Windows)
 REM ---------------------------------------------------------------------------
-REM  Double-click this file (or its Desktop shortcut) to run the ranking layer
-REM  now. It reads the extensions + reviews you've scraped from Supabase, mines
-REM  the reviews with Claude, and writes the `opportunities` table the dashboard
-REM  shows. (This is the analysis step - it does NOT scrape; run the scraper
-REM  first so there are reviews to analyze.)
+REM  Double-click this file (or its Desktop shortcut) to run ALL the Claude
+REM  analysis tasks at once over the extensions + reviews you've scraped:
+REM    1. RANKING      - mines reviews for fixable complaints + "I'd pay" signals,
+REM                      scores each extension, writes the `opportunities` table.
+REM    2. MONETIZATION - web-searches each extension's pricing and estimates
+REM                      monthly revenue, writes the `monetization` table.
+REM  (This is the analysis step - it does NOT scrape; run the scraper first so
+REM  there are reviews to analyze.)
 REM
 REM  Before running, it AUTO-UPDATES the code (git pull of the latest) so you're
 REM  always on the newest version - while keeping your .env and the .venv (those
@@ -31,13 +34,18 @@ if not exist "%REPO%\analysis\run.py"  goto :norepo
 
 REM ===========================================================================
 REM  EDITABLE KNOBS
-REM  RUN_ARGS     - what to run. Default scores the top 25 extensions by installs
-REM                 and writes `opportunities`. Add e.g. --limit 50, or --no-db
-REM                 for a dry run that writes nothing.
+REM  RUN_ARGS     - what to run. Default = ALL Claude tasks on the top 25
+REM                 extensions by installs: ranking (--> opportunities) AND
+REM                 monetization research (--monetize --> monetization). Tweak it:
+REM                   --limit 50      do more extensions
+REM                   (drop --monetize) ranking only, no web-search/pricing pass
+REM                   --no-db         dry run, write nothing
+REM                 Heads-up: --monetize web-searches per extension, so it costs
+REM                 more and takes longer than ranking alone.
 REM  AUTO_UPDATE  - 1 = git pull the latest code before running; 0 = don't.
 REM  UPDATE_BRANCH- which branch to track (main is the canonical, current one).
 REM ===========================================================================
-set "RUN_ARGS=--log-dir logs"
+set "RUN_ARGS=--monetize --log-dir logs"
 set "AUTO_UPDATE=1"
 set "UPDATE_BRANCH=main"
 
@@ -130,9 +138,9 @@ set "RC=%ERRORLEVEL%"
 
 echo.
 if "%RC%"=="0" (
-  echo [done] Ranking finished OK. Opportunities updated; logs are in %REPO%\logs
+  echo [done] Claude analysis finished OK. Opportunities + monetization updated; logs are in %REPO%\logs
 ) else (
-  echo [done] Ranking exited with code %RC%. See the message above; full log in %REPO%\logs
+  echo [done] Claude analysis exited with code %RC%. See the message above; full log in %REPO%\logs
 )
 
 if not defined UNATTENDED pause

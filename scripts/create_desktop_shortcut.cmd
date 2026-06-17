@@ -36,7 +36,7 @@ if errorlevel 1 (
 
 if exist "%RANKER%" (
   echo   %RANKER%
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $lnk = $ws.CreateShortcut([System.IO.Path]::Combine($ws.SpecialFolders('Desktop'),'Run ExtensionMiner Ranking.lnk')); $lnk.TargetPath = '%RANKER%'; $lnk.WorkingDirectory = '%WORKDIR%'; $lnk.IconLocation = 'shell32.dll,43'; $lnk.Description = 'Run the ExtensionMiner Claude opportunity ranking layer'; $lnk.Save()"
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $lnk = $ws.CreateShortcut([System.IO.Path]::Combine($ws.SpecialFolders('Desktop'),'Run ExtensionMiner Ranking.lnk')); $lnk.TargetPath = '%RANKER%'; $lnk.WorkingDirectory = '%WORKDIR%'; $lnk.IconLocation = 'shell32.dll,43'; $lnk.Description = 'Run all ExtensionMiner Claude analysis (ranking + monetization)'; $lnk.Save()"
   if errorlevel 1 (
     echo.
     echo [WARN] Created the scraper shortcut but could not create the ranking one.
@@ -48,7 +48,7 @@ if exist "%RANKER%" (
 echo.
 echo Done. Look on your Desktop for:
 echo   "Run ExtensionMiner Scraper"  - scrape the Chrome Web Store
-echo   "Run ExtensionMiner Ranking"  - rank opportunities with Claude
+echo   "Run ExtensionMiner Ranking"  - all Claude analysis (ranking + monetization)
 echo Double-click either any time - no need to open this folder.
 echo.
 pause
