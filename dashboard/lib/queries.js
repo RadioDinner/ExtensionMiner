@@ -8,8 +8,15 @@ const EMPTY = {
   lowest: [],
   highest: [],
   opportunities: [],
+  helpfulReviews: [],
   points: [],
 };
+
+// Helpful-flagged reviews (community-upvoted) — the strongest single signal:
+// complaints people agree with. Lowest-star first so the gold surfaces on top.
+const HELPFUL_REVIEW_COLS =
+  "stars,author,body,reviewed_at,helpful_count,extensions(ext_id,name,store_category)";
+const HELPFUL_LIMIT = 20;
 
 // Lightweight columns for the charts; capped so a large catalog stays cheap.
 const POINT_COLS = "ext_id,name,rating,rating_count,install_count,store_category";
@@ -26,7 +33,7 @@ export async function getDashboardData() {
   if (!supabase) return EMPTY;
 
   try {
-    const [zone, lowest, highest, opps, points, extCount, revCount] = await Promise.all([
+    const [zone, lowest, highest, opps, points, extCount, revCount, helpful] = await Promise.all([
       supabase
         .from("extensions")
         .select(EXT_COLS)
@@ -49,7 +56,7 @@ export async function getDashboardData() {
         .limit(10),
       supabase
         .from("opportunities")
-        .select("score,top_complaint,complaint_type,fixable,brief,extensions(name,rating,install_count,listing_url)")
+        .select("score,top_complaint,complaint_type,fixable,brief,extensions(ext_id,name,rating,install_count,listing_url)")
         .order("score", { ascending: false, nullsFirst: false })
         .limit(25),
       supabase
@@ -60,9 +67,19 @@ export async function getDashboardData() {
         .limit(POINT_LIMIT),
       supabase.from("extensions").select("*", { count: "exact", head: true }),
       supabase.from("reviews").select("*", { count: "exact", head: true }),
+      supabase
+        .from("reviews")
+        .select(HELPFUL_REVIEW_COLS)
+        .eq("helpful_ranked", true)
+        .order("stars", { ascending: true, nullsFirst: false })
+        .order("reviewed_at", { ascending: false, nullsFirst: false })
+        .limit(HELPFUL_LIMIT),
     ]);
 
     // Surface the first real error (e.g. schema not applied yet) without crashing.
+    // `helpful` is intentionally excluded: it reads reviews.helpful_ranked, which
+    // only exists once migration 996 is applied, so a missing column degrades to
+    // an empty section instead of erroring the whole page.
     const firstError = [zone, lowest, highest, opps, points, extCount, revCount]
       .map((r) => r.error)
       .find(Boolean);
@@ -75,6 +92,7 @@ export async function getDashboardData() {
       lowest: lowest.data || [],
       highest: highest.data || [],
       opportunities: opps.data || [],
+      helpfulReviews: helpful.data || [],
       points: points.data || [],
     };
   } catch (err) {

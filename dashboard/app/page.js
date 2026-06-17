@@ -10,14 +10,61 @@ function fmt(n) {
 function stars(r) {
   return r == null ? "—" : `${Number(r).toFixed(1)}★`;
 }
+function fmtDate(s) {
+  if (!s) return "—";
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? "—" : d.toISOString().slice(0, 10);
+}
 function extLink(row) {
   const href = row.listing_url || (row.ext_id ? `https://chromewebstore.google.com/detail/x/${row.ext_id}` : null);
   return href ? <a href={href} target="_blank" rel="noreferrer">{row.name || row.ext_id}</a> : (row.name || row.ext_id);
 }
-// Internal link to the saved reviews we scraped for this extension.
+// Internal link to the saved reviews we scraped for a given ext_id.
+function reviewLinkFor(extId, label) {
+  if (!extId) return label || "—";
+  return <a href={`/reviews/${encodeURIComponent(extId)}`}>{label || extId}</a>;
+}
 function reviewLink(row) {
-  if (!row.ext_id) return row.name || "—";
-  return <a href={`/reviews/${encodeURIComponent(row.ext_id)}`}>{row.name || row.ext_id}</a>;
+  return reviewLinkFor(row.ext_id, row.name || row.ext_id);
+}
+
+function StarRow({ n }) {
+  const filled = Math.max(0, Math.min(5, Math.round(Number(n) || 0)));
+  return (
+    <span className="stars" title={`${n ?? "?"} of 5`}>
+      {"★".repeat(filled)}
+      <span className="off">{"★".repeat(5 - filled)}</span>
+    </span>
+  );
+}
+
+// Community-upvoted reviews (surfaced under the store's "Helpful" sort) — the
+// complaints people agree with. Lowest-star first, each linking to that
+// extension's saved reviews. Hidden entirely until there's data (so it stays
+// quiet until migration 996 is applied and a Helpful-sort pass has run).
+function HelpfulReviews({ rows }) {
+  if (!rows || rows.length === 0) return null;
+  return (
+    <ul className="reviews">
+      {rows.map((rv, i) => (
+        <li key={i} className="review">
+          <div className="review-head">
+            <StarRow n={rv.stars} />
+            <span className="author">{rv.author || "Anonymous"}</span>
+            <span className="badge-helpful">👍 Helpful</span>
+            <span className="ext-ref">
+              {reviewLinkFor(rv.extensions?.ext_id, rv.extensions?.name)}
+              {rv.extensions?.store_category ? <span className="pill">{rv.extensions.store_category}</span> : null}
+            </span>
+            <span className="date">{fmtDate(rv.reviewed_at)}</span>
+          </div>
+          <p className="review-body">
+            {rv.body ? rv.body : <em className="muted">(no review text)</em>}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function ExtTable({ rows, showCategory, linkReviews }) {
@@ -67,7 +114,7 @@ function OpportunityTable({ rows }) {
         {rows.map((r, i) => (
           <tr key={i}>
             <td className="num">{r.score == null ? "—" : Number(r.score).toFixed(1)}</td>
-            <td>{r.extensions?.name || "—"}</td>
+            <td>{reviewLinkFor(r.extensions?.ext_id, r.extensions?.name)}</td>
             <td>{r.top_complaint || "—"}</td>
             <td><span className="pill">{r.complaint_type || "—"}</span></td>
             <td>{r.fixable || "—"}</td>
@@ -159,9 +206,17 @@ export default async function Page() {
 
       <section>
         <h2>Scored opportunities</h2>
-        <p className="sub">Ranked by the Claude review-mining layer (Phase 3).</p>
+        <p className="sub">Ranked by the Claude review-mining layer (Phase 3). Click a name to read its saved reviews.</p>
         <OpportunityTable rows={d.opportunities} />
       </section>
+
+      {d.helpfulReviews && d.helpfulReviews.length > 0 && (
+        <section>
+          <h2>👍 Community-upvoted reviews</h2>
+          <p className="sub">Reviews the store flagged as <em>Helpful</em> — complaints people agree with, lowest-rated first. Click an extension to see all its saved reviews.</p>
+          <HelpfulReviews rows={d.helpfulReviews} />
+        </section>
+      )}
 
       <section>
         <h2>Lowest rated (high installs first)</h2>
