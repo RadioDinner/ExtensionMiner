@@ -45,7 +45,12 @@ function moneyStatus(m) {
 // Every column: how to read its value (for sorting) and render its cell. One
 // source of truth drives both the header and the body.
 const COLUMNS = [
-  { key: "name", label: "Extension", num: false, get: (r) => (r.name || r.ext_id || "").toLowerCase(), cell: (r) => reviewLink(r) },
+  { key: "name", label: "Extension", num: false, get: (r) => (r.name || r.ext_id || "").toLowerCase(), cell: (r, _money, dd) => (
+      <>
+        {reviewLink(r)}
+        {dd && dd.has(r.ext_id) ? <span className="dd-mark" title="Deep-dive researched">🔬</span> : null}
+      </>
+    ) },
   { key: "category", label: "Category", num: false, get: (r) => r.store_category, cell: (r) => <span className="pill">{r.store_category || "—"}</span> },
   { key: "rating", label: "Rating", num: true, get: (r) => r.rating, cell: (r) => stars(r.rating) },
   { key: "ratings", label: "Ratings", num: true, get: (r) => r.rating_count, cell: (r) => fmt(r.rating_count) },
@@ -65,7 +70,7 @@ const INSTALL_PRESETS = [
 // Interactive "Opportunity zone" table: click any column header to sort (click
 // again to flip direction), plus filters. All client-side over the rows the
 // server already fetched — no new query.
-export default function OpportunityZoneCard({ rows, monetization }) {
+export default function OpportunityZoneCard({ rows, monetization, deepDived }) {
   const [sortKey, setSortKey] = useState("installs"); // matches the old default
   const [dir, setDir] = useState("desc");
   const [minInstalls, setMinInstalls] = useState(0);
@@ -77,6 +82,7 @@ export default function OpportunityZoneCard({ rows, monetization }) {
   if (!rows || rows.length === 0) return <p className="empty">No data yet.</p>;
 
   const money = monetization || {};
+  const dd = new Set(deepDived || []);
   const categories = Array.from(new Set(rows.map((r) => r.store_category).filter(Boolean))).sort();
 
   function onSort(col) {
@@ -181,7 +187,7 @@ export default function OpportunityZoneCard({ rows, monetization }) {
             {sorted.map((r) => (
               <tr key={r.ext_id}>
                 {COLUMNS.map((c) => (
-                  <td key={c.key} className={c.num ? "num" : undefined}>{c.cell(r, money)}</td>
+                  <td key={c.key} className={c.num ? "num" : undefined}>{c.cell(r, money, dd)}</td>
                 ))}
               </tr>
             ))}

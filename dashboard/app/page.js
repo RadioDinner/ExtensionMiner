@@ -51,6 +51,12 @@ function reviewLinkFor(extId, label) {
 function reviewLink(row) {
   return reviewLinkFor(row.ext_id, row.name || row.ext_id);
 }
+// 🔬 next to extensions that have a completed deep dive (set of ext_ids).
+function deepDiveMark(extId, ddSet) {
+  return ddSet && ddSet.has(extId) ? (
+    <span className="dd-mark" title="Deep-dive researched">🔬</span>
+  ) : null;
+}
 
 // Community-upvoted reviews (surfaced under the store's "Helpful" sort) — the
 // complaints people agree with. Defaults to lowest-star first (the gold), each
@@ -62,8 +68,9 @@ function HelpfulReviews({ rows }) {
   return <ReviewList rows={rows} variant="helpful" defaultSort="rating-asc" />;
 }
 
-function ExtTable({ rows, showCategory, linkReviews, showMoney, money }) {
+function ExtTable({ rows, showCategory, linkReviews, showMoney, money, deepDived }) {
   if (!rows || rows.length === 0) return <p className="empty">No data yet.</p>;
+  const dd = new Set(deepDived || []);
   return (
     <table>
       <thead>
@@ -83,7 +90,7 @@ function ExtTable({ rows, showCategory, linkReviews, showMoney, money }) {
           const m = money ? money[r.ext_id] : null;
           return (
             <tr key={r.ext_id}>
-              <td>{linkReviews ? reviewLink(r) : extLink(r)}</td>
+              <td>{linkReviews ? reviewLink(r) : extLink(r)}{deepDiveMark(r.ext_id, dd)}</td>
               {showCategory ? <td><span className="pill">{r.store_category || "—"}</span></td> : null}
               <td className="num">{stars(r.rating)}</td>
               <td className="num">{fmt(r.rating_count)}</td>
@@ -174,14 +181,14 @@ export default async function Page() {
 
       <section className="zone">
         <h2>★ Opportunity zone (2.5–3.5★)</h2>
-        <p className="sub">Real demand, unhappy users — the targets to overtake. Click any column to sort, or filter below. Click a name to read its saved reviews. Pricing/revenue is researched by the ranking layer.</p>
-        <OpportunityZoneCard rows={d.opportunityZone} monetization={d.monetization} />
+        <p className="sub">Real demand, unhappy users — the targets to overtake. Click any column to sort, or filter below. Click a name to read its saved reviews. Pricing/revenue is researched by the ranking layer. <span className="dd-mark">🔬</span> marks extensions you've deep-dive researched.</p>
+        <OpportunityZoneCard rows={d.opportunityZone} monetization={d.monetization} deepDived={d.deepDived} />
       </section>
 
       <section>
         <h2>Scored opportunities</h2>
         <p className="sub">Ranked by the Claude review-mining layer (Phase 3). Filter by complaint type or pricing; click a name to read its saved reviews.</p>
-        <OpportunitiesCard rows={d.opportunities} monetization={d.monetization} />
+        <OpportunitiesCard rows={d.opportunities} monetization={d.monetization} deepDived={d.deepDived} />
       </section>
 
       {d.helpfulReviews && d.helpfulReviews.length > 0 && (
@@ -194,12 +201,12 @@ export default async function Page() {
 
       <section>
         <h2>Lowest rated (high installs first)</h2>
-        <ExtTable rows={d.lowest} />
+        <ExtTable rows={d.lowest} deepDived={d.deepDived} />
       </section>
 
       <section>
         <h2>Highest rated</h2>
-        <ExtTable rows={d.highest} />
+        <ExtTable rows={d.highest} deepDived={d.deepDived} />
       </section>
     </main>
   );

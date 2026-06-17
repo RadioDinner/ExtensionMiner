@@ -51,7 +51,7 @@ function recencyCell(w) {
 
 // Interactive "Scored opportunities" card: filter by complaint type + paid/unpaid,
 // sort by score. All client-side over the rows the server already fetched.
-export default function OpportunitiesCard({ rows, monetization }) {
+export default function OpportunitiesCard({ rows, monetization, deepDived }) {
   const [type, setType] = useState("all");
   const [pricing, setPricing] = useState("all");
   const [sort, setSort] = useState("score-desc");
@@ -62,6 +62,7 @@ export default function OpportunitiesCard({ rows, monetization }) {
   }
 
   const money = monetization || {};
+  const dd = new Set(deepDived || []);
   const filtered = rows
     .filter((r) => {
       if (type !== "all" && r.complaint_type !== type) return false;
@@ -133,7 +134,10 @@ export default function OpportunitiesCard({ rows, monetization }) {
               return (
                 <tr key={i}>
                   <td className="num">{r.score == null ? "—" : Number(r.score).toFixed(1)}</td>
-                  <td>{reviewLinkFor(r.extensions?.ext_id, r.extensions?.name)}</td>
+                  <td>
+                    {reviewLinkFor(r.extensions?.ext_id, r.extensions?.name)}
+                    {dd.has(r.extensions?.ext_id) ? <span className="dd-mark" title="Deep-dive researched">🔬</span> : null}
+                  </td>
                   <td>{r.top_complaint || "—"}</td>
                   <td><span className="pill">{r.complaint_type || "—"}</span></td>
                   <td>{r.fixable || "—"}</td>

@@ -10,6 +10,7 @@ const EMPTY = {
   opportunities: [],
   helpfulReviews: [],
   monetization: {},
+  deepDived: [],
   points: [],
 };
 
@@ -42,7 +43,7 @@ export async function getDashboardData() {
   if (!supabase) return EMPTY;
 
   try {
-    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money] = await Promise.all([
+    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money, deepDives] = await Promise.all([
       supabase
         .from("extensions")
         .select(EXT_SELECT)
@@ -88,13 +89,18 @@ export async function getDashboardData() {
         .select(MONETIZATION_COLS)
         .order("estimated_monthly_revenue_usd", { ascending: false, nullsFirst: false })
         .limit(2000),
+      supabase
+        .from("deep_dives")
+        .select("extensions(ext_id)")
+        .eq("status", "done")
+        .limit(2000),
     ]);
 
     // Surface the first real error (e.g. schema not applied yet) without crashing.
-    // `helpful` and `money` are intentionally excluded: they read columns/tables
-    // (reviews.helpful_ranked, monetization) that only exist once migrations 996 /
-    // 995 are applied, so a missing one degrades to an empty section instead of
-    // erroring the whole page.
+    // `helpful`, `money` and `deepDives` are intentionally excluded: they read
+    // columns/tables (reviews.helpful_ranked, monetization, deep_dives) that only
+    // exist once migrations 996 / 995 / 993 are applied, so a missing one degrades
+    // to an empty section instead of erroring the whole page.
     const firstError = [zone, lowest, highest, opps, points, extCount, revCount]
       .map((r) => r.error)
       .find(Boolean);
@@ -106,6 +112,9 @@ export async function getDashboardData() {
       if (extId) monetization[extId] = m;
     }
 
+    // ext_ids that have a completed deep dive — to flag them in the lists.
+    const deepDived = (deepDives.data || []).map((d) => d.extensions?.ext_id).filter(Boolean);
+
     return {
       configured: true,
       error: firstError ? firstError.message : null,
@@ -116,6 +125,7 @@ export async function getDashboardData() {
       opportunities: opps.data || [],
       helpfulReviews: helpful.data || [],
       monetization,
+      deepDived,
       points: points.data || [],
     };
   } catch (err) {
