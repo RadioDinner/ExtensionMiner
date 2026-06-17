@@ -48,3 +48,12 @@ Why does it cap at 32 extensions? I wanted all extensions...
 
 5. On the dashboard, I see a count of ratings according to the google web store page. I like that and want to keep it, but I also want a count of ratings that I have saved for that extension per my own data, in a column next to it
 
+6. PS C:\Users\derrick.wengerd\Downloads\ExtensionMiner> python run_scraper.py --categories "productivity/tools" --max-extensions 0 --no-db --log-dir logs
+Traceback (most recent call last):
+  File "...run_scraper.py", line 15, in <module>
+    from scraper.run import main
+  ...
+  File "...scraper\parse.py", line 21, in <module>
+    from bs4 import BeautifulSoup
+ModuleNotFoundError: No module named 'bs4'
+
