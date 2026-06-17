@@ -25,6 +25,11 @@ opportunities  (score, top complaint, WTP evidence, brief)  → Supabase
 
 ## Run
 
+On Windows, the easy way is the **"Run ExtensionMiner Ranking"** Desktop button
+(from `scripts\create_desktop_shortcut.cmd`) → it runs `scripts\run_ranker.cmd`,
+which sets up the venv and runs the ranker. Full walkthrough:
+[`docs/RUNNING_THE_RANKER.md`](../docs/RUNNING_THE_RANKER.md). By hand:
+
 ```bash
 pip install -r requirements.txt
 # .env needs ANTHROPIC_API_KEY (+ SUPABASE_* unless --no-db). Model defaults to
@@ -32,6 +37,7 @@ pip install -r requirements.txt
 
 python -m analysis.run --limit 5 --no-db   # dry run: analyze + score, no writes
 python -m analysis.run --limit 25          # real run: writes opportunities
+# or the top-level shim: python run_ranker.py --limit 25 --log-dir logs
 ```
 
 This layer can run in the Claude-Code web env too — the Anthropic API is

@@ -11,16 +11,7 @@
 
 ---
 
-## 1. 🆕 Run the Claude ranking layer from a dashboard button
-Add a button on the dashboard that triggers the **Claude ranking layer** (the
-review-mining/scoring step in `analysis/`) so it can be run on demand without the
-command line.
-
-- Needs a server-side trigger (the ranking layer uses the Anthropic API key,
-  which must stay server-side — never shipped to the browser).
-- Consider: run state/progress feedback, and guarding against double-runs.
-
-## 2. 🆕 Monetization / pricing intel per extension
+## 1. 🆕 Monetization / pricing intel per extension
 Surface, on the dashboard, whether an extension **makes money** and how it's
 monetized: **paid / free / premium (freemium)**, plus an **estimated income**
 over a sensible timeframe (daily / weekly / monthly / annual).
@@ -30,14 +21,14 @@ over a sensible timeframe (daily / weekly / monthly / annual).
 - New stored fields (pricing model, price points, estimated income) + dashboard
   display.
 
-## 3. 🆕 Sort & filter the "Scored opportunities" card
+## 2. 🆕 Sort & filter the "Scored opportunities" card
 Make the **Scored opportunities** card sortable/filterable:
 
 - Load highest-scored opportunities **by complaint type** (e.g. `bug`,
   `missing_feature`, …).
-- **Filter paid vs. unpaid** extensions (depends on feature #2's pricing data).
+- **Filter paid vs. unpaid** extensions (depends on feature #1's pricing data).
 
-## 4. 🆕 Recency-weighted review scoring (decay old reviews)
+## 3. 🆕 Recency-weighted review scoring (decay old reviews)
 Keep collecting older reviews, but **down-weight old ones** in the ranking
 algorithm, since very old reviews likely describe old releases. Apply a decay to
 a review's contribution based on age (tune the exact curve):

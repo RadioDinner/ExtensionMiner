@@ -51,9 +51,13 @@ env). On Windows you don't need a terminal:
   installs deps + Chromium on first run, crawls, writes to Supabase, and quits.
 - **Run daily:** double-click `scripts\install_daily_task.cmd` once to register a
   Windows scheduled task.
+- **Rank opportunities:** double-click `scripts\run_ranker.cmd` to run the Claude
+  ranking layer (mines reviews → writes the `opportunities` table). Run
+  `scripts\create_desktop_shortcut.cmd` once to get both buttons on your Desktop.
 
-Full guide (setup, `.env`, scheduling, troubleshooting):
-[`docs/RUNNING_THE_SCRAPER.md`](./docs/RUNNING_THE_SCRAPER.md).
+Full guides (setup, `.env`, scheduling, troubleshooting):
+[`docs/RUNNING_THE_SCRAPER.md`](./docs/RUNNING_THE_SCRAPER.md) ·
+[`docs/RUNNING_THE_RANKER.md`](./docs/RUNNING_THE_RANKER.md).
 
 ## Working in this repo
 

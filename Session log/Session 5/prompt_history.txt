@@ -78,3 +78,7 @@ Is this what you were expecting to see for that command? [ran --all-categories -
 
 11. are there outstanding issues
 
+12. The test is running, and looks like it'll take some time. Let's Tackle the feature list. What is the first one
+
+13. [AskUserQuestion answer] Ranking trigger -> "Desktop button (local)": a one-click .cmd like the scraper launcher that runs the ranker directly on the machine (not a dashboard button).
+

@@ -1,38 +1,54 @@
 @echo off
 setlocal EnableExtensions
 REM ===========================================================================
-REM  ExtensionMiner - put a "Run ExtensionMiner Scraper" button on your Desktop
+REM  ExtensionMiner - put the run buttons on your Desktop
 REM ---------------------------------------------------------------------------
-REM  Run this ONCE. It creates a Desktop shortcut that points at run_scraper.cmd
-REM  in this folder. After that, just double-click the Desktop icon to run the
-REM  scraper - you never have to open the repo folder again. (The shortcut keeps
-REM  pointing at the real file in the repo, so it always runs in the right place.)
+REM  Run this ONCE. It creates two Desktop shortcuts pointing at the launchers in
+REM  this folder:
+REM    * "Run ExtensionMiner Scraper"  -> run_scraper.cmd  (scrape the store)
+REM    * "Run ExtensionMiner Ranking"  -> run_ranker.cmd   (Claude opportunity
+REM                                                          ranking)
+REM  After that, just double-click the Desktop icons - you never have to open the
+REM  repo folder again. (The shortcuts keep pointing at the real files in the
+REM  repo, so they always run in the right place.)
 REM ===========================================================================
 
-set "TARGET=%~dp0run_scraper.cmd"
 set "WORKDIR=%~dp0"
+set "SCRAPER=%~dp0run_scraper.cmd"
+set "RANKER=%~dp0run_ranker.cmd"
 
-if not exist "%TARGET%" (
+if not exist "%SCRAPER%" (
   echo [ERROR] Can't find run_scraper.cmd next to this script.
   echo         Keep this file in the repo's scripts\ folder and run it from there.
   pause
   exit /b 1
 )
 
-echo Creating a Desktop shortcut to:
-echo   %TARGET%
-echo.
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $lnk = $ws.CreateShortcut([System.IO.Path]::Combine($ws.SpecialFolders('Desktop'),'Run ExtensionMiner Scraper.lnk')); $lnk.TargetPath = '%TARGET%'; $lnk.WorkingDirectory = '%WORKDIR%'; $lnk.IconLocation = 'shell32.dll,137'; $lnk.Description = 'Run the ExtensionMiner Chrome Web Store scraper'; $lnk.Save()"
-
+echo Creating Desktop shortcuts...
+echo   %SCRAPER%
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $lnk = $ws.CreateShortcut([System.IO.Path]::Combine($ws.SpecialFolders('Desktop'),'Run ExtensionMiner Scraper.lnk')); $lnk.TargetPath = '%SCRAPER%'; $lnk.WorkingDirectory = '%WORKDIR%'; $lnk.IconLocation = 'shell32.dll,137'; $lnk.Description = 'Run the ExtensionMiner Chrome Web Store scraper'; $lnk.Save()"
 if errorlevel 1 (
   echo.
-  echo [ERROR] Could not create the shortcut.
+  echo [ERROR] Could not create the scraper shortcut.
   pause
   exit /b 1
 )
 
-echo Done. Look for "Run ExtensionMiner Scraper" on your Desktop.
-echo Double-click it any time to run the scraper - no need to open this folder.
+if exist "%RANKER%" (
+  echo   %RANKER%
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $lnk = $ws.CreateShortcut([System.IO.Path]::Combine($ws.SpecialFolders('Desktop'),'Run ExtensionMiner Ranking.lnk')); $lnk.TargetPath = '%RANKER%'; $lnk.WorkingDirectory = '%WORKDIR%'; $lnk.IconLocation = 'shell32.dll,43'; $lnk.Description = 'Run the ExtensionMiner Claude opportunity ranking layer'; $lnk.Save()"
+  if errorlevel 1 (
+    echo.
+    echo [WARN] Created the scraper shortcut but could not create the ranking one.
+  )
+) else (
+  echo [WARN] run_ranker.cmd not found next to this script; skipping the ranking shortcut.
+)
+
+echo.
+echo Done. Look on your Desktop for:
+echo   "Run ExtensionMiner Scraper"  - scrape the Chrome Web Store
+echo   "Run ExtensionMiner Ranking"  - rank opportunities with Claude
+echo Double-click either any time - no need to open this folder.
 echo.
 pause
