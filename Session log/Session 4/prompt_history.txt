@@ -27,3 +27,5 @@ Sample extensions
 No rows returned (see the verdict above for why).
 
 ← Back to dashboard
+
+3. before we go any further, I need to clarify and fix this, this is session 4, not 3
