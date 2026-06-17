@@ -11,3 +11,6 @@ Add a feature to the list. When I click into an extension to explore it, I want 
 
 3.
 Add a feature to the list. I want the ranking algorithm to check for extensions that are declining in quality or have an uptick of complaints in recent reviews. This way i can target the WEAK ONES and pick them off.
+
+4.
+whats the next feature
