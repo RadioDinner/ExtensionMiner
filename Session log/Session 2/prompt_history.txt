@@ -1,3 +1,38 @@
 1. Let's kick off a new session. Is it possible to have you work on the dashboard here while the powershell chat is going on? The powershell is running the python script
 
 2. where we at?
+
+3. is there any way to avoid the yes/no prompts like this
+
+" Command modifies environment variables
+
+ Do you want to proceed?
+ > 1. Yes
+   2. Yes, and don't ask again for: Remove-Item *
+   3. No"
+
+in the powershell session? considering setting a macro to press enter every 60 seconds
+
+4. also, I have data in the tables but the dashboard isn't showing anything
+
+5. You tell me, this is how its going... I'm not impressed, so far just this garbage
+   [User pasted a long transcript from the LOCAL PowerShell Claude Code session
+   doing the scraper work. Substance: fixed description/developer/summary parsing
+   (text-based); discovered reviews live on a dedicated /reviews sub-page (the
+   detail page shows none); the [aria-label*='out of 5'] selector had been
+   matching the overall rating + the "Related extensions" carousel ratings
+   (garbage, not real reviews); added real review-card selectors
+   (section.T7rvce / span.LfYwpe / span.ydlbEf / .fzDEpf) with dev-reply
+   exclusion; body-selector bug (div.fzDEpf vs the actual <p class="fzDEpf">);
+   KEY FINDING: the store reviews page HARD-CAPS at ~10 reviews per extension
+   even with 20+ scrolls; 46 tests passing; cleared reviews 54->0 for a clean
+   re-scrape. Embedded VERBATIM user interjections inside that transcript:
+   "I want ALL the reviews from ALL the extensions. I don't care if I need to
+   run the python script ALL NIGHT. I WANT ALL THE DATA, OK?!" and
+   "Why do you keep stopping me to ask me yes or no? I always hit yes anyways"]
+
+6. Is this session still valid
+
+7. well the dashboard still isn't loading data, can you put diagnostics into this so it does?
+
+8. merge to main
