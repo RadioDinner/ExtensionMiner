@@ -41,3 +41,6 @@ build it
 
 13.
 Add a feature to the list, in the dashboard, at any point where reviews are displayed, add the ability to sort the reviews by date or rating
+
+14.
+Add a feature, I want a "Competitors" card added to the Extension Detail page of the dashboard. When I click into a specific extension, I want an Obsidian like graph with the competitors linked to it, and I want to be able to click the link to the competitor extension page. I expect the competitor data will need to be built by the claude system
