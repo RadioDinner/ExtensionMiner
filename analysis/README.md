@@ -55,8 +55,10 @@ python -m analysis.run --deep-dive        # rank, then also process the pool
 Each queued extension gets one web-search-backed Claude call → `DeepDiveReport`
 (what it is, a deep review read, the **competitors** with pricing/strengths/
 weaknesses, the opportunity, and a build/maybe/avoid verdict), written back to
-its `deep_dives` row and shown on the detail page. The "Run Ranking" desktop
-button runs this pass too (`--deep-dive`).
+its `deep_dives` row and shown on the detail page — the competitors render as an
+Obsidian-style **force-directed graph** (drag nodes; click one to open its page)
+plus a detail list. The "Run Ranking" desktop button runs this pass too
+(`--deep-dive`).
 
 ### Extension detail digest (`/reviews/<ext_id>`)
 

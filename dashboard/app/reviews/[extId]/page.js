@@ -1,6 +1,7 @@
 import { getExtensionReviews } from "../../../lib/queries";
 import DeepDiveButton from "./DeepDiveButton";
 import ReviewList from "../../ReviewList";
+import CompetitorGraph from "../../CompetitorGraph";
 
 // Render at request time so the build never needs Supabase credentials.
 export const dynamic = "force-dynamic";
@@ -151,6 +152,7 @@ export default async function ReviewsPage({ params }) {
           {competitors.length > 0 ? (
             <div className="card digest-card">
               <h3>Competitors ({competitors.length})</h3>
+              <CompetitorGraph name={ext?.name || ext?.ext_id || "This extension"} competitors={competitors} />
               <ul className="competitors">
                 {competitors.map((c, i) => (
                   <li key={i} className="competitor">

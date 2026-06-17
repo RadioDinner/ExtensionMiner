@@ -196,6 +196,26 @@ header .store-link { margin: 8px 0 0; font-size: 13px; }
 .verdict-build { background: #123524; color: #4ade80; border: 1px solid #1c5238; }
 .verdict-maybe { background: #3a2f12; color: var(--gold); border: 1px solid #5c4a1c; }
 .verdict-avoid { background: #3a1620; color: #f87171; border: 1px solid #5c2230; }
+/* Competitor graph (Obsidian-style force layout) */
+.graph-wrap { margin: 4px 0 14px; }
+.competitor-graph {
+  width: 100%; height: auto; display: block; touch-action: none;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+}
+.graph-edge { stroke: var(--line); stroke-width: 1.5; }
+.graph-node { cursor: grab; }
+.graph-node.linked { cursor: pointer; }
+.graph-node:active { cursor: grabbing; }
+.node-dot { stroke: var(--bg); stroke-width: 2; transition: fill .12s ease; }
+.node-dot.self { fill: var(--gold); }
+.node-dot.comp { fill: var(--accent); }
+.competitor-graph a:hover .node-dot.comp { fill: color-mix(in srgb, var(--accent) 65%, #fff); }
+.competitor-graph a:hover .node-label { fill: #fff; }
+.node-label { fill: var(--text); font-size: 13px; font-weight: 600; }
+.node-label.self { fill: var(--gold); font-size: 14px; }
+.node-sub { fill: var(--muted); font-size: 11px; }
+.graph-hint { font-size: 12px; margin: 6px 0 0; text-align: center; }
+
 .competitors { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .competitor { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
 .competitor-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
