@@ -20,6 +20,27 @@ function fmtDate(s) {
 function savedCount(row) {
   return row?.reviews?.[0]?.count ?? null;
 }
+// Compact USD, e.g. $0 / $940 / $12k / $3.4M.
+function fmtUSD(n) {
+  if (n == null) return "—";
+  const v = Number(n);
+  if (!isFinite(v)) return "—";
+  if (v <= 0) return "$0";
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}k`;
+  return `$${Math.round(v)}`;
+}
+// Pricing-model pill from a monetization row (hover shows the summary + range).
+function pricingCell(m) {
+  if (!m || !m.pricing_model) return "—";
+  const label = m.pricing_model.charAt(0).toUpperCase() + m.pricing_model.slice(1);
+  const range =
+    m.revenue_low_usd != null && m.revenue_high_usd != null
+      ? ` · est ${fmtUSD(m.revenue_low_usd)}–${fmtUSD(m.revenue_high_usd)}/mo`
+      : "";
+  const title = `${m.monetization_summary || label}${range}${m.confidence ? ` (${m.confidence} confidence)` : ""}`;
+  return <span className="pill" title={title}>{label}</span>;
+}
 function extLink(row) {
   const href = row.listing_url || (row.ext_id ? `https://chromewebstore.google.com/detail/x/${row.ext_id}` : null);
   return href ? <a href={href} target="_blank" rel="noreferrer">{row.name || row.ext_id}</a> : (row.name || row.ext_id);
@@ -72,7 +93,7 @@ function HelpfulReviews({ rows }) {
   );
 }
 
-function ExtTable({ rows, showCategory, linkReviews }) {
+function ExtTable({ rows, showCategory, linkReviews, showMoney, money }) {
   if (!rows || rows.length === 0) return <p className="empty">No data yet.</p>;
   return (
     <table>
@@ -84,19 +105,26 @@ function ExtTable({ rows, showCategory, linkReviews }) {
           <th className="num" title="Total ratings on the Chrome Web Store">Ratings</th>
           <th className="num" title="Reviews/ratings saved in your own data">Saved</th>
           <th className="num">Installs</th>
+          {showMoney ? <th title="Monetization model (researched by the ranking layer)">Pricing</th> : null}
+          {showMoney ? <th className="num" title="Estimated monthly revenue (rough; hover for range + confidence)">Est. /mo</th> : null}
         </tr>
       </thead>
       <tbody>
-        {rows.map((r) => (
-          <tr key={r.ext_id}>
-            <td>{linkReviews ? reviewLink(r) : extLink(r)}</td>
-            {showCategory ? <td><span className="pill">{r.store_category || "—"}</span></td> : null}
-            <td className="num">{stars(r.rating)}</td>
-            <td className="num">{fmt(r.rating_count)}</td>
-            <td className="num">{fmt(savedCount(r))}</td>
-            <td className="num">{fmt(r.install_count)}</td>
-          </tr>
-        ))}
+        {rows.map((r) => {
+          const m = money ? money[r.ext_id] : null;
+          return (
+            <tr key={r.ext_id}>
+              <td>{linkReviews ? reviewLink(r) : extLink(r)}</td>
+              {showCategory ? <td><span className="pill">{r.store_category || "—"}</span></td> : null}
+              <td className="num">{stars(r.rating)}</td>
+              <td className="num">{fmt(r.rating_count)}</td>
+              <td className="num">{fmt(savedCount(r))}</td>
+              <td className="num">{fmt(r.install_count)}</td>
+              {showMoney ? <td>{pricingCell(m)}</td> : null}
+              {showMoney ? <td className="num">{m ? fmtUSD(m.estimated_monthly_revenue_usd) : "—"}</td> : null}
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
@@ -207,8 +235,8 @@ export default async function Page() {
 
       <section className="zone">
         <h2>★ Opportunity zone (2.5–3.5★, by installs)</h2>
-        <p className="sub">Real demand, unhappy users — the targets to overtake. Click a name to read its saved reviews.</p>
-        <ExtTable rows={d.opportunityZone} showCategory linkReviews />
+        <p className="sub">Real demand, unhappy users — the targets to overtake. Click a name to read its saved reviews. Pricing/revenue is researched by the ranking layer.</p>
+        <ExtTable rows={d.opportunityZone} showCategory linkReviews showMoney money={d.monetization} />
       </section>
 
       <section>

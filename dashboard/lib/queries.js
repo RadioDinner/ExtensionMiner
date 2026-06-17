@@ -9,8 +9,13 @@ const EMPTY = {
   highest: [],
   opportunities: [],
   helpfulReviews: [],
+  monetization: {},
   points: [],
 };
+
+// Monetization columns we surface in the tables (keyed by ext_id below).
+const MONETIZATION_COLS =
+  "pricing_model,makes_money,has_paid_tier,estimated_monthly_revenue_usd,revenue_low_usd,revenue_high_usd,confidence,monetization_summary,extensions(ext_id)";
 
 // Helpful-flagged reviews (community-upvoted) — the strongest single signal:
 // complaints people agree with. Lowest-star first so the gold surfaces on top.
@@ -37,7 +42,7 @@ export async function getDashboardData() {
   if (!supabase) return EMPTY;
 
   try {
-    const [zone, lowest, highest, opps, points, extCount, revCount, helpful] = await Promise.all([
+    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money] = await Promise.all([
       supabase
         .from("extensions")
         .select(EXT_SELECT)
@@ -78,15 +83,28 @@ export async function getDashboardData() {
         .order("stars", { ascending: true, nullsFirst: false })
         .order("reviewed_at", { ascending: false, nullsFirst: false })
         .limit(HELPFUL_LIMIT),
+      supabase
+        .from("monetization")
+        .select(MONETIZATION_COLS)
+        .order("estimated_monthly_revenue_usd", { ascending: false, nullsFirst: false })
+        .limit(2000),
     ]);
 
     // Surface the first real error (e.g. schema not applied yet) without crashing.
-    // `helpful` is intentionally excluded: it reads reviews.helpful_ranked, which
-    // only exists once migration 996 is applied, so a missing column degrades to
-    // an empty section instead of erroring the whole page.
+    // `helpful` and `money` are intentionally excluded: they read columns/tables
+    // (reviews.helpful_ranked, monetization) that only exist once migrations 996 /
+    // 995 are applied, so a missing one degrades to an empty section instead of
+    // erroring the whole page.
     const firstError = [zone, lowest, highest, opps, points, extCount, revCount]
       .map((r) => r.error)
       .find(Boolean);
+
+    // ext_id -> monetization profile, for cheap lookups in the tables.
+    const monetization = {};
+    for (const m of money.data || []) {
+      const extId = m.extensions?.ext_id;
+      if (extId) monetization[extId] = m;
+    }
 
     return {
       configured: true,
@@ -97,6 +115,7 @@ export async function getDashboardData() {
       highest: highest.data || [],
       opportunities: opps.data || [],
       helpfulReviews: helpful.data || [],
+      monetization,
       points: points.data || [],
     };
   } catch (err) {

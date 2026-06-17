@@ -21,7 +21,23 @@ opportunities  (score, top complaint, WTP evidence, brief)  → Supabase
 | `schema.py` | Pydantic structured-output schema for Claude |
 | `prompt.py` | System + per-extension user prompt |
 | `rank.py` | `analyze_extension` (the one Claude call) + `score_opportunity` (pure, tested) + `rank_all` orchestration |
-| `run.py` | CLI (`python -m analysis.run`) |
+| `monetize.py` | Monetization research: `research_monetization` (one **web-search** Claude call → `MonetizationProfile`) + `monetize_all`; writes the `monetization` table the dashboard shows |
+| `run.py` | CLI (`python -m analysis.run`; `--monetize` also runs the monetization pass) |
+
+### Monetization (is it making money?)
+
+`python -m analysis.monetize` web-searches each extension for its pricing
+(free / freemium / paid / subscription / ads) and estimates monthly revenue,
+writing the `monetization` table (migration **995**). Run it standalone, or add
+`--monetize` to a ranking run to do both at once:
+
+```bash
+python -m analysis.monetize --limit 25            # research the top 25 by installs
+python -m analysis.run --limit 25 --monetize      # rank AND research monetization
+```
+
+The dashboard's opportunity-zone table shows the pricing model + an estimated
+monthly revenue per extension once this has run.
 
 ## Run
 

@@ -149,7 +149,7 @@ def fetch_extensions_for_analysis(limit: int = 25) -> list[dict[str, Any]]:
     res = (
         get_client()
         .table("extensions")
-        .select("id,ext_id,name,store_category,rating,rating_count,install_count")
+        .select("id,ext_id,name,store_category,rating,rating_count,install_count,website")
         .order("install_count", desc=True)
         .limit(limit)
         .execute()
@@ -174,4 +174,10 @@ def fetch_reviews_for_extension(extension_id: int, limit: int = 120) -> list[dic
 def upsert_opportunity(row: dict[str, Any]) -> dict[str, Any]:
     """Upsert one scored opportunity (one row per extension)."""
     res = get_client().table("opportunities").upsert(row, on_conflict="extension_id").execute()
+    return res.data[0] if res.data else {}
+
+
+def upsert_monetization(row: dict[str, Any]) -> dict[str, Any]:
+    """Upsert one extension's monetization profile (one row per extension)."""
+    res = get_client().table("monetization").upsert(row, on_conflict="extension_id").execute()
     return res.data[0] if res.data else {}

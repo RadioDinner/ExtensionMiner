@@ -47,9 +47,26 @@ reviews, and writes one `opportunities` row each. To change that, edit the
 | `--limit N` | How many extensions to score (by installs). Default 25. |
 | `--min-reviews N` | Skip extensions with fewer than N saved reviews. Default 5. |
 | `--max-reviews N` | How many reviews to send Claude per extension. Default 120. |
+| `--monetize` | Also research each extension's **pricing / revenue** (web search) and write the `monetization` table the dashboard shows. |
 | `--no-db` | Dry run: analyze + score, but don't write `opportunities`. |
 | `--model NAME` | Anthropic model (default `ANTHROPIC_MODEL` or `claude-opus-4-8`). |
 | `--log-dir logs` | Also write a timestamped log file. |
+
+## Monetization research (pricing / revenue)
+
+To populate the dashboard's **Pricing** + **Est. /mo** columns, run the
+monetization researcher — it web-searches each extension for its pricing plans
+and estimates monthly revenue (needs migration **995** applied):
+
+```bat
+.venv\Scripts\python.exe -m analysis.monetize --limit 25      :: standalone
+.venv\Scripts\python.exe run_ranker.py --limit 25 --monetize  :: rank + monetize together
+```
+
+To make the **Run ExtensionMiner Ranking** Desktop button do both every time, add
+`--monetize` to the `RUN_ARGS` line near the top of `scripts\run_ranker.cmd`
+(e.g. `set "RUN_ARGS=--monetize --log-dir logs"`). Heads-up: web search runs per
+extension, so a monetize run costs more and takes longer than ranking alone.
 
 ### Exit codes
 `0` ok · `2` no `ANTHROPIC_API_KEY` · `3` missing Supabase env (real run) · `1` other error.

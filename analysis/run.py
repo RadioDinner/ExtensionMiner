@@ -41,6 +41,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-reviews", type=int, default=120, help="reviews sent to Claude per extension")
     p.add_argument("--model", default=None, help="Anthropic model (default: ANTHROPIC_MODEL or claude-opus-4-8)")
     p.add_argument("--no-db", action="store_true", help="dry run: analyze + score, but don't write opportunities")
+    p.add_argument("--monetize", action="store_true",
+                   help="also research each extension's monetization (pricing / revenue) with web "
+                        "search and write the monetization table (see analysis/monetize.py)")
     p.add_argument("--log-level", default="INFO")
     p.add_argument("--log-dir", metavar="DIR", default=None,
                    help="also write a timestamped log file into DIR (e.g. 'logs'). The "
@@ -128,6 +131,18 @@ def main(argv=None) -> int:
             f"(--min-reviews={args.min_reviews}). Run the scraper first to collect "
             "reviews, or lower --min-reviews."
         )
+
+    # Optional: also research monetization (pricing / revenue) for the same batch.
+    if args.monetize:
+        from .monetize import monetize_all
+
+        log.info("researching monetization for up to %d extensions (web search)", args.limit)
+        try:
+            money = monetize_all(settings, limit=args.limit, write_db=not args.no_db, model=args.model)
+            print(f"\nMonetization researched: {len(money)} extensions.")
+        except Exception as exc:  # never let monetization sink an otherwise-good ranking run
+            log.warning("monetization pass skipped (%s)", exc)
+
     return EXIT_OK
 
 
