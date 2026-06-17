@@ -1,5 +1,6 @@
 import { getExtensionReviews } from "../../../lib/queries";
 import DeepDiveButton from "./DeepDiveButton";
+import ReviewList from "../../ReviewList";
 
 // Render at request time so the build never needs Supabase credentials.
 export const dynamic = "force-dynamic";
@@ -25,16 +26,6 @@ function usd(n) {
 function range(lo, hi) {
   if (lo == null && hi == null) return "—";
   return `${usd(lo)} – ${usd(hi)}`;
-}
-
-function StarRow({ n }) {
-  const filled = Math.max(0, Math.min(5, Math.round(Number(n) || 0)));
-  return (
-    <span className="stars" title={`${n ?? "?"} of 5`}>
-      {"★".repeat(filled)}
-      <span className="off">{"★".repeat(5 - filled)}</span>
-    </span>
-  );
 }
 
 export default async function ReviewsPage({ params }) {
@@ -292,24 +283,7 @@ export default async function ReviewsPage({ params }) {
               No reviews saved for this extension yet. Run the scraper to collect them.
             </p>
           ) : (
-            <ul className="reviews">
-              {d.reviews.map((rv, i) => (
-                <li key={i} className="review">
-                  <div className="review-head">
-                    <StarRow n={rv.stars} />
-                    <span className="author">{rv.author || "Anonymous"}</span>
-                    {rv.helpful_ranked ? <span className="badge-helpful">👍 Helpful</span> : null}
-                    <span className="date">{fmtDate(rv.reviewed_at)}</span>
-                    {rv.helpful_count ? (
-                      <span className="helpful">{fmt(rv.helpful_count)} found helpful</span>
-                    ) : null}
-                  </div>
-                  <p className="review-body">
-                    {rv.body ? rv.body : <em className="muted">(no review text)</em>}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <ReviewList rows={d.reviews} variant="saved" defaultSort="date-desc" />
           )}
         </section>
       )}

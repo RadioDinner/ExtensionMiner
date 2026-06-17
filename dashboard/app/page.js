@@ -2,6 +2,7 @@ import { getDashboardData } from "../lib/queries";
 import { RatingHistogram, OpportunityScatter } from "./charts";
 import OpportunitiesCard from "./OpportunitiesCard";
 import OpportunityZoneCard from "./OpportunityZoneCard";
+import ReviewList from "./ReviewList";
 
 // Always render at request time so the build never needs Supabase credentials.
 export const dynamic = "force-dynamic";
@@ -11,11 +12,6 @@ function fmt(n) {
 }
 function stars(r) {
   return r == null ? "—" : `${Number(r).toFixed(1)}★`;
-}
-function fmtDate(s) {
-  if (!s) return "—";
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? "—" : d.toISOString().slice(0, 10);
 }
 // How many reviews/ratings we've actually saved for this extension, from the
 // embedded `reviews(count)` aggregate (shape: reviews: [{ count: N }]).
@@ -56,43 +52,14 @@ function reviewLink(row) {
   return reviewLinkFor(row.ext_id, row.name || row.ext_id);
 }
 
-function StarRow({ n }) {
-  const filled = Math.max(0, Math.min(5, Math.round(Number(n) || 0)));
-  return (
-    <span className="stars" title={`${n ?? "?"} of 5`}>
-      {"★".repeat(filled)}
-      <span className="off">{"★".repeat(5 - filled)}</span>
-    </span>
-  );
-}
-
 // Community-upvoted reviews (surfaced under the store's "Helpful" sort) — the
-// complaints people agree with. Lowest-star first, each linking to that
-// extension's saved reviews. Hidden entirely until there's data (so it stays
-// quiet until migration 996 is applied and a Helpful-sort pass has run).
+// complaints people agree with. Defaults to lowest-star first (the gold), each
+// linking to that extension's saved reviews, and is sortable by date/rating.
+// Hidden entirely until there's data (so it stays quiet until migration 996 is
+// applied and a Helpful-sort pass has run).
 function HelpfulReviews({ rows }) {
   if (!rows || rows.length === 0) return null;
-  return (
-    <ul className="reviews">
-      {rows.map((rv, i) => (
-        <li key={i} className="review">
-          <div className="review-head">
-            <StarRow n={rv.stars} />
-            <span className="author">{rv.author || "Anonymous"}</span>
-            <span className="badge-helpful">👍 Helpful</span>
-            <span className="ext-ref">
-              {reviewLinkFor(rv.extensions?.ext_id, rv.extensions?.name)}
-              {rv.extensions?.store_category ? <span className="pill">{rv.extensions.store_category}</span> : null}
-            </span>
-            <span className="date">{fmtDate(rv.reviewed_at)}</span>
-          </div>
-          <p className="review-body">
-            {rv.body ? rv.body : <em className="muted">(no review text)</em>}
-          </p>
-        </li>
-      ))}
-    </ul>
-  );
+  return <ReviewList rows={rows} variant="helpful" defaultSort="rating-asc" />;
 }
 
 function ExtTable({ rows, showCategory, linkReviews, showMoney, money }) {
