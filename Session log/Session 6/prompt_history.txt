@@ -65,3 +65,6 @@ actually it looks like it is missing from all the extensions
 
 21.
 On the main dashboard, I want a way of seeing if it has ever been deep dive researched, can you add a star or something by the ones that have been researched?
+
+22.
+ship it
