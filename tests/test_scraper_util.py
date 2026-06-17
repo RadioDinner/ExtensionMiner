@@ -273,3 +273,33 @@ def test_review_sorts_are_recent_and_helpful_only():
     from scraper import selectors
 
     assert [key for key, _ in selectors.REVIEW_SORTS] == ["recent", "helpful"]
+
+
+def test_collect_extension_ids_passes_category_load_more():
+    # Discovery must hand the category "Load more" texts to collect_scrolling so a
+    # button-paginated grid isn't capped at its first ~30 by scrolling alone.
+    import scraper.crawl as crawlmod
+    from scraper import selectors
+
+    captured = {}
+
+    class _RecCache:
+        def has(self, *a, **k):
+            return False
+
+        def get(self, *a, **k):
+            return None
+
+    class _RecBrowser:
+        refresh = True
+        cache = _RecCache()
+
+        def collect_scrolling(self, url, extract, **kw):
+            captured.update(kw)
+            return ["x" * 32]
+
+    ids = crawlmod.collect_extension_ids(
+        _RecBrowser(), "productivity", max_extensions=0, opts=crawlmod.CrawlOptions()
+    )
+    assert ids == ["x" * 32]
+    assert captured.get("load_more_texts") == selectors.CATEGORY_LOAD_MORE_TEXTS

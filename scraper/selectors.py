@@ -102,3 +102,11 @@ REVIEW_EXPAND_TEXTS = ["Show more", "See more", "Read more"]
 # store will serve for a sort (well past the ~10 first shown). Matched by visible
 # text (robust to class churn); distinct from the per-review "Show more" expander.
 REVIEW_LOAD_MORE_TEXTS = ["Load more", "Show more reviews", "More reviews"]
+
+# Category grids appear to render one initial batch (~30) and paginate the rest
+# behind a button rather than pure infinite scroll — so a category that only ever
+# yields ~32 ids is the tell that scrolling alone isn't loading more. Discovery
+# clicks this between scroll passes to pull the whole category list. Matched by
+# visible text (class-churn proof); a graceful no-op if the page truly
+# infinite-scrolls. TUNE against the live DOM if categories still cap (see README).
+CATEGORY_LOAD_MORE_TEXTS = ["Load more", "Show more", "See more", "More extensions"]

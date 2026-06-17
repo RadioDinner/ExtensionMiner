@@ -119,6 +119,7 @@ def collect_extension_ids(
             parse.extract_extension_ids,
             max_scrolls=opts.category_scrolls,
             patience=opts.discovery_patience,
+            load_more_texts=selectors.CATEGORY_LOAD_MORE_TEXTS,
         )
     return ids[:max_extensions] if max_extensions else ids
 

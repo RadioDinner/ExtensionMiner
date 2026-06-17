@@ -167,6 +167,29 @@ class CWSBrowser:
                 break
         return clicks
 
+    def _click_more(self, texts: Optional[List[str]], *, pause_ms: int = 1_200) -> bool:
+        """Click the first visible "Load more"/"Show more" button if present.
+
+        Category grids (and some lists) paginate with a button rather than pure
+        infinite scroll, so scrolling alone stops at the first batch. Matched by
+        exact visible text (robust to class churn); best-effort and defensive —
+        returns False (a no-op) if no such button is on the page."""
+        for text in texts or []:
+            try:
+                btn = self._page.query_selector(f'text="{text}"')
+            except Exception:
+                btn = None
+            if btn is None:
+                continue
+            try:
+                btn.scroll_into_view_if_needed(timeout=1_000)
+                btn.click(timeout=1_500)
+                self._page.wait_for_timeout(pause_ms)
+                return True
+            except Exception:
+                continue
+        return False
+
     def _apply_review_sort(self, label: str, trigger_selector: str, option_selector: str) -> bool:
         """Open the sort dropdown and pick the option titled ``label``.
 
@@ -259,15 +282,17 @@ class CWSBrowser:
         patience: int = 3,
         scroll_pause_ms: int = 1_200,
         wait_selector: Optional[str] = None,
+        load_more_texts: Optional[List[str]] = None,
     ) -> List[str]:
         """Navigate once, then scroll progressively to exhaust a lazy-loading list.
 
-        After each scroll, ``extract`` is run on the live HTML and any new items
-        are accumulated (de-duped, first-seen order). Scrolling stops when
-        ``extract`` yields nothing new for ``patience`` consecutive scrolls, or
-        after ``max_scrolls``. Just ONE navigation happens (polite); this is how
-        we pull *every* extension a category page is willing to lazy-load, rather
-        than a fixed number of scrolls. The final HTML is cached for debugging.
+        After each scroll (and a best-effort ``load_more_texts`` button click, for
+        grids that paginate by button instead of pure infinite scroll), ``extract``
+        is run on the live HTML and any new items are accumulated (de-duped,
+        first-seen order). Scrolling stops when ``extract`` yields nothing new for
+        ``patience`` consecutive scrolls, or after ``max_scrolls``. Just ONE
+        navigation happens (polite); this is how we pull *every* extension a
+        category page is willing to surface. The final HTML is cached for debugging.
         """
         if self.robots_allowed is not None and not self.robots_allowed(url):
             raise RobotsDisallowed(url)
@@ -297,7 +322,11 @@ class CWSBrowser:
         for _ in range(max(1, max_scrolls)):
             self._page.mouse.wheel(0, 24_000)
             self._page.wait_for_timeout(scroll_pause_ms)
-            if harvest() == 0:
+            # Grids that paginate by button won't load more on scroll alone; click
+            # "Load more" if present (no-op when the page infinite-scrolls instead).
+            clicked = self._click_more(load_more_texts, pause_ms=scroll_pause_ms)
+            added = harvest()
+            if added == 0 and not clicked:
                 stale += 1
                 if stale >= max(1, patience):
                     break

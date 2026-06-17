@@ -57,10 +57,14 @@ below), `--max-total N` (cap total discovered), `--no-db` (dry run),
 > For an all-night full-store run, bump it (e.g. `--concurrency 8`); watch RAM.
 
 > Discovery: `--all-categories` reads the category list from the store's own nav
-> and scrolls each until no new extensions appear; `--follow-related` then turns
-> the crawl into a breadth-first graph walk over "related" links, which reaches
-> far more than category pages alone (those are capped and partly curated). There
-> is still no public index of *all* extensions, so 100% isn't guaranteed.
+> and exhausts each category page — scrolling **and** clicking a "Load more"
+> button (`CATEGORY_LOAD_MORE_TEXTS`) until no new extensions appear, because the
+> grid paginates by button, not pure infinite scroll (a category that only ever
+> yields ~30 ids is the tell that the button text needs tuning — see below).
+> `--follow-related` then turns the crawl into a breadth-first graph walk over
+> "related" links — this is the real "reach everything" engine, fanning out far
+> past the category seeds. There is still no public index of *all* extensions, so
+> 100% isn't guaranteed.
 
 > Reviews: the crawler re-sorts the reviews page (**Recent** + **Helpful** — the
 > two sorts that carry signal) and merges, de-duped on `extension_id +
@@ -97,6 +101,13 @@ dropdown, and inspect it. Set `SEL_REVIEW_SORT_TRIGGER` (the dropdown button),
 `SEL_REVIEW_SORT_OPTION_ROLE` (the ARIA role of each choice, usually `option` or
 `menuitem`), and the visible `REVIEW_SORTS` labels in `scraper/selectors.py`. If
 these don't match, multi-sort silently falls back to one default-sort pass.
+
+**Category "Load more" (for discovery):** if every category stops at the same
+small number (~30) of extensions, the grid is paginating behind a button the bot
+isn't clicking. Scroll to the bottom of a category page, read the button's exact
+visible text, and add it to `CATEGORY_LOAD_MORE_TEXTS` in `scraper/selectors.py`.
+If instead there's a numbered pager (1 2 3 … Next), that needs a small code change
+in `CWSBrowser.collect_scrolling` — note it and pass along the DOM.
 
 ## Extension identity / duplicates
 
