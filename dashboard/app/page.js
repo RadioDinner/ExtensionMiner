@@ -14,8 +14,13 @@ function extLink(row) {
   const href = row.listing_url || (row.ext_id ? `https://chromewebstore.google.com/detail/x/${row.ext_id}` : null);
   return href ? <a href={href} target="_blank" rel="noreferrer">{row.name || row.ext_id}</a> : (row.name || row.ext_id);
 }
+// Internal link to the saved reviews we scraped for this extension.
+function reviewLink(row) {
+  if (!row.ext_id) return row.name || "—";
+  return <a href={`/reviews/${encodeURIComponent(row.ext_id)}`}>{row.name || row.ext_id}</a>;
+}
 
-function ExtTable({ rows, showCategory }) {
+function ExtTable({ rows, showCategory, linkReviews }) {
   if (!rows || rows.length === 0) return <p className="empty">No data yet.</p>;
   return (
     <table>
@@ -31,7 +36,7 @@ function ExtTable({ rows, showCategory }) {
       <tbody>
         {rows.map((r) => (
           <tr key={r.ext_id}>
-            <td>{extLink(r)}</td>
+            <td>{linkReviews ? reviewLink(r) : extLink(r)}</td>
             {showCategory ? <td><span className="pill">{r.store_category || "—"}</span></td> : null}
             <td className="num">{stars(r.rating)}</td>
             <td className="num">{fmt(r.rating_count)}</td>
@@ -148,8 +153,8 @@ export default async function Page() {
 
       <section className="zone">
         <h2>★ Opportunity zone (2.5–3.5★, by installs)</h2>
-        <p className="sub">Real demand, unhappy users — the targets to overtake.</p>
-        <ExtTable rows={d.opportunityZone} showCategory />
+        <p className="sub">Real demand, unhappy users — the targets to overtake. Click a name to read its saved reviews.</p>
+        <ExtTable rows={d.opportunityZone} showCategory linkReviews />
       </section>
 
       <section>

@@ -81,3 +81,57 @@ export async function getDashboardData() {
     return { ...EMPTY, configured: true, error: String(err && err.message ? err.message : err) };
   }
 }
+
+// --- Per-extension saved reviews (the /reviews/[extId] page) -----------------
+
+const EXT_DETAIL_COLS =
+  "id,ext_id,name,developer,store_category,rating,rating_count,install_count,listing_url";
+const REVIEW_COLS = "stars,author,body,reviewed_at,helpful_count,language";
+const REVIEW_LIMIT = 1000;
+
+// Fetch one extension (by its Chrome Web Store ext_id) plus the reviews we've
+// saved for it, most recent first. Returns a small, page-ready shape.
+export async function getExtensionReviews(extId) {
+  const supabase = getServerClient();
+  if (!supabase) {
+    return { configured: false, error: null, notFound: false, extension: null, reviews: [] };
+  }
+
+  try {
+    const { data: ext, error: extErr } = await supabase
+      .from("extensions")
+      .select(EXT_DETAIL_COLS)
+      .eq("ext_id", extId)
+      .maybeSingle();
+
+    if (extErr) {
+      return { configured: true, error: extErr.message, notFound: false, extension: null, reviews: [] };
+    }
+    if (!ext) {
+      return { configured: true, error: null, notFound: true, extension: null, reviews: [] };
+    }
+
+    const { data: reviews, error: revErr } = await supabase
+      .from("reviews")
+      .select(REVIEW_COLS)
+      .eq("extension_id", ext.id)
+      .order("reviewed_at", { ascending: false, nullsFirst: false })
+      .limit(REVIEW_LIMIT);
+
+    return {
+      configured: true,
+      error: revErr ? revErr.message : null,
+      notFound: false,
+      extension: ext,
+      reviews: reviews || [],
+    };
+  } catch (err) {
+    return {
+      configured: true,
+      error: String(err && err.message ? err.message : err),
+      notFound: false,
+      extension: null,
+      reviews: [],
+    };
+  }
+}

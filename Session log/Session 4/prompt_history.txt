@@ -31,3 +31,5 @@ No rows returned (see the verdict above for why).
 3. before we go any further, I need to clarify and fix this, this is session 4, not 3
 
 4. I said, but first, because I want to make some big changes to this program. I want to keep the dashboard written in the language that it is, and I want to keep the scraper in python, BUT I want to change how it runs. I want you to edit the python scraper code here, vs in terminal, and I want you to help me set up a way that I can just click a button, the scraper runs and saves the data to supabase, and then quits. Whenever I tried to run the scraper script in the terminal, it errored out and was gross. Furthermore, I want the scraper to be executable outside of powershell because I want to set it up on a schedule task, to run every day to check for new reviews
+
+5. In the dashboard, I want the link in the "opportunity zone" section to go to a list of the copied/saved reviews based off my data, not go to the extension page itself.

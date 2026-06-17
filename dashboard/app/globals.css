@@ -99,3 +99,23 @@ a:hover { text-decoration: underline; }
 .diag-summary.warn { border-left-color: var(--gold); }
 .diag-summary.fail { border-left-color: #f87171; }
 .diag-link { margin: 16px 0 0; font-size: 13px; }
+
+/* Saved-reviews page (/reviews/[extId]) */
+.back { margin: 0 0 14px; font-size: 13px; }
+header .meta { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+header .store-link { margin: 8px 0 0; font-size: 13px; }
+.reviews { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.review {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px;
+}
+.review-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--muted);
+}
+.stars { letter-spacing: 1px; color: var(--gold); font-size: 14px; }
+.stars .off { color: var(--line); }
+.review-head .author { color: var(--text); font-weight: 600; }
+.review-head .date { font-variant-numeric: tabular-nums; }
+.review-head .helpful { margin-left: auto; font-style: italic; }
+.review-body { margin: 8px 0 0; white-space: pre-wrap; line-height: 1.55; }
