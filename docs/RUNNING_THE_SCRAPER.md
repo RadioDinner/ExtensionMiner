@@ -37,6 +37,17 @@ If anything goes wrong, the window **stays open** with a plain-English message
 (missing `.env`, browser not installed, store unreachable, etc.) instead of
 flashing a traceback and vanishing.
 
+> **You clone the repo once.** It's a permanent folder on your machine — you do
+> **not** re-clone to run again. After the first setup it's just double-click →
+> run → quit, as often as you like, and the scheduled task does it daily.
+
+### Make a Desktop button (optional, recommended)
+So you never have to open the repo folder, run **`scripts\create_desktop_shortcut.cmd`**
+once. It drops a **"Run ExtensionMiner Scraper"** icon on your Desktop that points
+back at the launcher inside the repo. Double-click the Desktop icon any time to
+run. (You can also just right-click `run_scraper.cmd` → *Send to* → *Desktop
+(create shortcut)*.)
+
 ### What the daily preset does
 By default the launcher runs `--preset daily`: a **full crawl** of every category
 in your `.env`. For an extension that's **already in the database**, the reviews
