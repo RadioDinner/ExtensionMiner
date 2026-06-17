@@ -1,0 +1,189 @@
+SESSION 4 — HANDOFF LOG
+=======================
+Date: 2026-06-17 (UTC). WEB session (Claude-Code-on-the-web).
+Branch: assigned claude/great-cray-i6q77i. Per user requests (prompts 14, 17),
+        EVERYTHING IS MERGED TO main. main and the feature branch are kept in
+        sync (0 ahead / 0 behind) — after each push the branch is fast-forwarded
+        into main, so the GitHub "N behind" indicator stays at 0.
+
+This was a big session: the scraper went from a 2-category sampler to a
+whole-store discovery + review-mining engine, got a one-click self-updating
+Windows runner, and the dashboard gained a saved-reviews page. The Chrome Web
+Store is egress-blocked in this web env, so all scraper changes were verified by
+unit tests + (for the dashboard) `next build`; the live browser behavior is
+verified on the user's machine.
+
+================================================================================
+WHAT THE USER ASKED (prompt by prompt)
+================================================================================
+1.  "most recent session?" -> Session 2. Set up this session's folder.
+2.  Pasted /diagnostics: Vercel dashboard key is the PUBLISHABLE key (wrong) ->
+    reads return nothing under RLS. (Fix is on their Vercel side; see OPEN ITEMS.)
+3.  "this is session 4, not 3" -> renamed Session 3 folder to Session 4 (a local
+    Session 3 had run elsewhere; its logs later landed on main as 7a33734).
+4.  Big ask: edit the Python scraper HERE; make it a one-click button that runs +
+    saves to Supabase + quits; runnable outside PowerShell; schedulable daily.
+5.  Dashboard: the Opportunity-zone link should open a list of OUR saved reviews,
+    not the external store page.
+6.  Error pasted: launcher failed (`requirements.txt` not found at home dir) ->
+    they'd run a copy of run_scraper.cmd from OUTSIDE the repo. Hardened it.
+7.  `git pull` output -> their clone is at C:\Users\derrick.wengerd\Downloads\
+    ExtensionMiner. Explained clone-once.
+8.  Desktop-button run log (preset 'daily' starting) -> working; explained what to
+    expect.
+9.  "Is it set up to get EVERY extension?" -> No; explained limits. They replied:
+    "I want every, single, review ... multi-thread ... run all night ... reviews
+    checked daily." Then "Build it now, I'll grab the selector."
+10. Uploaded the first run's log: pre-Phase-1 code, 2 categories returned the SAME
+    57 ids (skipped:57), 567 reviews (~10/ext). Diagnosed.
+11. Pasted the live reviews sort-control DOM -> locked in real selectors.
+12. "sorted by recent? + open 'see more' before saving?" -> confirmed + built.
+13. "It's 'Show more'. Implement multi-point match dedup" -> chose "auto-link,
+    keep both" when asked how aggressive.
+14. "merge all branches to main" -> merged (clean).
+15. "branch 2 behind? + all migrations applied + add Helpful-sort flag + make the
+    bot click 'Load more'" -> fixed sync, built both.
+16. "make the desktop button always run the newest scraper" (wanted re-clone) ->
+    built AUTO-UPDATE (git pull) instead; explained why re-clone is wrong.
+17. "write the handoff, merge to main, close the session" -> this.
+
+================================================================================
+WHAT WAS BUILT (all on main)
+================================================================================
+DASHBOARD (dashboard/)
+  NEW  app/reviews/[extId]/page.js  — saved-reviews page (force-dynamic). Header
+       (rating/installs/category + "View on Chrome Web Store"), saved count +
+       saved-review average, review list (stars/author/date/body). Shows a
+       "👍 Helpful" badge per flagged review + a flagged-helpful count.
+  MOD  app/page.js     — Opportunity-zone extension names now link to
+       /reviews/<ext_id> (ExtTable gains linkReviews); other tables still link out.
+  MOD  lib/queries.js  — getExtensionReviews(extId); REVIEW_COLS includes
+       helpful_ranked.
+  MOD  app/globals.css — reviews list/cards, star rows, .badge-helpful.
+
+SCRAPER RUN EXPERIENCE
+  NEW  scripts/run_scraper.cmd          — one-click Windows launcher. Bootstraps
+       .venv + deps + Chromium (first run), runs `--preset daily`, logs to logs\,
+       pauses on error. HARDENED: bails clearly if run outside the repo. AUTO-
+       UPDATES (git pull of UPDATE_BRANCH=main) before each run, preserving
+       .env/.venv/cache; safe offline / no-git / non-clone; GIT_TERMINAL_PROMPT=0.
+  NEW  scripts/install_daily_task.cmd / uninstall_daily_task.cmd — schtasks daily
+       task (runs the launcher "unattended").
+  NEW  scripts/create_desktop_shortcut.cmd — drops a Desktop shortcut.
+  NEW  run_scraper.py                   — top-level shim (avoids the
+       `python scraper/run.py` relative-import trap).
+  NEW  docs/RUNNING_THE_SCRAPER.md      — full Windows runbook (setup, .env,
+       scheduling, auto-update, troubleshooting, exit codes).
+  MOD  scraper/run.py — `--preset daily`, `--log-dir` (timestamped file),
+       friendly error translation + exit codes (2 no-Supabase / 3 no-browser /
+       4 store-unreachable), and all the new flags below.
+
+DISCOVERY (get every extension)
+  --all-categories : discover the WHOLE category taxonomy from the store's nav
+       (parse.extract_category_slugs over the homepage), not 2 hardcoded slugs.
+  Exhaust-scroll   : CWSBrowser.collect_scrolling scrolls a category until no new
+       ids appear (cap --category-scrolls=40, --discovery-patience=3).
+  --follow-related : breadth-first GRAPH crawl — scrape_extension returns the
+       detail page's related ext_ids; crawl() runs a frontier queue (seed from
+       categories, enqueue related), --max-total caps it. This was the fix for
+       "only got 57": the 2 category slugs returned the same default listing.
+  --preset daily implies --all-categories + --follow-related + refresh.
+
+REVIEWS (get every available review + signal)
+  Multi-sort: fetch_review_sorts re-sorts the reviews page and merges, de-duped
+       on dedupe_uid (store id else content hash). Sort control CONFIRMED from
+       live DOM: trigger [role=combobox][aria-haspopup=listbox]; options
+       li[role=option][title="..."]; titles "Recent" / "Helpful" / "Highest to
+       lowest rating" / "Lowest to highest rating".
+  "Show more": _expand_reviews clicks every per-review expander (text-matched;
+       "Show more" confirmed) before each snapshot -> full bodies (also keeps the
+       content-hash id stable across runs).
+  "Load more": _load_all_reviews clicks the logged-out reviews "Load more" button
+       until gone (--load-more-max=40/sort) -> paginates past the first ~10.
+  Helpful flag: reviews appearing under the "Helpful" sort get a STICKY
+       reviews.helpful_ranked = true (migration 996). merge_reviews OR-s the flag
+       across sorts + de-dupes; persist writes it via a separate monotonic UPDATE
+       (db.mark_reviews_helpful) so a later recent-only re-scrape never clears it.
+  Recent + daily + upsert dedupe => the stored review set GROWS past 10 over time.
+
+IDENTITY (dedupe across re-publishes)
+  NEW  scraper/identity.py    — pure matchers: ext_id is the decisive primary key
+       (a same-id change is just an update); the SECONDARY multi-point match links
+       the same product under a DIFFERENT ext_id when >=2 of name/developer/
+       website agree (normalized). matching_points / is_same_extension /
+       find_successor_match / link_successors (blocked O(n), newer id -> older).
+  NEW  scraper/successors.py  — `python -m scraper.successors [--dry-run]` runner.
+  --link-successors (implied by daily) runs the pass after the crawl; skipped
+       gracefully (logged) if migration 997 isn't applied.
+  "auto-link, keep both": both rows kept; newer gets successor_of + successor_points.
+
+MIGRATIONS (count DOWN from 999; lowest is now 996)
+  NEW  supabase/migrations/997_extension_successor_links.sql — extensions.
+       successor_of (self-FK) + successor_points jsonb.
+  NEW  supabase/migrations/996_reviews_helpful_flag.sql — reviews.helpful_ranked
+       boolean (sticky) + partial index.
+
+OTHER
+  NEW  .gitattributes (CRLF for *.cmd), logs/ (.gitkeep, logs/*.log ignored).
+  MOD  common/db.py — fetch_extensions_for_matching, set_successor,
+       mark_reviews_helpful.
+  MOD  scraper/models.py — Review.helpful (in-memory; NOT in to_row()).
+  MOD  README.md / scraper/README.md — run + discovery + reviews + identity docs.
+  Tests: 68 passing. NEW tests/test_identity.py; expanded test_parse.py
+       (category slugs) and test_scraper_util.py (preset/flag wiring, labeled
+       merge + helpful OR-flag, fake-browser graph-crawl BFS + max_total).
+
+================================================================================
+CURRENT PROJECT STATE
+================================================================================
+* main HEAD includes all of the above; feature branch == main (0/0).
+* 68 Python unit tests pass; dashboard `next build` succeeds (routes /, /diagnostics,
+  /reviews/[extId] all ƒ dynamic).
+* The user's clone: C:\Users\derrick.wengerd\Downloads\ExtensionMiner. Desktop
+  button "Run ExtensionMiner Scraper" -> scripts\run_scraper.cmd. Local .env has
+  the correct SERVICE_ROLE key (scraper writes succeeded: 200/201 in the run log).
+* `--preset daily` now = all categories + related graph + exhaust-scroll +
+  multi-sort reviews (Recent/Helpful/Highest/Lowest) + Load-more pagination +
+  Show-more expansion + successor linking. First full run is MULTI-DAY at the
+  polite 3s/page rate.
+
+================================================================================
+OPEN ITEMS / FOR NEXT SESSION (priority order)
+================================================================================
+1. APPLY MIGRATIONS 997 + 996 to Supabase. The user said "all migrations applied"
+   at prompt 15, but 996 (and possibly 997) were added around/after that — confirm
+   both are applied, or successor-linking + helpful flagging will log a skip.
+2. VERCEL DASHBOARD KEY (the original blocker, prompt 2). /diagnostics reported
+   the PUBLISHABLE key in Vercel -> dashboard reads nothing under RLS. The LOCAL
+   scraper .env is correct, but it's unconfirmed whether the Vercel env var
+   SUPABASE_SERVICE_ROLE_KEY was switched to the sb_secret_ key + redeployed. If
+   the dashboard shows zeros, that's still why. Have them re-check /diagnostics.
+3. LIVE-DOM CONFIRMATION of two text-matched controls (best-effort, graceful
+   fallback if wrong): the per-review "Show more" (confirmed) and the reviews
+   "Load more" button (NOT yet confirmed — ask them to paste its DOM if the bot
+   isn't paginating). Sort control IS confirmed.
+4. CONCURRENCY — the explicitly-requested next lever. A full-store daily refresh
+   (every extension, 4 sorts, Load-more) cannot finish in a day single-threaded
+   at 3s/page. Proposed: bounded parallel browser contexts + a shared frontier
+   queue, while staying polite. (User: "I don't care if I need to multi-thread.")
+5. AUTO-UPDATE BOOTSTRAP: the self-updating launcher only takes effect once the
+   user has it. They must run ONCE in their clone:
+       git fetch origin && git checkout main && git reset --hard origin/main
+   After that the Desktop button + scheduled task self-update every run.
+6. Optional: link the "Scored opportunities" table rows to /reviews/<ext_id> too
+   (currently plain text); surface helpful-flagged reviews on the main dashboard.
+
+================================================================================
+KEY CONTEXT / GOTCHAS
+================================================================================
+* Migrations count DOWN from 999. Next new one = 995.
+* ext_id is the permanent primary identity; multi-point match is ONLY for
+  re-publishes under a new ext_id (non-destructive link).
+* helpful_ranked is sticky on purpose (set true, never auto-cleared) — written by
+  a separate UPDATE, kept OUT of Review.to_row().
+* The "~10 reviews per sort" ceiling is bypassed two ways now: (a) Load-more
+  pagination within a sort, and (b) daily Recent + upsert accumulation over time.
+* Egress: store is HTTP 403 in the web env; run the scraper locally. PyPI + the
+  Anthropic API are reachable here (tests + ranking layer run fine).
+* Git hygiene this session: keep main and the feature branch synced (ff main after
+  each push) so the "behind" indicator stays at 0.
