@@ -41,6 +41,9 @@ export default async function ReviewsPage({ params }) {
   const savedAvg = withStars.length
     ? (withStars.reduce((a, r) => a + Number(r.stars), 0) / withStars.length).toFixed(1)
     : null;
+  // Reviews the community upvoted (surfaced under the store's "Helpful" sort) —
+  // a lead on the complaints people agree with.
+  const helpfulCount = d.reviews.filter((r) => r.helpful_ranked).length;
 
   return (
     <main className="wrap">
@@ -93,7 +96,8 @@ export default async function ReviewsPage({ params }) {
         <section>
           <h2>{fmt(d.reviews.length)} saved review{d.reviews.length === 1 ? "" : "s"}</h2>
           <p className="sub">
-            Straight from your scraped data{savedAvg ? <> · avg <strong>{savedAvg}★</strong> across saved reviews</> : null}.
+            Straight from your scraped data{savedAvg ? <> · avg <strong>{savedAvg}★</strong> across saved reviews</> : null}
+            {helpfulCount ? <> · <strong>{fmt(helpfulCount)}</strong> flagged 👍 helpful</> : null}.
           </p>
 
           {d.reviews.length === 0 ? (
@@ -107,6 +111,7 @@ export default async function ReviewsPage({ params }) {
                   <div className="review-head">
                     <StarRow n={rv.stars} />
                     <span className="author">{rv.author || "Anonymous"}</span>
+                    {rv.helpful_ranked ? <span className="badge-helpful">👍 Helpful</span> : null}
                     <span className="date">{fmtDate(rv.reviewed_at)}</span>
                     {rv.helpful_count ? (
                       <span className="helpful">{fmt(rv.helpful_count)} found helpful</span>

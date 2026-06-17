@@ -117,6 +117,25 @@ def upsert_reviews(rows: list[dict[str, Any]]) -> int:
     return len(res.data or [])
 
 
+def mark_reviews_helpful(extension_id: int, review_uids: list[str]) -> int:
+    """Sticky-flag the given reviews as community-helpful (set true, never false).
+
+    A separate UPDATE (not part of the review upsert) so a later recent-only
+    re-scrape can't clear a flag set on a previous Helpful-sort pass.
+    """
+    if not review_uids:
+        return 0
+    res = (
+        get_client()
+        .table("reviews")
+        .update({"helpful_ranked": True})
+        .eq("extension_id", extension_id)
+        .in_("review_uid", list(review_uids))
+        .execute()
+    )
+    return len(res.data or [])
+
+
 def insert_rating_snapshot(row: dict[str, Any]) -> dict[str, Any]:
     """Append a point-in-time rating/install snapshot for trajectory tracking."""
     res = get_client().table("rating_snapshots").insert(row).execute()

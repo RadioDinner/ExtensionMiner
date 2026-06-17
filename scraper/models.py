@@ -92,6 +92,10 @@ class Review:
     language: Optional[str] = None
     helpful_count: Optional[int] = None
     raw: Optional[Dict[str, Any]] = None
+    # In-memory only: set when this review showed up under the "Helpful" sort.
+    # Persisted via a separate, sticky UPDATE (see common/db.mark_reviews_helpful),
+    # NOT in to_row(), so a later recent-only re-scrape never clears the flag.
+    helpful: bool = False
 
     def dedupe_uid(self) -> str:
         """Stable id for the review. Use the store's id if we have one; else a

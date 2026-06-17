@@ -145,16 +145,32 @@ def test_follow_related_flag_and_daily_preset():
 
 def test_merge_reviews_dedupes_across_sorts():
     # Same review under two sort orders must collapse to one (by store id, or by
-    # the synthetic content hash when there's no id).
+    # the synthetic content hash when there's no id). Input is (sort_key, reviews).
     a = Review(stars=1, author="A", body="needs sync")
     b = Review(stars=5, review_uid="r2", body="great")
     b_again = Review(stars=5, review_uid="r2", body="great")   # dup by store id
     c = Review(stars=3, review_uid="r3", body="ok")
     a_again = Review(stars=1, author="A", body="needs sync")   # dup by content hash
 
-    merged = merge_reviews([[a, b], [b_again, c, a_again]])
+    merged = merge_reviews([("recent", [a, b]), ("lowest", [b_again, c, a_again])])
     assert len(merged) == 3
     assert {r.dedupe_uid() for r in merged} == {a.dedupe_uid(), "r2", "r3"}
+
+
+def test_merge_reviews_flags_helpful_and_or_s_across_sorts():
+    # A review under "recent" that ALSO appears under "helpful" gets flagged,
+    # de-duped to one row. Reviews only under "recent" stay unflagged.
+    r_recent = Review(stars=2, review_uid="r1", body="if sync worked I'd pay")
+    r_recent_only = Review(stars=4, review_uid="r2", body="nice")
+    r_helpful_same = Review(stars=2, review_uid="r1", body="if sync worked I'd pay")  # same as r1
+    r_helpful_new = Review(stars=1, review_uid="r3", body="constant crashes")
+
+    merged = merge_reviews([
+        ("recent", [r_recent, r_recent_only]),
+        ("helpful", [r_helpful_same, r_helpful_new]),
+    ])
+    flags = {r.dedupe_uid(): r.helpful for r in merged}
+    assert flags == {"r1": True, "r2": False, "r3": True}
 
 
 # --- Graph-crawl (follow-related BFS) via a fake browser --------------------

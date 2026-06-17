@@ -86,7 +86,7 @@ export async function getDashboardData() {
 
 const EXT_DETAIL_COLS =
   "id,ext_id,name,developer,store_category,rating,rating_count,install_count,listing_url";
-const REVIEW_COLS = "stars,author,body,reviewed_at,helpful_count,language";
+const REVIEW_COLS = "stars,author,body,reviewed_at,helpful_count,language,helpful_ranked";
 const REVIEW_LIMIT = 1000;
 
 // Fetch one extension (by its Chrome Web Store ext_id) plus the reviews we've

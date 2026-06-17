@@ -118,4 +118,9 @@ header .store-link { margin: 8px 0 0; font-size: 13px; }
 .review-head .author { color: var(--text); font-weight: 600; }
 .review-head .date { font-variant-numeric: tabular-nums; }
 .review-head .helpful { margin-left: auto; font-style: italic; }
+.badge-helpful {
+  font-size: 11px; font-weight: 700; color: #4ade80;
+  background: #123524; border: 1px solid #1c5238; border-radius: 999px;
+  padding: 1px 8px; letter-spacing: .02em;
+}
 .review-body { margin: 8px 0 0; white-space: pre-wrap; line-height: 1.55; }

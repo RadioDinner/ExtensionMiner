@@ -33,6 +33,7 @@ class CrawlOptions:
     discovery_patience: int = 3       # stop after N scrolls that surface no new ids
     review_scrolls: int = 6           # lazy-load passes on a detail page
     multi_sort: bool = True           # re-sort reviews to gather past the ~10/sort cap
+    load_more_max: int = 40           # max "Load more" clicks per sort (0 disables)
     follow_related: bool = False      # graph-crawl: enqueue each page's related ids
     max_total: int = 0                # cap on total extensions discovered (0 = no cap)
     write_db: bool = True
@@ -101,17 +102,28 @@ def collect_extension_ids(
     return ids[:max_extensions] if max_extensions else ids
 
 
-def merge_reviews(review_lists: Iterable[Iterable[Review]]) -> List[Review]:
-    """De-dupe reviews gathered across multiple sort passes, keyed by dedupe_uid.
+def merge_reviews(labeled_review_lists: Iterable[Tuple[str, Iterable[Review]]]) -> List[Review]:
+    """De-dupe reviews gathered across sort passes; flag the helpful ones.
 
-    The store id wins when present; otherwise a content hash of (author, date,
-    body) — the same key the DB unique index uses — so the same review seen under
-    two sort orders collapses to one row.
+    Input is ``(sort_key, [Review, ...])`` per pass. Reviews are keyed by
+    dedupe_uid (store id, else a content hash of author/date/body — the same key
+    the DB unique index uses), so the same review seen under two sorts collapses
+    to one row. Any review that appeared under the ``"helpful"`` sort gets its
+    ``helpful`` flag set (OR-ed across passes), even if it was first seen under
+    "recent".
     """
     out: dict = {}
-    for lst in review_lists:
-        for r in lst:
-            out.setdefault(r.dedupe_uid(), r)
+    for key, reviews in labeled_review_lists:
+        is_helpful = key == "helpful"
+        for r in reviews:
+            uid = r.dedupe_uid()
+            existing = out.get(uid)
+            if existing is None:
+                if is_helpful:
+                    r.helpful = True
+                out[uid] = r
+            elif is_helpful:
+                existing.helpful = True
     return list(out.values())
 
 
@@ -122,6 +134,7 @@ def scrape_extension(
     category: Optional[str] = None,
     review_scrolls: int = 6,
     multi_sort: bool = True,
+    load_more_max: int = 40,
 ) -> Tuple[Extension, List[Review], List[str]]:
     """Scrape one extension. Returns (extension, reviews, related_ext_ids).
 
@@ -148,14 +161,16 @@ def scrape_extension(
     elif multi_sort:
         snapshots = browser.fetch_review_sorts(
             reviews_url,
-            [label for _, label in selectors.REVIEW_SORTS],
+            selectors.REVIEW_SORTS,
             trigger_selector=selectors.SEL_REVIEW_SORT_TRIGGER,
             option_selector=selectors.SEL_REVIEW_SORT_OPTION,
             expand_texts=selectors.REVIEW_EXPAND_TEXTS,
+            load_more_texts=selectors.REVIEW_LOAD_MORE_TEXTS,
+            load_more_max=load_more_max,
             scrolls=review_scrolls,
             wait_selector=selectors.SEL_DETAIL_READY,
         )
-        reviews = merge_reviews(parse.parse_reviews(h) for h in snapshots)
+        reviews = merge_reviews((key, parse.parse_reviews(html)) for key, html in snapshots)
     else:
         reviews_html, _ = browser.fetch(
             reviews_url, wait_selector=selectors.SEL_DETAIL_READY, scrolls=review_scrolls
@@ -176,6 +191,17 @@ def persist(ext: Extension, reviews: List[Review], *, write_db: bool) -> int:
         log.warning("No id returned for %s; skipping its reviews", ext.ext_id)
         return 0
     written = db.upsert_reviews([r.to_row(ext_pk) for r in reviews])
+    # Sticky "helpful" flag for reviews seen under the Helpful sort (separate
+    # monotonic UPDATE so a later recent-only re-scrape never clears it).
+    helpful_uids = [r.dedupe_uid() for r in reviews if getattr(r, "helpful", False)]
+    if helpful_uids:
+        try:
+            db.mark_reviews_helpful(ext_pk, helpful_uids)
+        except Exception as exc:  # most likely: migration 996 not applied yet
+            log.warning(
+                "could not flag helpful reviews for %s (%s); apply migration "
+                "996_reviews_helpful_flag.sql", ext.ext_id, exc,
+            )
     db.insert_rating_snapshot(
         {
             "extension_id": ext_pk,
@@ -263,6 +289,7 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
                 ext, reviews, related = scrape_extension(
                     browser, ext_id, category=category,
                     review_scrolls=opts.review_scrolls, multi_sort=opts.multi_sort,
+                    load_more_max=opts.load_more_max,
                 )
             except RobotsDisallowed:
                 log.warning("robots.txt disallows %s; skipping", ext_id)

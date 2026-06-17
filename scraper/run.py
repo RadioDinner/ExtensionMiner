@@ -70,6 +70,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "extensions (default 3)")
     p.add_argument("--review-scrolls", type=int, default=6,
                    help="lazy-load scroll passes on a reviews page (default 6)")
+    p.add_argument("--load-more-max", type=int, default=40, metavar="N",
+                   help="max 'Load more' clicks per review sort, to paginate past the "
+                        "first ~10 (default 40; 0 disables)")
     p.add_argument("--no-multi-sort", dest="multi_sort", action="store_false",
                    help="only scrape the default review sort; skip the recent/highest/"
                         "lowest re-sort passes that gather past the store's ~10-per-sort cap")
@@ -164,6 +167,7 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
         discovery_patience=args.discovery_patience,
         review_scrolls=args.review_scrolls,
         multi_sort=args.multi_sort,
+        load_more_max=args.load_more_max,
         follow_related=follow_related,
         max_total=args.max_total,
         write_db=not args.no_db,

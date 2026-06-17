@@ -132,6 +132,41 @@ class CWSBrowser:
                     break
         return clicked
 
+    def _load_all_reviews(self, load_more_texts: Optional[List[str]], *,
+                          max_clicks: int = 40, pause_ms: int = 1_200) -> int:
+        """Click the reviews "Load more" button until it's gone (or the cap).
+
+        Logged-out/incognito reviews pages paginate with a button rather than pure
+        infinite scroll, so this pulls every review the store will serve for the
+        current sort — well past the ~10 first shown. Nudges the scroll each round
+        so the button stays reachable and lazy content keeps loading. Defensive:
+        any failure just stops."""
+        clicks = 0
+        texts = load_more_texts or []
+        if not texts:
+            return 0
+        while clicks < max_clicks:
+            self._page.mouse.wheel(0, 24_000)
+            self._page.wait_for_timeout(400)
+            btn = None
+            for text in texts:
+                try:
+                    btn = self._page.query_selector(f'text="{text}"')
+                except Exception:
+                    btn = None
+                if btn is not None:
+                    break
+            if btn is None:
+                break
+            try:
+                btn.scroll_into_view_if_needed(timeout=1_000)
+                btn.click(timeout=2_000)
+                clicks += 1
+                self._page.wait_for_timeout(pause_ms)
+            except Exception:
+                break
+        return clicks
+
     def _apply_review_sort(self, label: str, trigger_selector: str, option_selector: str) -> bool:
         """Open the sort dropdown and pick the option titled ``label``.
 
@@ -166,22 +201,25 @@ class CWSBrowser:
     def fetch_review_sorts(
         self,
         url: str,
-        sort_labels: List[str],
+        sorts: List[Tuple[str, str]],
         *,
         trigger_selector: str,
         option_selector: str,
         expand_texts: Optional[List[str]] = None,
+        load_more_texts: Optional[List[str]] = None,
+        load_more_max: int = 40,
         scrolls: int = 6,
         scroll_pause_ms: int = 1_200,
         wait_selector: Optional[str] = None,
-    ) -> List[str]:
-        """Snapshot a reviews page under several sort orders to gather more reviews.
+    ) -> List[Tuple[str, str]]:
+        """Snapshot a reviews page under several sort orders, fully paginated.
 
-        Navigates once, scrolls the default sort and snapshots it, then for each
-        label re-sorts, scrolls, and snapshots again. Returns the list of HTML
-        snapshots (always at least the default one). The store caps each sort at
-        ~10 reviews, so merging snapshots is how we get past that ceiling. If the
-        sort control can't be driven, this degrades to a single snapshot.
+        Navigates once; for the default sort and then each ``(key, label)`` sort
+        it scrolls, clicks "Load more" until exhausted, expands every "Show more",
+        and snapshots. Returns ``[(sort_key, html), ...]`` (the default snapshot
+        keyed ``"default"``) so callers can tell which reviews came from, e.g.,
+        the ``"helpful"`` sort. Degrades to just the default snapshot if the sort
+        control can't be driven.
         """
         if self.robots_allowed is not None and not self.robots_allowed(url):
             raise RobotsDisallowed(url)
@@ -194,16 +232,16 @@ class CWSBrowser:
             except Exception:
                 pass
 
-        snapshots: List[str] = []
-        self._scroll_page(scrolls, scroll_pause_ms)
-        self._expand_reviews(expand_texts)
-        snapshots.append(self._page.content())
+        def load_and_snapshot(key: str) -> Tuple[str, str]:
+            self._scroll_page(scrolls, scroll_pause_ms)
+            self._load_all_reviews(load_more_texts, max_clicks=load_more_max, pause_ms=scroll_pause_ms)
+            self._expand_reviews(expand_texts)
+            return key, self._page.content()
 
-        for label in sort_labels:
+        snapshots: List[Tuple[str, str]] = [load_and_snapshot("default")]
+        for key, label in sorts:
             if self._apply_review_sort(label, trigger_selector, option_selector):
-                self._scroll_page(scrolls, scroll_pause_ms)
-                self._expand_reviews(expand_texts)
-                snapshots.append(self._page.content())
+                snapshots.append(load_and_snapshot(key))
 
         try:
             self.cache.put(url, self._page.content(), "html")

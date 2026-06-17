@@ -54,14 +54,15 @@ extension's related links), `--max-total N` (cap total discovered),
 > far more than category pages alone (those are capped and partly curated). There
 > is still no public index of *all* extensions, so 100% isn't guaranteed.
 
-> Reviews: the store caps each sort order at ~10 reviews, so by default the
-> crawler re-sorts the reviews page (Recent / Helpful / Highest / Lowest rating)
-> and merges to get ~25–30 distinct reviews/extension (`--no-multi-sort` to
-> disable). Selectors for the sort dropdown are confirmed against the live store.
-> Before each snapshot it also clicks every per-review **"See more"** toggle so
-> bodies are saved in full (`selectors.REVIEW_EXPAND_TEXTS`). Because **Recent**
-> is one of the sorts, running daily accumulates new reviews over time (upserts
-> dedupe on `extension_id + review_uid`), growing past the 10-per-sort cap.
+> Reviews: the crawler re-sorts the reviews page (Recent / Helpful / Highest /
+> Lowest rating) and merges, de-duped on `extension_id + review_uid`. Per sort it
+> clicks **"Load more"** until exhausted (`--load-more-max`, default 40) to
+> paginate past the first ~10, expands every per-review **"Show more"** so bodies
+> save in full, and snapshots. Because **Recent** is a sort, running daily
+> accumulates new reviews over time. Any review that appears under the **Helpful**
+> sort is sticky-flagged `helpful_ranked` (community-upvoted — a lead on
+> agreed-upon complaints); requires migration **996**. `--no-multi-sort` falls
+> back to a single default-sort pass.
 
 > Tip: never run `python scraper/run.py` directly — relative imports break.
 > Use `python -m scraper.run …` or the top-level `python run_scraper.py …`.

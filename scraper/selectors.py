@@ -92,3 +92,9 @@ REVIEW_SORTS = [
 # stable across daily runs, so re-scrapes de-dupe instead of duplicating.
 # "Show more" confirmed against the live store; others kept as fallbacks.
 REVIEW_EXPAND_TEXTS = ["Show more", "See more", "Read more"]
+
+# Logged-out / incognito reviews pages paginate with a "Load more" button instead
+# of pure infinite scroll. The bot clicks it repeatedly to pull every review the
+# store will serve for a sort (well past the ~10 first shown). Matched by visible
+# text (robust to class churn); distinct from the per-review "Show more" expander.
+REVIEW_LOAD_MORE_TEXTS = ["Load more", "Show more reviews", "More reviews"]

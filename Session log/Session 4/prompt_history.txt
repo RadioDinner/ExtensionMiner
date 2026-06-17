@@ -99,3 +99,11 @@ this is what I get so far when I click the button on the desktop
 13. It's "Show more". As far as the dedupe processing, can you implement a multi point match system logic in the scraper algorithm? For example, if "save to pinterest" is named "save to pinterest", and has an id of 98 and has a home page of "url...wahtever" but the name changes, we'd check the other two points to see if they match and then override with changes, does this make sense?
 
 14. merge all branches to main
+
+15. on the "branches" page on the repo, I see that the "great-cray-i6q77i" is 2 behind. How do I fix that?
+
+All migrations are run against supabase
+
+I want an additional feature added to the scraper. I want the scraper to check and save any new reviews based on "recent" sorting, BUT i also want the page to be re-checked with the sort by set to "Helpful". I wanted this saved into the reviews and not get duplicated if a helpful review is also listed in most recent, BUT i want a system in place to flag reviews that are marked as helpful. I feel like that will give us a good lead on people trying to fix the extension, complaining and people agreeing, etc.
+
+Also, when I load the review pages in a logged out/incognito window, I can click the "Load more" button to see more reviews. Make the bot do this as well, got it?
