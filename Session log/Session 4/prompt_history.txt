@@ -97,3 +97,5 @@ this is what I get so far when I click the button on the desktop
 12. I want it sorted by recent, can you confirm that? Recent sorted, when run daily, will begin catching more than 10 reviews across time.  I noticed some of the reviews have "see more" or something like that at the end of it, can the bot open that before saving?
 
 13. It's "Show more". As far as the dedupe processing, can you implement a multi point match system logic in the scraper algorithm? For example, if "save to pinterest" is named "save to pinterest", and has an id of 98 and has a home page of "url...wahtever" but the name changes, we'd check the other two points to see if they match and then override with changes, does this make sense?
+
+14. merge all branches to main
