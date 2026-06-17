@@ -84,3 +84,7 @@ Is this what you were expecting to see for that command? [ran --all-categories -
 
 14. Let's work on montenaitaization / pricing intel
 
+15. Add a feature to the list, when I click open an extension on the list, to look at reviews, I want some changes made. On the dashboard portion, I want a summary of the user challenges, to see if there are multiple people having the same challenges. I also want a summary of what the extension is and does, and I want more detailed profitability numbers in the details page of the extension. I expect the ranking layer will need to build the summary of problems/ratings and the summary of the function and then the dashboard portion will need to handle display.
+
+After you add the feature to the list, help me download a new copy of the scripts folder so I can run those new commands
+

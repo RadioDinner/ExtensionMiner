@@ -33,3 +33,21 @@ a review's contribution based on age (tune the exact curve):
 
 This affects scoring/ranking only — we still **store** all reviews regardless of
 age.
+
+## 3. 🆕 Richer extension detail page (problem clusters, "what it is", profitability)
+When you open an extension from a list to read its reviews (`/reviews/<ext_id>`),
+show more than the raw review list:
+
+- **Summary of user challenges/problems**, *clustered*, so you can see when
+  multiple people hit the **same** issue (the recurring complaint + how many
+  distinct reviewers raised it).
+- **Summary of what the extension is and does** (a plain "function overview").
+- **More detailed profitability numbers** on the details page (the full
+  monetization breakdown — pricing tiers, user estimate, revenue range,
+  confidence, basis — not just the dashboard's compact column).
+
+Implementation hints (from the user): the **ranking layer** builds the
+problems/ratings summary and the function summary; the **dashboard** then
+displays them. Likely reuses what's already there — `opportunities.details`
+(complaint clusters + counts) and the `monetization` table — plus a NEW
+"what it does" summary field added to the ranking output.
