@@ -72,3 +72,7 @@ While that is running, I want you to fix the categorization in the data that we'
 3. I want a way to sort the "Scored opportunities" card. So I can load a list of highest scored opportunities in the "bug" type, or "missing_feature" type and I can filter paid/unpaid extensions.
 4. I want to be careful with getting old reviews. I still want older reviews but reviews that are from very long ago, are probably from old releases. I want to add a feature to the ranking algorityhm that lowers the rating a bit if it is old. Like within the last 3 months, is a high score, last 6 months is a little lower, last 12 months a little lower than 6 motnhs and over 2 years old gets a lower score, anything older than 3 years old gets a much lower score, etc.
 
+10. A note on the feature list, once it is shipped, remove it.
+
+Is this what you were expecting to see for that command? [ran --all-categories --max-extensions 5 --category-scrolls 1 --no-db --refresh; log showed "discovered 5 categories from the store nav" and only 5 categories crawled, 5 ext each]
+

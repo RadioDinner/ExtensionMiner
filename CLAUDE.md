@@ -183,8 +183,10 @@ Full text in `NEW_SESSION_INSTRUCTIONS.md`. Operational summary:
   implementation hints the user gave; mark it 🆕 Proposed.
 - Only start building a backlog item when the user **explicitly** asks for that
   item to be worked on/implemented.
-- Keep entries numbered and in the existing format; don't reorder or delete
-  items unless asked (mark status changes instead: 🔨 In progress, ✅ Done).
+- **When an item ships, REMOVE it from `docs/FEATURE_LIST.md`** — the user wants
+  shipped features deleted from the list, not kept as "done".
+- Otherwise keep entries numbered and in the existing format; don't reorder or
+  delete items unless asked (mark 🔨 In progress when work starts).
 
 ---
 
