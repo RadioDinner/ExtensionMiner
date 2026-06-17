@@ -32,3 +32,5 @@ in the powershell session? considering setting a macro to press enter every 60 s
    "Why do you keep stopping me to ask me yes or no? I always hit yes anyways"]
 
 6. Is this session still valid
+
+7. well the dashboard still isn't loading data, can you put diagnostics into this so it does?

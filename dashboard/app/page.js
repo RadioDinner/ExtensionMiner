@@ -88,7 +88,8 @@ export default async function Page() {
         <div className="banner">
           <strong>Supabase not connected.</strong> Set <code>SUPABASE_URL</code> and{" "}
           <code>SUPABASE_SERVICE_ROLE_KEY</code> as environment variables (Vercel project
-          settings, or <code>dashboard/.env.local</code> for local dev), then redeploy.
+          settings, or <code>dashboard/.env.local</code> for local dev), then redeploy.{" "}
+          <strong><a href="/diagnostics">→ Run diagnostics</a></strong>
         </div>
       )}
 
@@ -97,7 +98,8 @@ export default async function Page() {
           <strong>Connected, but a query failed:</strong> {d.error}
           <br />
           If this mentions a missing relation, apply{" "}
-          <code>supabase/migrations/999_initial_schema.sql</code> to your project.
+          <code>supabase/migrations/999_initial_schema.sql</code> to your project.{" "}
+          <strong><a href="/diagnostics">→ Run diagnostics</a></strong>
         </div>
       )}
 
@@ -109,8 +111,13 @@ export default async function Page() {
           <em>anon / publishable</em> key instead of the <em>service_role</em> secret — RLS
           is enabled with no policies, so the wrong key returns nothing with no error; or{" "}
           <strong>(2)</strong> <code>SUPABASE_URL</code> points at a different project than
-          the scraper writes to. Fix the value in your host and redeploy.
+          the scraper writes to. Fix the value in your host and redeploy.{" "}
+          <strong><a href="/diagnostics">→ Run diagnostics</a></strong> to see which.
         </div>
+      )}
+
+      {(!d.configured || d.error || d.counts.extensions === 0) ? null : (
+        <p className="diag-link"><a href="/diagnostics">Connection diagnostics →</a></p>
       )}
 
       <div className="stats">
