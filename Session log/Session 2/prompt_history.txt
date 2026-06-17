@@ -30,3 +30,5 @@ in the powershell session? considering setting a macro to press enter every 60 s
    "I want ALL the reviews from ALL the extensions. I don't care if I need to
    run the python script ALL NIGHT. I WANT ALL THE DATA, OK?!" and
    "Why do you keep stopping me to ask me yes or no? I always hit yes anyways"]
+
+6. Is this session still valid
