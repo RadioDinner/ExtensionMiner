@@ -82,3 +82,5 @@ Is this what you were expecting to see for that command? [ran --all-categories -
 
 13. [AskUserQuestion answer] Ranking trigger -> "Desktop button (local)": a one-click .cmd like the scraper launcher that runs the ranker directly on the machine (not a dashboard button).
 
+14. Let's work on montenaitaization / pricing intel
+
