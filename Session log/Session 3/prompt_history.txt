@@ -1,1 +1,29 @@
 1. Alright, what is the most recent session you see here? I want to kick off a new session with some changes to this system
+
+2. First things first, we're going to work on the dashboard. I went to /diagnostics and saw this data
+
+Diagnostics
+Connection check
+
+Why the dashboard is / isn't loading data. No secrets are shown — only key type, never the value.
+FAIL Wrong key: publishable (new format). This is the WRONG key. Publishable keys obey RLS, so reads return nothing. Use the SECRET key.
+Environment
+SUPABASE_URL	https://jagtupajcgdvehqfltom.supabase.co
+URL project ref	jagtupajcgdvehqfltom
+SUPABASE_SERVICE_ROLE_KEY	present (46 chars)
+Key type	FAIL publishable (new format)
+This is the WRONG key. Publishable keys obey RLS, so reads return nothing. Use the SECRET key.
+Table reads
+
+Row count + error for each table, using the configured key.
+Table	Rows	Result
+extensions	0	ok
+reviews	0	ok
+opportunities	0	ok
+categories	0	ok
+rating_snapshots	0	ok
+Sample extensions
+
+No rows returned (see the verdict above for why).
+
+← Back to dashboard
