@@ -87,6 +87,25 @@ dropdown, and inspect it. Set `SEL_REVIEW_SORT_TRIGGER` (the dropdown button),
 `menuitem`), and the visible `REVIEW_SORTS` labels in `scraper/selectors.py`. If
 these don't match, multi-sort silently falls back to one default-sort pass.
 
+## Extension identity / duplicates
+
+The Chrome `ext_id` is permanent and unique, so it's the primary key — a same-id
+name/website change is just an update, never a duplicate. The **secondary**
+multi-point matcher (`scraper/identity.py`) catches the one case `ext_id` can't:
+the *same product re-published under a different `ext_id`*. It links the newer
+listing to the older one (`successor_of`) when **≥2 of {name, developer,
+website}** agree — non-destructively (both rows kept). `--preset daily` runs the
+pass after each crawl; or run it on demand:
+
+```bash
+python -m scraper.successors            # link (needs migration 997 applied)
+python -m scraper.successors --dry-run  # just report candidates
+```
+
+> Requires `supabase/migrations/997_extension_successor_links.sql` to be applied
+> (adds `successor_of` + `successor_points`). If it isn't, the linking step logs
+> a note and is skipped — the crawl itself is unaffected.
+
 ## Layout
 
 | File | Role |

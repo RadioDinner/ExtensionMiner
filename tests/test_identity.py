@@ -59,3 +59,38 @@ def test_find_successor_match_picks_best_different_id():
     # nothing strong enough -> no match
     row2, hits2 = identity.find_successor_match(candidate, existing[:2])
     assert row2 is None and hits2 == []
+
+
+def test_link_successors_pairs_newer_to_older():
+    rows = [
+        {"id": 10, "ext_id": "old", "name": "Save to Pinterest", "developer": "Pinterest", "website": "pinterest.com"},
+        {"id": 25, "ext_id": "new", "name": "Pinterest Saver", "developer": "Pinterest", "website": "https://www.pinterest.com/"},
+        {"id": 30, "ext_id": "other", "name": "Totally Different", "developer": "Someone", "website": "example.com"},
+    ]
+    links = identity.link_successors(rows)
+    assert len(links) == 1
+    succ_id, pred_id, hits = links[0]
+    assert succ_id == 25 and pred_id == 10          # newer (higher id) -> older
+    assert set(hits) == {"developer", "website"}
+
+
+def test_link_successors_ignores_same_ext_id_and_weak_matches():
+    rows = [
+        {"id": 1, "ext_id": "a", "name": "Note App", "developer": "Acme", "website": "acme.com"},
+        {"id": 2, "ext_id": "a", "name": "Note App", "developer": "Acme", "website": "acme.com"},  # same id col? same ext_id -> skip
+        {"id": 3, "ext_id": "b", "name": "Note App", "developer": "Other", "website": "other.com"},  # only name -> 1 pt
+    ]
+    assert identity.link_successors(rows) == []
+
+
+def test_link_successors_each_successor_takes_strongest_predecessor():
+    rows = [
+        {"id": 1, "ext_id": "p1", "name": "Cool Tool", "developer": "Cool Co", "website": "x.com"},        # shares dev only with new
+        {"id": 2, "ext_id": "p2", "name": "Cool Tool", "developer": "Cool Co", "website": "cool.com"},     # shares name+dev+web stronger
+        {"id": 9, "ext_id": "new", "name": "Cool Tool", "developer": "Cool Co", "website": "cool.com"},
+    ]
+    links = identity.link_successors(rows)
+    # id 9 is newest; its strongest predecessor is id 2 (name+developer+website)
+    succ = [l for l in links if l[0] == 9]
+    assert succ and succ[0][1] == 2
+    assert set(succ[0][2]) == {"name", "developer", "website"}

@@ -81,6 +81,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-total", type=int, default=0, metavar="N",
                    help="stop after discovering N extensions total (0 = no cap). Handy to "
                         "bound a --follow-related run while testing.")
+    p.add_argument("--link-successors", dest="link_successors", action="store_true",
+                   help="after crawling, link the same product re-published under a "
+                        "different ext_id (multi-point match; requires migration 997). "
+                        "Implied by --preset daily.")
+    p.add_argument("--no-link-successors", dest="link_successors", action="store_false",
+                   help="skip the post-crawl successor-linking pass")
+    p.set_defaults(link_successors=False)
     p.add_argument("--no-db", action="store_true",
                    help="dry run: fetch + parse + cache, but do not write to Supabase")
     p.add_argument("--no-headless", action="store_true",
@@ -257,6 +264,16 @@ def main(argv=None) -> int:
             "Note: 0 extensions found. If you expected data, check your "
             "--categories / TARGET_CATEGORIES and that the store is reachable."
         )
+
+    # Post-crawl: link the same product re-published under a different ext_id.
+    if (args.link_successors or args.preset == "daily") and opts.write_db:
+        try:
+            from .successors import run as link_successors
+            link_stats = link_successors()
+            print(f"Successor links: {link_stats}")
+        except Exception as exc:  # never let linking sink an otherwise-good crawl
+            log.warning("successor linking skipped (%s)", exc)
+
     return EXIT_OK
 
 
