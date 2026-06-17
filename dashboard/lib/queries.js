@@ -67,7 +67,7 @@ export async function getDashboardData() {
         .from("opportunities")
         .select("score,top_complaint,complaint_type,fixable,brief,extensions(ext_id,name,rating,install_count,listing_url)")
         .order("score", { ascending: false, nullsFirst: false })
-        .limit(25),
+        .limit(200),
       supabase
         .from("extensions")
         .select(POINT_COLS)

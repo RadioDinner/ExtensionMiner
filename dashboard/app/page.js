@@ -1,5 +1,6 @@
 import { getDashboardData } from "../lib/queries";
 import { RatingHistogram, OpportunityScatter } from "./charts";
+import OpportunitiesCard from "./OpportunitiesCard";
 
 // Always render at request time so the build never needs Supabase credentials.
 export const dynamic = "force-dynamic";
@@ -130,36 +131,6 @@ function ExtTable({ rows, showCategory, linkReviews, showMoney, money }) {
   );
 }
 
-function OpportunityTable({ rows }) {
-  if (!rows || rows.length === 0) {
-    return <p className="empty">No scored opportunities yet — run the Claude ranking layer after scraping.</p>;
-  }
-  return (
-    <table>
-      <thead>
-        <tr>
-          <th className="num">Score</th>
-          <th>Extension</th>
-          <th>Top fixable complaint</th>
-          <th>Type</th>
-          <th>Fixable</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i}>
-            <td className="num">{r.score == null ? "—" : Number(r.score).toFixed(1)}</td>
-            <td>{reviewLinkFor(r.extensions?.ext_id, r.extensions?.name)}</td>
-            <td>{r.top_complaint || "—"}</td>
-            <td><span className="pill">{r.complaint_type || "—"}</span></td>
-            <td>{r.fixable || "—"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
 export default async function Page() {
   const d = await getDashboardData();
 
@@ -241,8 +212,8 @@ export default async function Page() {
 
       <section>
         <h2>Scored opportunities</h2>
-        <p className="sub">Ranked by the Claude review-mining layer (Phase 3). Click a name to read its saved reviews.</p>
-        <OpportunityTable rows={d.opportunities} />
+        <p className="sub">Ranked by the Claude review-mining layer (Phase 3). Filter by complaint type or pricing; click a name to read its saved reviews.</p>
+        <OpportunitiesCard rows={d.opportunities} monetization={d.monetization} />
       </section>
 
       {d.helpfulReviews && d.helpfulReviews.length > 0 && (

@@ -11,15 +11,7 @@
 
 ---
 
-## 1. 🆕 Sort & filter the "Scored opportunities" card
-Make the **Scored opportunities** card sortable/filterable:
-
-- Load highest-scored opportunities **by complaint type** (e.g. `bug`,
-  `missing_feature`, …).
-- **Filter paid vs. unpaid** extensions (uses the monetization pricing data,
-  now available per extension via the `monetization` table).
-
-## 2. 🆕 Recency-weighted review scoring (decay old reviews)
+## 1. 🆕 Recency-weighted review scoring (decay old reviews)
 Keep collecting older reviews, but **down-weight old ones** in the ranking
 algorithm, since very old reviews likely describe old releases. Apply a decay to
 a review's contribution based on age (tune the exact curve):
@@ -34,7 +26,7 @@ a review's contribution based on age (tune the exact curve):
 This affects scoring/ranking only — we still **store** all reviews regardless of
 age.
 
-## 3. 🆕 Richer extension detail page (problem clusters, "what it is", profitability)
+## 2. 🆕 Richer extension detail page (problem clusters, "what it is", profitability)
 When you open an extension from a list to read its reviews (`/reviews/<ext_id>`),
 show more than the raw review list:
 

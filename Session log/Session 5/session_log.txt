@@ -137,12 +137,13 @@ CURRENT PROJECT STATE
 OPEN ITEMS / FOR NEXT SESSION (priority order)
 ================================================================================
 1. FEATURE BACKLOG (docs/FEATURE_LIST.md) — build only when the user asks:
-   #1 Sort & filter the "Scored opportunities" card (by complaint_type + paid/
-      unpaid). NEXT UP, mostly dashboard; data already exists (opportunities.
-      complaint_type + monetization.pricing_model).
-   #2 Recency-weighted review scoring (decay old reviews in the ranker; curve in
-      the file: <=3mo highest ... >3yr much lower). Ranking-layer change.
-   #3 Richer extension detail page (/reviews/<ext_id>): clustered user-problem
+   (SHIPPED this session: "Sort & filter the Scored-opportunities card" — the
+    dashboard card is now a client component, dashboard/app/OpportunitiesCard.js,
+    with filters for complaint type + paid/unpaid + a score sort; opportunities
+    query limit raised 25 -> 200. Removed from the backlog per the ship rule.)
+   #1 Recency-weighted review scoring (decay old reviews in the ranker; curve in
+      the file: <=3mo highest ... >3yr much lower). Ranking-layer change. NEXT UP.
+   #2 Richer extension detail page (/reviews/<ext_id>): clustered user-problem
       summary, a "what it does" summary, detailed profitability. Hint: ranker
       builds the summaries (reuse opportunities.details clusters + add a NEW
       "what it does" field), dashboard displays; show full monetization breakdown.

@@ -104,3 +104,5 @@ After you add the feature to the list, help me download a new copy of the script
 
 22. the daily scraper is currently running, Let's wrap this session. Write a handoff, commit it to main and close the session.
 
+23. I'm going to run the ranking, but you can start working on the next feature
+
