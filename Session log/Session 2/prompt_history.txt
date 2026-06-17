@@ -36,3 +36,5 @@ in the powershell session? considering setting a macro to press enter every 60 s
 7. well the dashboard still isn't loading data, can you put diagnostics into this so it does?
 
 8. merge to main
+
+9. ok, write a handoff and merge it to main and then we're done here
