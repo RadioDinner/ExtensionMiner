@@ -74,9 +74,15 @@ def build_parser() -> argparse.ArgumentParser:
                    help="max 'Load more' clicks per review sort, to paginate past the "
                         "first ~10 (default 40; 0 disables)")
     p.add_argument("--no-multi-sort", dest="multi_sort", action="store_false",
-                   help="only scrape the default review sort; skip the recent/highest/"
-                        "lowest re-sort passes that gather past the store's ~10-per-sort cap")
+                   help="only scrape the default review sort; skip the Recent + Helpful "
+                        "re-sort passes that gather past the store's ~10-per-sort cap")
     p.set_defaults(multi_sort=True)
+    p.add_argument("--concurrency", type=int, default=None, metavar="N",
+                   help="parallel browser workers draining the frontier (default 1; "
+                        "4 under --preset daily). Each worker is its own headless "
+                        "Chromium (~200-300MB RAM) but they share ONE polite rate "
+                        "limiter, so raising this speeds the crawl without raising the "
+                        "request rate. Bump it (e.g. 8) for an all-night full-store run.")
     p.add_argument("--follow-related", action="store_true",
                    help="graph-crawl: also enqueue each extension's 'related' links, "
                         "reaching far more than category pages expose. Implied by "
@@ -144,6 +150,7 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
     refresh = args.refresh
     all_categories = args.all_categories
     follow_related = args.follow_related
+    concurrency = args.concurrency
 
     if args.preset == "daily":
         # Full crawl of the WHOLE store taxonomy, re-checking everything for new
@@ -155,9 +162,13 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
         refresh = True
         all_categories = True
         follow_related = True
+        if concurrency is None:
+            concurrency = 4  # parallelize the all-store crawl; override with --concurrency
 
     if max_extensions is None:
         max_extensions = 25  # the interactive default
+    if concurrency is None:
+        concurrency = 1  # serial by default; preserves the interactive behavior
 
     return CrawlOptions(
         categories=args.categories or [],
@@ -170,6 +181,7 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
         load_more_max=args.load_more_max,
         follow_related=follow_related,
         max_total=args.max_total,
+        concurrency=concurrency,
         write_db=not args.no_db,
         headless=not args.no_headless,
         refresh=refresh,
@@ -236,8 +248,9 @@ def main(argv=None) -> int:
     if args.preset == "daily":
         log.info(
             "preset 'daily': full refresh crawl of the WHOLE category taxonomy + "
-            "related-link graph (no cap, cache bypassed); already-stored extensions "
-            "only gain new reviews"
+            "related-link graph (no cap, cache bypassed) with %d parallel worker(s), "
+            "Recent + Helpful review sorts; already-stored extensions only gain new reviews",
+            opts.concurrency,
         )
 
     # Friendly preflight for the most common stumble: missing Supabase creds.

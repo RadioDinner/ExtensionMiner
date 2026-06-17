@@ -76,13 +76,17 @@ SEL_REVIEWS_MORE = "text=See all reviews"
 # gracefully falls back to a single (default-sort) pass.
 SEL_REVIEW_SORT_TRIGGER = '[role="combobox"][aria-haspopup="listbox"]'
 SEL_REVIEW_SORT_OPTION = 'li[role="option"][title="{label}"]'
-# (key, exact option title). "Lowest to highest rating" is the strategic gold —
-# the 1-star "I'd pay if it worked" complaints surface first.
+# (key, exact option title). We pull only the two sorts that carry signal:
+#   - "Recent"  : the freshest reviews (new complaints land here first; daily
+#                 runs + "Load more" + upsert accumulate the full history).
+#   - "Helpful" : community-upvoted reviews — complaints people agree with. A
+#                 review seen here gets the sticky reviews.helpful_ranked flag.
+# "Highest/Lowest rating" were dropped on purpose: with "Load more" paginating
+# the full Recent list, the 1-star complaints already come through, so the extra
+# two re-sort passes per extension weren't worth the time on a full-store crawl.
 REVIEW_SORTS = [
     ("recent", "Recent"),
     ("helpful", "Helpful"),
-    ("highest", "Highest to lowest rating"),
-    ("lowest", "Lowest to highest rating"),
 ]
 
 # Per-review "See more" / "Show more" toggles that reveal the FULL review text.

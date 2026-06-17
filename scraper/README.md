@@ -42,11 +42,19 @@ python -m scraper.run --preset daily --log-dir logs
 Useful flags: `--preset daily` (full refresh crawl of the **whole** taxonomy +
 related graph), `--all-categories` (discover & crawl every category from the
 store nav), `--follow-related` (graph-crawl past category pages via each
-extension's related links), `--max-total N` (cap total discovered),
-`--no-db` (dry run), `--no-headless` (watch it), `--refresh` (ignore cache),
-`--skip-existing`, `--refresh-after-days N`, `--log-dir DIR`, `--no-robots`,
-`--log-level DEBUG`, `--category-scrolls` (max passes to exhaust a category) /
-`--discovery-patience` (stop after N empty passes) / `--review-scrolls`.
+extension's related links), `--concurrency N` (parallel browser workers; see
+below), `--max-total N` (cap total discovered), `--no-db` (dry run),
+`--no-headless` (watch it), `--refresh` (ignore cache), `--skip-existing`,
+`--refresh-after-days N`, `--log-dir DIR`, `--no-robots`, `--log-level DEBUG`,
+`--category-scrolls` (max passes to exhaust a category) / `--discovery-patience`
+(stop after N empty passes) / `--review-scrolls`.
+
+> Concurrency: `--concurrency N` runs N browser workers that drain the discovery
+> frontier in parallel (default **1**; **4** under `--preset daily`). Each worker
+> is its own headless Chromium (~200–300 MB RAM) — but they all share **one**
+> rate limiter, so raising N speeds the crawl by overlapping the slow on-page work
+> ("Load more" / "Show more" / scrolling) **without** raising the request rate.
+> For an all-night full-store run, bump it (e.g. `--concurrency 8`); watch RAM.
 
 > Discovery: `--all-categories` reads the category list from the store's own nav
 > and scrolls each until no new extensions appear; `--follow-related` then turns
@@ -54,14 +62,16 @@ extension's related links), `--max-total N` (cap total discovered),
 > far more than category pages alone (those are capped and partly curated). There
 > is still no public index of *all* extensions, so 100% isn't guaranteed.
 
-> Reviews: the crawler re-sorts the reviews page (Recent / Helpful / Highest /
-> Lowest rating) and merges, de-duped on `extension_id + review_uid`. Per sort it
-> clicks **"Load more"** until exhausted (`--load-more-max`, default 40) to
-> paginate past the first ~10, expands every per-review **"Show more"** so bodies
-> save in full, and snapshots. Because **Recent** is a sort, running daily
-> accumulates new reviews over time. Any review that appears under the **Helpful**
-> sort is sticky-flagged `helpful_ranked` (community-upvoted — a lead on
-> agreed-upon complaints); requires migration **996**. `--no-multi-sort` falls
+> Reviews: the crawler re-sorts the reviews page (**Recent** + **Helpful** — the
+> two sorts that carry signal) and merges, de-duped on `extension_id +
+> review_uid`. Per sort it clicks **"Load more"** until exhausted
+> (`--load-more-max`, default 40) to paginate past the first ~10, expands every
+> per-review **"Show more"** so bodies save in full, and snapshots. Because
+> **Recent** is a sort, running daily accumulates new reviews over time (and the
+> full "Load more" list brings the low-star complaints through, so the old
+> Highest/Lowest-rating passes were dropped). Any review that appears under the
+> **Helpful** sort is sticky-flagged `helpful_ranked` (community-upvoted — a lead
+> on agreed-upon complaints); requires migration **996**. `--no-multi-sort` falls
 > back to a single default-sort pass.
 
 > Tip: never run `python scraper/run.py` directly — relative imports break.

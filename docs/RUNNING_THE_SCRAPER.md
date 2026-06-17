@@ -73,10 +73,18 @@ there's nothing new, it effectively moves on. Newly listed extensions get picked
 up automatically. It also records a daily rating/install **snapshot** per
 extension so you can track trajectory over time.
 
-> Heads-up: the whole-taxonomy crawl is **long** (polite 3s/page rate limit). A
-> first full run can take hours — that's expected for an overnight scheduled job.
-> Set `TARGET_CATEGORIES` + drop `--all-categories` in `RUN_ARGS` if you want a
-> smaller, faster run while testing.
+The daily preset also reviews each extension under the **Recent** and **Helpful**
+sorts (clicking "Load more" to pull the full list each time), and runs **4
+parallel browser workers** so the long crawl finishes far sooner. The workers
+share one polite rate limiter, so going parallel speeds things up *without*
+hitting the store any harder. Raise it with `--concurrency 8` for an all-night
+full-store run (each worker is its own headless Chromium, ~200–300 MB RAM — so
+watch memory if you push it high).
+
+> Heads-up: even parallelized, the whole-taxonomy crawl is **long** (the shared
+> polite rate limit still paces every page). A first full run can take hours —
+> that's expected for an overnight scheduled job. Set `TARGET_CATEGORIES` + drop
+> `--all-categories` in `RUN_ARGS` if you want a smaller, faster run while testing.
 
 To change behavior, edit the `RUN_ARGS` line near the top of
 `scripts\run_scraper.cmd`. Examples are in the comments there.
@@ -125,6 +133,7 @@ imports. Use `run_scraper.py` or the `-m scraper.run` form above.
 | Flag | What it does |
 |------|--------------|
 | `--preset daily` | Full refresh crawl of configured categories (the scheduled default). |
+| `--concurrency N` | Parallel browser workers (default 1; 4 under `--preset daily`). Higher = faster, more RAM; the request rate stays polite. |
 | `--categories productivity developer-tools` | Crawl specific category slugs. |
 | `--max-extensions N` | Cap extensions per category (`0` = no cap). |
 | `--no-db` | Dry run: fetch + parse, write nothing (great for a quick test). |

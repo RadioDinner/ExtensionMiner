@@ -246,3 +246,30 @@ def test_crawl_max_total_caps_discovery(monkeypatch):
     stats = _crawl_with_fake(monkeypatch, follow_related=True, max_total=2)
     assert stats["discovered"] == 2
     assert stats["extensions"] == 2
+
+
+def test_crawl_parallel_follows_related_graph(monkeypatch):
+    # Same A->C->A graph, but drained by several workers at once. The thread-safe
+    # discovered/seen guards mean every node is still scraped exactly once.
+    stats = _crawl_with_fake(monkeypatch, follow_related=True, concurrency=3)
+    assert stats["extensions"] == 3
+    assert stats["discovered"] == 3
+
+
+def test_concurrency_flag_wires_through():
+    # serial by default; the daily preset parallelizes; an explicit value wins.
+    assert build_parser().parse_args([]).concurrency is None
+    assert CrawlOptions().concurrency == 1
+    assert resolve_options(build_parser().parse_args([])).concurrency == 1
+    assert resolve_options(build_parser().parse_args(["--preset", "daily"])).concurrency == 4
+    assert resolve_options(build_parser().parse_args(["--concurrency", "8"])).concurrency == 8
+    assert resolve_options(
+        build_parser().parse_args(["--preset", "daily", "--concurrency", "12"])
+    ).concurrency == 12
+
+
+def test_review_sorts_are_recent_and_helpful_only():
+    # We pull only the two sorts that carry signal (no highest/lowest passes).
+    from scraper import selectors
+
+    assert [key for key, _ in selectors.REVIEW_SORTS] == ["recent", "helpful"]
