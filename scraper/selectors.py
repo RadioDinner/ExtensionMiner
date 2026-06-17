@@ -84,3 +84,10 @@ REVIEW_SORTS = [
     ("highest", "Highest to lowest rating"),
     ("lowest", "Lowest to highest rating"),
 ]
+
+# Per-review "See more" / "Show more" toggles that reveal the FULL review text.
+# We click these (matched by exact visible text, robust to class churn) after
+# scrolling and before snapshotting, so the saved body is the whole review, not a
+# truncated preview. Bonus: full, stable text keeps the content-hash review id
+# stable across daily runs, so re-scrapes de-dupe instead of duplicating.
+REVIEW_EXPAND_TEXTS = ["See more", "Show more", "Read more"]

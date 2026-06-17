@@ -58,6 +58,10 @@ extension's related links), `--max-total N` (cap total discovered),
 > crawler re-sorts the reviews page (Recent / Helpful / Highest / Lowest rating)
 > and merges to get ~25–30 distinct reviews/extension (`--no-multi-sort` to
 > disable). Selectors for the sort dropdown are confirmed against the live store.
+> Before each snapshot it also clicks every per-review **"See more"** toggle so
+> bodies are saved in full (`selectors.REVIEW_EXPAND_TEXTS`). Because **Recent**
+> is one of the sorts, running daily accumulates new reviews over time (upserts
+> dedupe on `extension_id + review_uid`), growing past the 10-per-sort cap.
 
 > Tip: never run `python scraper/run.py` directly — relative imports break.
 > Use `python -m scraper.run …` or the top-level `python run_scraper.py …`.

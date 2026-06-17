@@ -151,6 +151,7 @@ def scrape_extension(
             [label for _, label in selectors.REVIEW_SORTS],
             trigger_selector=selectors.SEL_REVIEW_SORT_TRIGGER,
             option_selector=selectors.SEL_REVIEW_SORT_OPTION,
+            expand_texts=selectors.REVIEW_EXPAND_TEXTS,
             scrolls=review_scrolls,
             wait_selector=selectors.SEL_DETAIL_READY,
         )

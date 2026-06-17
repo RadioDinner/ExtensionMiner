@@ -109,6 +109,29 @@ class CWSBrowser:
             self._page.mouse.wheel(0, 20_000)
             self._page.wait_for_timeout(scroll_pause_ms)
 
+    def _expand_reviews(self, expand_texts: Optional[List[str]], max_clicks: int = 600) -> int:
+        """Click every per-review "See more"/"Show more" toggle so bodies aren't
+        truncated. Matched by exact visible text; clicking a toggle flips it to
+        "See less", so re-querying the same text naturally walks to the next
+        still-collapsed review. Defensive: any failure just stops early."""
+        clicked = 0
+        for text in expand_texts or []:
+            sel = f'text="{text}"'
+            while clicked < max_clicks:
+                try:
+                    el = self._page.query_selector(sel)
+                except Exception:
+                    break
+                if el is None:
+                    break
+                try:
+                    el.click(timeout=800)
+                    clicked += 1
+                    self._page.wait_for_timeout(60)
+                except Exception:
+                    break
+        return clicked
+
     def _apply_review_sort(self, label: str, trigger_selector: str, option_selector: str) -> bool:
         """Open the sort dropdown and pick the option titled ``label``.
 
@@ -147,6 +170,7 @@ class CWSBrowser:
         *,
         trigger_selector: str,
         option_selector: str,
+        expand_texts: Optional[List[str]] = None,
         scrolls: int = 6,
         scroll_pause_ms: int = 1_200,
         wait_selector: Optional[str] = None,
@@ -172,11 +196,13 @@ class CWSBrowser:
 
         snapshots: List[str] = []
         self._scroll_page(scrolls, scroll_pause_ms)
+        self._expand_reviews(expand_texts)
         snapshots.append(self._page.content())
 
         for label in sort_labels:
             if self._apply_review_sort(label, trigger_selector, option_selector):
                 self._scroll_page(scrolls, scroll_pause_ms)
+                self._expand_reviews(expand_texts)
                 snapshots.append(self._page.content())
 
         try:
