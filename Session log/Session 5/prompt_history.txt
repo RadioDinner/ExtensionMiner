@@ -23,3 +23,7 @@ Error: NetworkError when attempting to fetch resource. (api.supabase.com)
 
 Otherwise, 997 is run. Vercel dashboard is fixed, not sure about item #3 yet. on the #4 concurrency, I don't need 4 sorts. I just need most recent and helpful. Not highest lowest. But yes, I still want every extension scanned to see if there are new ones. I'll run #5 in a second. Add in the #6 optional polish on this session to do. I want to wrap all open items before adding more features
 
+3. [AskUserQuestion answer] "Merge to main": Yes, merge to main (Recommended) —
+   merge claude/intelligent-wozniak-gjt2g9 into main and push so the launcher
+   (which pulls main) picks up Session 5's code.
+

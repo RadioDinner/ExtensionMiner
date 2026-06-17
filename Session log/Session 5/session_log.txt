@@ -123,10 +123,11 @@ OPEN ITEMS / FOR NEXT SESSION (priority order)
    git fetch origin && git checkout main && git reset --hard origin/main
    (After that the Desktop button + scheduled task self-update each run.) BUT NOTE
    the merge caveat below — this session's work is on the feature branch, not main.
-5. MERGE TO MAIN — this session pushed to claude/intelligent-wozniak-gjt2g9 only.
-   The user's launcher auto-updates from main (UPDATE_BRANCH=main). So to actually
-   get Session 5's code on their machine, this branch must be merged to main
-   (Sessions 1-4 pattern). Confirm with the user, then merge + push main.
+5. MERGE TO MAIN — DONE. User chose to merge (prompt 3). main was fast-forwarded
+   to the feature branch and pushed (main and claude/intelligent-wozniak-gjt2g9
+   are 0/0 again, Sessions 1-4 pattern). The launcher (UPDATE_BRANCH=main) will
+   pick up Session 5's code on its next run — once the user has run the one-time
+   auto-update bootstrap (#4 above).
 
 POSSIBLE NEXT FEATURES (only after the above; user wanted items wrapped first)
   - Parallelize category discovery too (seed phase is still serial; minor vs the
