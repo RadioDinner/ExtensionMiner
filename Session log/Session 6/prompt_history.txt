@@ -17,3 +17,6 @@ whats the next feature
 
 5.
 build it
+
+6.
+migration run
