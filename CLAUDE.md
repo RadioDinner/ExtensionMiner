@@ -173,7 +173,22 @@ Full text in `NEW_SESSION_INSTRUCTIONS.md`. Operational summary:
 
 ---
 
-## 6. Notes for future sessions
+## 6. Feature list / backlog (CAPTURE-ONLY — do not auto-build)
+
+- The user keeps a running feature backlog in [`docs/FEATURE_LIST.md`](./docs/FEATURE_LIST.md).
+- **Rule:** when the user says *"add this to the feature list"* — or anything
+  like it (*"add to the backlog"*, *"put this on the feature list"*, etc.) —
+  **just append the item to `docs/FEATURE_LIST.md` and STOP. Do NOT begin
+  implementing it.** Capture the title, a faithful description, and any
+  implementation hints the user gave; mark it 🆕 Proposed.
+- Only start building a backlog item when the user **explicitly** asks for that
+  item to be worked on/implemented.
+- Keep entries numbered and in the existing format; don't reorder or delete
+  items unless asked (mark status changes instead: 🔨 In progress, ✅ Done).
+
+---
+
+## 7. Notes for future sessions
 - These instructions may be updated by the user at any time — re-read
   `NEW_SESSION_INSTRUCTIONS.md` if behavior seems off.
 - Keep `.env`/secrets out of git. Add a `.env.example` when wiring Supabase.

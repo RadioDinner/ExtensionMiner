@@ -65,3 +65,10 @@ ModuleNotFoundError: No module named 'bs4'
 
 While that is running, I want you to fix the categorization in the data that we're pulling. IN the webstore, there are clearly definied categories and URLs to match. so the categories are in there under "Productivity" there are Communication, Developer Tools, Education, Tools, Workflow & Planning. Under "Lifestyle" there is Art & Design, Entertainment, Games, Household, Just for Fun, News & Weather, Shopping, Social Networking, Travel, Well-being. And under "Make Chrome Yours", I have "Accessibility, Functionality & UI, Privacy & Security. I want my system to match those categories.
 
+9. I'm working on building a running feature list. Add these items to the list and whenever I say something like "add this to the feature list", don't begin working on it, just add it to the feature list in the repo.
+
+1. I want you to setup a way for me to run the "Claude ranking layer" via clicking a button on the dashboard.
+2. I want some tool added to the dashboard where I can see if an extension is making money or not, or if it is paid, free or premium, along with an estimated monthly/daily/weekly/annual/whatever makes sense, income. This will be an item to add to the ranking layer probably, because it'll require an agent to research the extension for pricing plans, user base size, etc.
+3. I want a way to sort the "Scored opportunities" card. So I can load a list of highest scored opportunities in the "bug" type, or "missing_feature" type and I can filter paid/unpaid extensions.
+4. I want to be careful with getting old reviews. I still want older reviews but reviews that are from very long ago, are probably from old releases. I want to add a feature to the ranking algorityhm that lowers the rating a bit if it is old. Like within the last 3 months, is a high score, last 6 months is a little lower, last 12 months a little lower than 6 motnhs and over 2 years old gets a lower score, anything older than 3 years old gets a much lower score, etc.
+
