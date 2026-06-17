@@ -32,3 +32,20 @@ Lowest/Highest tables, so either add an opt-in sortable/filterable client
 variant or split the zone out into its own client component so the other tables
 stay untouched. Monetization columns (Pricing / Est. /mo) come from the
 `monetization` map already passed in.
+
+## 2. 🆕 Sort displayed reviews by date or rating (everywhere reviews show)
+**Anywhere a list of reviews is displayed in the dashboard**, let the user sort
+the reviews by **date** or by **rating (stars)** — and toggle the direction
+(newest/oldest, highest/lowest).
+
+- Applies to **every** place reviews are rendered, not just one — currently the
+  per-extension **saved-reviews list** on `/reviews/<ext_id>` and the
+  **community-upvoted reviews** list on the home dashboard. If more review lists
+  are added later, they should get the same control.
+
+Implementation hints: client-side sort over the rows already fetched (no new
+query), mirroring the `OpportunitiesCard.js` sort dropdown. Best done as a small
+reusable sortable-review-list component (a client component) so each review list
+reuses one control instead of duplicating it. Sort keys: `reviewed_at` (date)
+and `stars` (rating), each asc/desc. Reviews already carry `reviewed_at` +
+`stars`.

@@ -38,3 +38,6 @@ migration run next feature
 
 12.
 build it
+
+13.
+Add a feature to the list, in the dashboard, at any point where reviews are displayed, add the ability to sort the reviews by date or rating
