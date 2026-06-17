@@ -90,4 +90,5 @@ REVIEW_SORTS = [
 # scrolling and before snapshotting, so the saved body is the whole review, not a
 # truncated preview. Bonus: full, stable text keeps the content-hash review id
 # stable across daily runs, so re-scrapes de-dupe instead of duplicating.
-REVIEW_EXPAND_TEXTS = ["See more", "Show more", "Read more"]
+# "Show more" confirmed against the live store; others kept as fallbacks.
+REVIEW_EXPAND_TEXTS = ["Show more", "See more", "Read more"]
