@@ -15,7 +15,7 @@ from typing import Iterable, List, Optional, Tuple
 from common.config import Settings
 from common.config import settings as default_settings
 
-from . import parse, selectors
+from . import categories, parse, selectors
 from .browser import CWSBrowser, RobotsDisallowed
 from .cache import RawCache
 from .models import Extension, Review
@@ -86,20 +86,27 @@ def build_worker_browser(
 
 
 def discover_categories(browser: CWSBrowser) -> List[str]:
-    """Read the store's category taxonomy from its homepage nav.
+    """The full category taxonomy to crawl.
 
-    Returns every ``/category/extensions/<slug>`` the nav links to, so a crawl
-    follows the store's own menu instead of a hardcoded list. Empty on failure
-    (the caller falls back to the configured categories).
+    Starts from the canonical taxonomy in ``scraper/categories.py`` (every
+    ``group/sub`` the store defines) so coverage doesn't depend on the homepage
+    nav, which only surfaces a rotating handful. Any *extra* category slug the nav
+    happens to expose is appended too, so a brand-new store category is still
+    picked up. Never empty (always at least the canonical list).
     """
+    canonical = categories.all_category_slugs()
     try:
         html, _ = browser.fetch(selectors.HOME_URL, scrolls=2)
     except Exception as exc:  # discovery must never hard-fail the crawl
-        log.warning("category discovery failed (%s); using configured categories", exc)
-        return []
-    slugs = parse.extract_category_slugs(html)
-    log.info("discovered %d categories from the store nav", len(slugs))
-    return slugs
+        log.warning("category nav fetch failed (%s); using the canonical taxonomy only", exc)
+        return canonical
+    nav = parse.extract_category_slugs(html)
+    extra = [s for s in nav if s not in canonical]
+    log.info(
+        "category taxonomy: %d canonical + %d extra from nav = %d total",
+        len(canonical), len(extra), len(canonical) + len(extra),
+    )
+    return canonical + extra
 
 
 def collect_extension_ids(
@@ -170,8 +177,13 @@ def scrape_extension(
         scrolls=2,
     )
     ext = parse.parse_detail(html, ext_id, page_text=text)
+    # Tag with a clean, store-matching category name. Prefer the category page we
+    # found it under (reliable); for related-only finds (no crawl category), fall
+    # back to the detail page's own category breadcrumb when it's unambiguous.
     if category:
-        ext.store_category = category
+        ext.store_category = categories.display_for(category)
+    else:
+        ext.store_category = categories.category_from_detail(parse.extract_category_slugs(html))
     related = [i for i in parse.extract_extension_ids(html) if i != ext_id]
 
     # Reviews live on a dedicated sub-page; the store caps each sort at ~10, so we

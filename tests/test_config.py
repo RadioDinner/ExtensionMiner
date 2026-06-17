@@ -32,4 +32,5 @@ def test_require_supabase_raises_when_missing():
 def test_defaults_are_sane():
     s = Settings()
     assert s.rate_limit_seconds == 3.0
-    assert s.target_categories == ["productivity", "developer-tools"]
+    # full "group/sub" paths so a plain run hits real category pages
+    assert s.target_categories == ["productivity/tools", "lifestyle/shopping"]

@@ -275,6 +275,64 @@ def test_review_sorts_are_recent_and_helpful_only():
     assert [key for key, _ in selectors.REVIEW_SORTS] == ["recent", "helpful"]
 
 
+def test_category_taxonomy_covers_the_store_groups():
+    from scraper import categories
+
+    slugs = categories.all_category_slugs()
+    assert len(slugs) == 18  # productivity(5) + lifestyle(10) + make_chrome_yours(3)
+    for confirmed in (
+        "productivity/tools", "lifestyle/shopping", "lifestyle/art",
+        "lifestyle/entertainment", "make_chrome_yours/accessibility",
+    ):
+        assert confirmed in slugs
+
+
+def test_category_display_for():
+    from scraper import categories
+
+    assert categories.display_for("productivity/tools") == "Productivity / Tools"
+    assert categories.display_for("make_chrome_yours/accessibility") == "Make Chrome Yours / Accessibility"
+    assert categories.display_for("productivity") == "Productivity"   # group-only slug
+    assert categories.display_for(None) is None
+    # an unknown slug is tidied, never dropped
+    assert categories.display_for("newgroup/cool-stuff") == "Newgroup / Cool Stuff"
+
+
+def test_category_from_detail_is_safe():
+    from scraper import categories
+
+    # exactly one known category -> use it
+    assert categories.category_from_detail(["productivity/tools"]) == "Productivity / Tools"
+    # ambiguous (nav lists several) -> None, never a wrong guess
+    assert categories.category_from_detail(["productivity/tools", "lifestyle/shopping"]) is None
+    # nothing recognizable -> None
+    assert categories.category_from_detail(["weird/thing"]) is None
+    assert categories.category_from_detail([]) is None
+
+
+def test_scrape_extension_normalizes_category():
+    from scraper.crawl import scrape_extension
+
+    class _Cache:
+        def has(self, *a, **k):
+            return False
+
+        def get(self, *a, **k):
+            return None
+
+    class _Browser:
+        refresh = True
+        cache = _Cache()
+
+        def fetch(self, url, **kw):
+            if url.endswith("/reviews"):
+                return "<html></html>", ""
+            return "<html><body><h1>X</h1></body></html>", ""
+
+    ext, _, _ = scrape_extension(_Browser(), "a" * 32, category="productivity/tools", multi_sort=False)
+    assert ext.store_category == "Productivity / Tools"
+
+
 def test_collect_extension_ids_passes_category_load_more():
     # Discovery must hand the category "Load more" texts to collect_scrolling so a
     # button-paginated grid isn't capped at its first ~30 by scrolling alone.

@@ -56,15 +56,23 @@ below), `--max-total N` (cap total discovered), `--no-db` (dry run),
 > ("Load more" / "Show more" / scrolling) **without** raising the request rate.
 > For an all-night full-store run, bump it (e.g. `--concurrency 8`); watch RAM.
 
-> Discovery: `--all-categories` reads the category list from the store's own nav
-> and exhausts each category page — scrolling **and** clicking a "Load more"
-> button (`CATEGORY_LOAD_MORE_TEXTS`) until no new extensions appear, because the
-> grid paginates by button, not pure infinite scroll (a category that only ever
-> yields ~30 ids is the tell that the button text needs tuning — see below).
-> `--follow-related` then turns the crawl into a breadth-first graph walk over
-> "related" links — this is the real "reach everything" engine, fanning out far
-> past the category seeds. There is still no public index of *all* extensions, so
-> 100% isn't guaranteed.
+> Discovery: `--all-categories` crawls the **whole taxonomy** defined in
+> `scraper/categories.py` (every `group/sub` the store has — Productivity,
+> Lifestyle, Make Chrome Yours), plus any extra slug the homepage nav happens to
+> expose. Each category page is exhausted by scrolling **and** clicking a "Load
+> more" button (`CATEGORY_LOAD_MORE_TEXTS`) until no new extensions appear,
+> because the grid paginates by button, not pure infinite scroll (a category that
+> only ever yields ~30 ids is the tell that the button text needs tuning — see
+> below; a category reporting `0 extensions` means its slug in `categories.py` is
+> wrong). `--follow-related` then turns the crawl into a breadth-first graph walk
+> over "related" links — fanning out past the category seeds. There is still no
+> public index of *all* extensions, so 100% isn't guaranteed.
+>
+> Categorization: every extension is tagged with a clean, store-matching name
+> ("Productivity / Tools") via `categories.display_for()` — taken from the
+> category page it was found on (reliable), or, for related-only finds, from the
+> detail page's own breadcrumb when unambiguous. The slug→name map lives in
+> `scraper/categories.py`.
 
 > Reviews: the crawler re-sorts the reviews page (**Recent** + **Helpful** — the
 > two sorts that carry signal) and merges, de-duped on `extension_id +

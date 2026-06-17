@@ -35,9 +35,10 @@ class Settings:
     rate_limit_seconds: float = 3.0
     cache_dir: str = "data/cache"
     user_agent: str = "ExtensionMiner/0.1 (research)"
-    # Target categories to crawl (start small).
+    # Target categories to crawl when neither --all-categories nor --categories is
+    # given (start small). Full "group/sub" paths — see scraper/categories.py.
     target_categories: list[str] = field(
-        default_factory=lambda: ["productivity", "developer-tools"]
+        default_factory=lambda: ["productivity/tools", "lifestyle/shopping"]
     )
 
     @classmethod
@@ -51,7 +52,7 @@ class Settings:
             cache_dir=os.environ.get("SCRAPER_CACHE_DIR", "data/cache"),
             user_agent=os.environ.get("SCRAPER_USER_AGENT", "ExtensionMiner/0.1 (research)"),
             target_categories=_split_csv(
-                os.environ.get("TARGET_CATEGORIES", "productivity,developer-tools")
+                os.environ.get("TARGET_CATEGORIES", "productivity/tools,lifestyle/shopping")
             ),
         )
 

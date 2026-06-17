@@ -61,3 +61,7 @@ ModuleNotFoundError: No module named 'bs4'
    -> still "category 'productivity/tools' -> 32 extensions"; 32 extensions each reviews=10 (dry-run), [+0 related], ~0.6s each.
    [Diagnosis: run was on OLD code (no git pull before a direct run) AND no --refresh, so category list + 10-review snapshots came from the 11:45 daily-run CACHE; +0 related is just because --follow-related wasn't passed.]
 
+8. that test is running. 996 is applied. Review Load more is working I think. Verified dashboard.
+
+While that is running, I want you to fix the categorization in the data that we're pulling. IN the webstore, there are clearly definied categories and URLs to match. so the categories are in there under "Productivity" there are Communication, Developer Tools, Education, Tools, Workflow & Planning. Under "Lifestyle" there is Art & Design, Entertainment, Games, Household, Just for Fun, News & Weather, Shopping, Social Networking, Travel, Well-being. And under "Make Chrome Yours", I have "Accessibility, Functionality & UI, Privacy & Security. I want my system to match those categories.
+
