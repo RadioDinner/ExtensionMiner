@@ -57,3 +57,7 @@ Traceback (most recent call last):
     from bs4 import BeautifulSoup
 ModuleNotFoundError: No module named 'bs4'
 
+7. [ran the one-category test] .venv python run_scraper.py --categories "productivity/tools" --max-extensions 0 --no-db --log-dir logs
+   -> still "category 'productivity/tools' -> 32 extensions"; 32 extensions each reviews=10 (dry-run), [+0 related], ~0.6s each.
+   [Diagnosis: run was on OLD code (no git pull before a direct run) AND no --refresh, so category list + 10-review snapshots came from the 11:45 daily-run CACHE; +0 related is just because --follow-related wasn't passed.]
+

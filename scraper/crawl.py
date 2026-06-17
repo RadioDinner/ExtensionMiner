@@ -305,14 +305,22 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
             categories = opts.categories or list(s.target_categories)
         log.info("crawling %d categories", len(categories))
         for category in categories:
+            # Tell the operator when a count came from the on-disk cache rather
+            # than a fresh fetch — otherwise a stale cached list (e.g. "32") looks
+            # like a live discovery result. (Cache is bypassed under --refresh /
+            # --preset daily.)
+            from_cache = (not browser.refresh) and browser.cache.has(
+                parse.category_url(category), "html"
+            )
             ids = collect_extension_ids(
                 browser, category, max_extensions=opts.max_extensions, opts=opts
             )
             bump("categories")
             new_here = sum(1 for ext_id in ids if enqueue(ext_id, category))
             log.info(
-                "category '%s' -> %d extensions (%d new; frontier=%d)",
+                "category '%s' -> %d extensions (%d new; frontier=%d)%s",
                 category, len(ids), new_here, frontier.qsize(),
+                " [cached — pass --refresh to re-fetch]" if from_cache else "",
             )
 
     # --- Process phase: N worker threads, each with its OWN browser (Playwright's
