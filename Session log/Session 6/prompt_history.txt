@@ -56,3 +56,9 @@ build the next one, dont stop
 
 18.
 all migrations applied
+
+19.
+the summary card is missing from one of the extensions, why?
+
+20.
+actually it looks like it is missing from all the extensions

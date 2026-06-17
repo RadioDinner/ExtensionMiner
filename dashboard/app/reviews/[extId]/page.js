@@ -272,6 +272,17 @@ export default async function ReviewsPage({ params }) {
         </section>
       )}
 
+      {d.configured && !d.notFound && !d.error && !opp && !mon && (!dd || dd.status !== "done") && (
+        <section>
+          <p className="empty">
+            No Claude analysis for this extension yet — run the ranking layer (the
+            {" "}<strong>“Run ExtensionMiner Ranking”</strong> button) to generate the summary,
+            problem clusters, and profitability. Use <strong>“Add to deep-dive pool”</strong> above
+            for competitor research.
+          </p>
+        </section>
+      )}
+
       {d.configured && !d.notFound && !d.error && (
         <section>
           <h2>{fmt(d.reviews.length)} saved review{d.reviews.length === 1 ? "" : "s"}</h2>

@@ -134,6 +134,11 @@ const REVIEW_LIMIT = 1000;
 // (clusters + "what it does"), used for the detail page's digest.
 const OPP_DETAIL_COLS =
   "score,top_complaint,complaint_type,fixable,recency_weight,decline_score,recent_rating,baseline_rating,complaint_trend,brief,build_effort,details";
+// The subset guaranteed by the initial schema (migration 999). Used as a
+// fallback so a newer column that isn't queryable yet (migration not applied, or
+// PostgREST's schema cache still stale right after one) can't drop the whole
+// digest — we lose only the Recency/Trend extras, not the summary.
+const OPP_CORE_COLS = "score,top_complaint,complaint_type,fixable,brief,build_effort,details";
 // Full monetization profile (every field) for the profitability breakdown.
 const MON_DETAIL_COLS =
   "pricing_model,makes_money,has_paid_tier,price_min_usd,price_max_usd,estimated_users," +
@@ -145,16 +150,29 @@ const DEEP_DIVE_COLS =
 
 // One row by extension_id, tolerating a missing table/column (e.g. the
 // opportunities/monetization migration not applied yet) by returning null
-// instead of throwing — the detail page just hides that section.
-async function maybeRowByExtension(supabase, table, cols, extensionId) {
+// instead of throwing — the detail page just hides that section. If the full
+// select errors and `fallbackCols` is given, retry with those: a single
+// unknown/uncached column then costs only those fields, not the whole row.
+async function maybeRowByExtension(supabase, table, cols, extensionId, fallbackCols) {
+  const fetchWith = (select) =>
+    supabase.from(table).select(select).eq("extension_id", extensionId).maybeSingle();
   try {
-    const { data, error } = await supabase
-      .from(table)
-      .select(cols)
-      .eq("extension_id", extensionId)
-      .maybeSingle();
-    return error ? null : data;
+    const { data, error } = await fetchWith(cols);
+    if (!error) return data;
+    if (fallbackCols) {
+      const r = await fetchWith(fallbackCols);
+      return r.error ? null : r.data;
+    }
+    return null;
   } catch {
+    if (fallbackCols) {
+      try {
+        const r = await fetchWith(fallbackCols);
+        return r.error ? null : r.data;
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
 }
@@ -189,7 +207,7 @@ export async function getExtensionReviews(extId) {
         .eq("extension_id", ext.id)
         .order("reviewed_at", { ascending: false, nullsFirst: false })
         .limit(REVIEW_LIMIT),
-      maybeRowByExtension(supabase, "opportunities", OPP_DETAIL_COLS, ext.id),
+      maybeRowByExtension(supabase, "opportunities", OPP_DETAIL_COLS, ext.id, OPP_CORE_COLS),
       maybeRowByExtension(supabase, "monetization", MON_DETAIL_COLS, ext.id),
       maybeRowByExtension(supabase, "deep_dives", DEEP_DIVE_COLS, ext.id),
     ]);
