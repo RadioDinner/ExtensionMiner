@@ -1,9 +1,11 @@
 from datetime import date, datetime, timezone
 
 from scraper.cache import RawCache
+from scraper.crawl import CrawlOptions
 from scraper.models import Extension, Review
 from scraper.ratelimit import RateLimiter
 from scraper.robots import make_checker
+from scraper.run import build_parser
 
 
 def test_rate_limiter_sleeps_when_too_soon():
@@ -80,3 +82,21 @@ def test_review_to_row_and_synthetic_uid():
     # an explicit store id wins over the synthetic hash
     r2 = Review(stars=5, review_uid="real-id")
     assert r2.dedupe_uid() == "real-id"
+
+
+def test_skip_existing_flag_wires_through():
+    # default off
+    assert build_parser().parse_args([]).skip_existing is False
+    assert CrawlOptions().skip_existing is False
+    # flag turns it on
+    args = build_parser().parse_args(["--skip-existing"])
+    assert args.skip_existing is True
+
+
+def test_refresh_after_days_flag_wires_through():
+    # default off
+    assert build_parser().parse_args([]).refresh_after_days is None
+    assert CrawlOptions().refresh_after_days is None
+    # parses an int window
+    args = build_parser().parse_args(["--refresh-after-days", "30"])
+    assert args.refresh_after_days == 30

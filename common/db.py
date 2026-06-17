@@ -26,6 +26,49 @@ def upsert_extension(row: dict[str, Any]) -> dict[str, Any]:
     return res.data[0] if res.data else {}
 
 
+def existing_ext_ids() -> set[str]:
+    """Every ext_id already stored, so a crawl can skip what it has seen before.
+
+    Paginates because PostgREST caps a single response (default 1000 rows).
+    """
+    client = get_client()
+    ids: set[str] = set()
+    start, page = 0, 1000
+    while True:
+        res = client.table("extensions").select("ext_id").range(start, start + page - 1).execute()
+        rows = res.data or []
+        ids.update(r["ext_id"] for r in rows)
+        if len(rows) < page:
+            break
+        start += page
+    return ids
+
+
+def ext_ids_scraped_since(cutoff_iso: str) -> set[str]:
+    """ext_ids whose last_scraped is at/after cutoff_iso — i.e. still "fresh".
+
+    A refresh crawl skips these and re-scrapes everything older. Paginated like
+    existing_ext_ids().
+    """
+    client = get_client()
+    ids: set[str] = set()
+    start, page = 0, 1000
+    while True:
+        res = (
+            client.table("extensions")
+            .select("ext_id")
+            .gte("last_scraped", cutoff_iso)
+            .range(start, start + page - 1)
+            .execute()
+        )
+        rows = res.data or []
+        ids.update(r["ext_id"] for r in rows)
+        if len(rows) < page:
+            break
+        start += page
+    return ids
+
+
 def upsert_reviews(rows: list[dict[str, Any]]) -> int:
     """Upsert review rows, deduped on (extension_id, review_uid). Returns count."""
     if not rows:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from common.config import Settings
@@ -32,6 +33,8 @@ class CrawlOptions:
     headless: bool = True
     refresh: bool = False             # ignore cache, re-fetch
     respect_robots: bool = True
+    skip_existing: bool = False       # skip ext_ids already stored in the DB
+    refresh_after_days: Optional[int] = None  # re-scrape rows older than N days; skip fresher
 
 
 def build_browser(s: Settings, opts: CrawlOptions) -> CWSBrowser:
@@ -41,13 +44,16 @@ def build_browser(s: Settings, opts: CrawlOptions) -> CWSBrowser:
             robots_allowed = make_checker(fetch_robots(s.user_agent), s.user_agent)
         except Exception as exc:  # network/parse issues shouldn't hard-fail the run
             log.warning("Could not load robots.txt (%s); proceeding without it", exc)
+    # A refresh run must re-fetch (not serve stale cached HTML) for the pages it
+    # decides to re-scrape, so bypass the cache when a freshness window is set.
+    refresh = opts.refresh or opts.refresh_after_days is not None
     return CWSBrowser(
         cache=RawCache(s.cache_dir),
         rate_limiter=RateLimiter(s.rate_limit_seconds),
         user_agent=s.user_agent,
         headless=opts.headless,
         robots_allowed=robots_allowed,
-        refresh=opts.refresh,
+        refresh=refresh,
     )
 
 
@@ -112,7 +118,29 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
     if opts.write_db:
         s.require_supabase()
 
-    stats = {"categories": 0, "ids": 0, "extensions": 0, "reviews": 0}
+    stats = {"categories": 0, "ids": 0, "extensions": 0, "reviews": 0, "skipped": 0}
+
+    # `seen` short-circuits work: ids already scraped this run (cross-category
+    # duplicates), plus — depending on options — ids we should not re-scrape:
+    #   --refresh-after-days N : skip ids scraped within the last N days (re-scrape older)
+    #   --skip-existing        : skip every id already in the DB
+    seen: set = set()
+    if opts.refresh_after_days is not None:
+        from common import db  # lazy: dry runs without supabase still import this module
+
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=opts.refresh_after_days)).isoformat()
+        seen = db.ext_ids_scraped_since(cutoff)
+        log.info(
+            "refresh mode: %d extensions scraped in the last %d day(s) will be skipped; "
+            "older ones get re-scraped",
+            len(seen), opts.refresh_after_days,
+        )
+    elif opts.skip_existing:
+        from common import db  # lazy: dry runs without supabase still import this module
+
+        seen = db.existing_ext_ids()
+        log.info("skip-existing: %d extensions already in the DB will be skipped", len(seen))
+
     with build_browser(s, opts) as browser:
         for category in opts.categories:
             ids = collect_extension_ids(
@@ -122,6 +150,10 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
             stats["ids"] += len(ids)
             log.info("category '%s' -> %d extensions", category, len(ids))
             for ext_id in ids:
+                if ext_id in seen:
+                    stats["skipped"] += 1
+                    continue
+                seen.add(ext_id)
                 try:
                     ext, reviews = scrape_extension(
                         browser, ext_id, category=category, review_scrolls=opts.review_scrolls

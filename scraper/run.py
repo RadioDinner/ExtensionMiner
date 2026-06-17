@@ -38,6 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="show the browser window (useful while tuning selectors)")
     p.add_argument("--refresh", action="store_true",
                    help="ignore the cache and re-fetch pages")
+    p.add_argument("--skip-existing", action="store_true",
+                   help="skip extensions already stored in the DB (faster resume)")
+    p.add_argument("--refresh-after-days", type=int, metavar="N", default=None,
+                   help="refresh mode: re-scrape extensions whose last_scraped is older "
+                        "than N days, skip fresher ones (implies cache bypass)")
     p.add_argument("--no-robots", action="store_true",
                    help="skip the robots.txt check (use responsibly)")
     p.add_argument("--log-level", default="INFO",
@@ -60,6 +65,8 @@ def main(argv=None) -> int:
         headless=not args.no_headless,
         refresh=args.refresh,
         respect_robots=not args.no_robots,
+        skip_existing=args.skip_existing,
+        refresh_after_days=args.refresh_after_days,
     )
     stats = crawl(default_settings, opts)
     print(f"\nSummary: {stats}")
