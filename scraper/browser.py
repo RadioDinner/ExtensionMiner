@@ -109,8 +109,8 @@ class CWSBrowser:
             self._page.mouse.wheel(0, 20_000)
             self._page.wait_for_timeout(scroll_pause_ms)
 
-    def _apply_review_sort(self, label: str, trigger_selector: str, option_role: str) -> bool:
-        """Open the sort dropdown and pick the option named ``label``.
+    def _apply_review_sort(self, label: str, trigger_selector: str, option_selector: str) -> bool:
+        """Open the sort dropdown and pick the option titled ``label``.
 
         Returns True if a sort option was clicked. Best-effort and defensive: any
         failure (control absent / classes changed) returns False so the caller
@@ -124,14 +124,17 @@ class CWSBrowser:
             self._page.wait_for_timeout(500)
         except Exception:
             return False
-        # Try a couple of ways to click the option by its visible/accessible name.
+        # Prefer the exact title= CSS selector (precise); fall back to accessible
+        # name / visible text if the markup differs.
+        css = option_selector.format(label=label.replace('"', '\\"'))
         for attempt in (
-            lambda: self._page.get_by_role(option_role, name=label).first.click(timeout=2_000),
-            lambda: self._page.get_by_text(label, exact=False).first.click(timeout=2_000),
+            lambda: self._page.click(css, timeout=2_000),
+            lambda: self._page.get_by_role("option", name=label, exact=True).first.click(timeout=2_000),
+            lambda: self._page.get_by_text(label, exact=True).first.click(timeout=2_000),
         ):
             try:
                 attempt()
-                self._page.wait_for_timeout(800)
+                self._page.wait_for_timeout(1_000)  # let the list re-render
                 return True
             except Exception:
                 continue
@@ -143,7 +146,7 @@ class CWSBrowser:
         sort_labels: List[str],
         *,
         trigger_selector: str,
-        option_role: str = "option",
+        option_selector: str,
         scrolls: int = 6,
         scroll_pause_ms: int = 1_200,
         wait_selector: Optional[str] = None,
@@ -172,7 +175,7 @@ class CWSBrowser:
         snapshots.append(self._page.content())
 
         for label in sort_labels:
-            if self._apply_review_sort(label, trigger_selector, option_role):
+            if self._apply_review_sort(label, trigger_selector, option_selector):
                 self._scroll_page(scrolls, scroll_pause_ms)
                 snapshots.append(self._page.content())
 

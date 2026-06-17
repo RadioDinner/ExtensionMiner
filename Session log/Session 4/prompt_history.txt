@@ -80,3 +80,16 @@ this is what I get so far when I click the button on the desktop
 [answer to my coverage question, verbatim]: "I want every, single, review. I will not mince my words. I don't care if I need to multi-thread the crawler, or run it all day and all night. I want every single one, and I want reviews checked daily"
 
 [answer to my Phase 2 question, verbatim]: "Build it now, I'll grab the selector"
+
+10. [uploaded logs/scraper-20260617-101228.log] "The scraper finished after only an hour or so, here is the log, I don't think it did much."
+    [+ "I'll get the sort control selector in a bit"]
+    Log summary: pre-Phase-1 code; categories productivity + developer-tools both
+    returned the SAME 57 ids (skipped:57), so done: categories=2 ids=114
+    extensions=57 reviews=567 (~10/ext) skipped=57. Writes to Supabase all 200/201.
+
+11. [pasted the live reviews-page sort control DOM] "open the drop down"
+    Real sort control: <div role="combobox" aria-haspopup="listbox"> labelled
+    "Sort by"; options are <li role="option" title="..."> in a <ul role="listbox"
+    aria-label="Sort by">. Real option labels/titles: "Recent" (data-value=2),
+    "Helpful" (1), "Highest to lowest rating" (4), "Lowest to highest rating" (3).
+    Also confirmed reviews link shape: ./detail/<slug>/<id>/reviews.

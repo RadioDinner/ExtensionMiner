@@ -132,6 +132,17 @@ def test_multi_sort_flag_wires_through():
     assert resolve_options(build_parser().parse_args(["--no-multi-sort"])).multi_sort is False
 
 
+def test_follow_related_flag_and_daily_preset():
+    # off by default; explicit flag and the daily preset both enable it
+    assert build_parser().parse_args([]).follow_related is False
+    assert CrawlOptions().follow_related is False
+    assert resolve_options(build_parser().parse_args(["--follow-related"])).follow_related is True
+    daily = resolve_options(build_parser().parse_args(["--preset", "daily"]))
+    assert daily.follow_related is True
+    # --max-total bounds a graph crawl
+    assert resolve_options(build_parser().parse_args(["--max-total", "500"])).max_total == 500
+
+
 def test_merge_reviews_dedupes_across_sorts():
     # Same review under two sort orders must collapse to one (by store id, or by
     # the synthetic content hash when there's no id).
@@ -144,3 +155,78 @@ def test_merge_reviews_dedupes_across_sorts():
     merged = merge_reviews([[a, b], [b_again, c, a_again]])
     assert len(merged) == 3
     assert {r.dedupe_uid() for r in merged} == {a.dedupe_uid(), "r2", "r3"}
+
+
+# --- Graph-crawl (follow-related BFS) via a fake browser --------------------
+
+ID_A, ID_B, ID_C = "a" * 32, "b" * 32, "c" * 32
+_DETAILS = {
+    ID_A: f'<html><body><h1>A</h1><a href="/detail/x/{ID_C}">c</a></body></html>',
+    ID_B: "<html><body><h1>B</h1></body></html>",
+    ID_C: f'<html><body><h1>C</h1><a href="/detail/x/{ID_A}">a</a></body></html>',
+}
+
+
+class _FakeCache:
+    def has(self, *a, **k):
+        return False
+
+    def get(self, *a, **k):
+        return None
+
+    def put(self, *a, **k):
+        return None
+
+
+class _FakeBrowser:
+    """Minimal stand-in: category seeds [A, B]; A links to C; C links back to A."""
+
+    refresh = True
+    cache = _FakeCache()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def collect_scrolling(self, url, extract, **kw):
+        return [ID_A, ID_B]
+
+    def fetch(self, url, **kw):
+        if url.endswith("/reviews"):
+            return "<html></html>", ""
+        ext_id = url.rstrip("/").split("/")[-1]
+        return _DETAILS.get(ext_id, "<html><body><h1>?</h1></body></html>"), ""
+
+
+def _crawl_with_fake(monkeypatch, **opt_kwargs):
+    import scraper.crawl as crawlmod
+    from common.config import Settings
+
+    monkeypatch.setattr(crawlmod, "build_browser", lambda s, o: _FakeBrowser())
+    opts = crawlmod.CrawlOptions(
+        categories=["productivity"], write_db=False, respect_robots=False,
+        multi_sort=False, **opt_kwargs,
+    )
+    return crawlmod.crawl(Settings(), opts)
+
+
+def test_crawl_follows_related_graph(monkeypatch):
+    # Seeds A,B; A->C via related; C->A (already seen). All three get scraped.
+    stats = _crawl_with_fake(monkeypatch, follow_related=True)
+    assert stats["extensions"] == 3
+    assert stats["discovered"] == 3
+
+
+def test_crawl_without_related_stays_on_seeds(monkeypatch):
+    stats = _crawl_with_fake(monkeypatch, follow_related=False)
+    assert stats["extensions"] == 2          # only the category seeds A, B
+    assert stats["discovered"] == 2
+
+
+def test_crawl_max_total_caps_discovery(monkeypatch):
+    # Cap at 2: the related C is never enqueued.
+    stats = _crawl_with_fake(monkeypatch, follow_related=True, max_total=2)
+    assert stats["discovered"] == 2
+    assert stats["extensions"] == 2

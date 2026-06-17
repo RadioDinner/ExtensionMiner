@@ -74,6 +74,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help="only scrape the default review sort; skip the recent/highest/"
                         "lowest re-sort passes that gather past the store's ~10-per-sort cap")
     p.set_defaults(multi_sort=True)
+    p.add_argument("--follow-related", action="store_true",
+                   help="graph-crawl: also enqueue each extension's 'related' links, "
+                        "reaching far more than category pages expose. Implied by "
+                        "--preset daily.")
+    p.add_argument("--max-total", type=int, default=0, metavar="N",
+                   help="stop after discovering N extensions total (0 = no cap). Handy to "
+                        "bound a --follow-related run while testing.")
     p.add_argument("--no-db", action="store_true",
                    help="dry run: fetch + parse + cache, but do not write to Supabase")
     p.add_argument("--no-headless", action="store_true",
@@ -126,15 +133,18 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
     max_extensions = args.max_extensions
     refresh = args.refresh
     all_categories = args.all_categories
+    follow_related = args.follow_related
 
     if args.preset == "daily":
         # Full crawl of the WHOLE store taxonomy, re-checking everything for new
         # reviews. Cache is bypassed so we actually see new reviews; upserts dedupe
         # so an already-stored extension just gains its new reviews and moves on.
+        # Follow related links so discovery reaches past the category pages.
         if max_extensions is None:
             max_extensions = 0  # no per-category cap
         refresh = True
         all_categories = True
+        follow_related = True
 
     if max_extensions is None:
         max_extensions = 25  # the interactive default
@@ -147,6 +157,8 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
         discovery_patience=args.discovery_patience,
         review_scrolls=args.review_scrolls,
         multi_sort=args.multi_sort,
+        follow_related=follow_related,
+        max_total=args.max_total,
         write_db=not args.no_db,
         headless=not args.no_headless,
         refresh=refresh,
@@ -212,8 +224,9 @@ def main(argv=None) -> int:
 
     if args.preset == "daily":
         log.info(
-            "preset 'daily': full refresh crawl of the WHOLE category taxonomy "
-            "(no cap, cache bypassed); already-stored extensions only gain new reviews"
+            "preset 'daily': full refresh crawl of the WHOLE category taxonomy + "
+            "related-link graph (no cap, cache bypassed); already-stored extensions "
+            "only gain new reviews"
         )
 
     # Friendly preflight for the most common stumble: missing Supabase creds.

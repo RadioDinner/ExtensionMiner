@@ -6,6 +6,7 @@ scraper/parse.py; this module wires fetching, parsing, and persistence together.
 from __future__ import annotations
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, List, Optional, Tuple
@@ -32,6 +33,8 @@ class CrawlOptions:
     discovery_patience: int = 3       # stop after N scrolls that surface no new ids
     review_scrolls: int = 6           # lazy-load passes on a detail page
     multi_sort: bool = True           # re-sort reviews to gather past the ~10/sort cap
+    follow_related: bool = False      # graph-crawl: enqueue each page's related ids
+    max_total: int = 0                # cap on total extensions discovered (0 = no cap)
     write_db: bool = True
     headless: bool = True
     refresh: bool = False             # ignore cache, re-fetch
@@ -119,7 +122,12 @@ def scrape_extension(
     category: Optional[str] = None,
     review_scrolls: int = 6,
     multi_sort: bool = True,
-) -> Tuple[Extension, List[Review]]:
+) -> Tuple[Extension, List[Review], List[str]]:
+    """Scrape one extension. Returns (extension, reviews, related_ext_ids).
+
+    ``related_ext_ids`` are other extension ids linked from the detail page (the
+    "related"/"more from" sections) — the fuel for graph discovery.
+    """
     # Detail page: metadata + description. Reviews are NOT here.
     html, text = browser.fetch(
         parse.detail_url(ext_id),
@@ -129,10 +137,11 @@ def scrape_extension(
     ext = parse.parse_detail(html, ext_id, page_text=text)
     if category:
         ext.store_category = category
+    related = [i for i in parse.extract_extension_ids(html) if i != ext_id]
 
     # Reviews live on a dedicated sub-page; the store caps each sort at ~10, so we
-    # re-sort (recent/highest/lowest) and merge to gather more. A non-refresh run
-    # reuses the cached snapshot.
+    # re-sort (recent/helpful/highest/lowest) and merge to gather more. A
+    # non-refresh run reuses the cached snapshot.
     reviews_url = parse.reviews_url(ext_id)
     if not browser.refresh and browser.cache.has(reviews_url, "html"):
         reviews = parse.parse_reviews(browser.cache.get(reviews_url, "html") or "")
@@ -141,7 +150,7 @@ def scrape_extension(
             reviews_url,
             [label for _, label in selectors.REVIEW_SORTS],
             trigger_selector=selectors.SEL_REVIEW_SORT_TRIGGER,
-            option_role=selectors.SEL_REVIEW_SORT_OPTION_ROLE,
+            option_selector=selectors.SEL_REVIEW_SORT_OPTION,
             scrolls=review_scrolls,
             wait_selector=selectors.SEL_DETAIL_READY,
         )
@@ -151,7 +160,7 @@ def scrape_extension(
             reviews_url, wait_selector=selectors.SEL_DETAIL_READY, scrolls=review_scrolls
         )
         reviews = parse.parse_reviews(reviews_html)
-    return ext, reviews
+    return ext, reviews, related
 
 
 def persist(ext: Extension, reviews: List[Review], *, write_db: bool) -> int:
@@ -216,36 +225,61 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
             categories = opts.categories or list(s.target_categories)
         log.info("crawling %d categories", len(categories))
 
+        # Seed a frontier from the category pages, then (optionally) grow it by
+        # following each extension's "related" links — a breadth-first graph crawl
+        # that reaches far more than category pages alone expose.
+        frontier: deque = deque()
+        discovered: set = set()
+
+        def enqueue(ext_id: str, category: Optional[str]) -> bool:
+            if ext_id in discovered:
+                return False
+            if opts.max_total and len(discovered) >= opts.max_total:
+                return False
+            discovered.add(ext_id)
+            frontier.append((ext_id, category))
+            stats["ids"] += 1
+            return True
+
         for category in categories:
             ids = collect_extension_ids(
                 browser, category, max_extensions=opts.max_extensions, opts=opts
             )
             stats["categories"] += 1
-            stats["ids"] += len(ids)
-            log.info("category '%s' -> %d extensions", category, len(ids))
-            for ext_id in ids:
-                if ext_id in seen:
-                    stats["skipped"] += 1
-                    continue
-                seen.add(ext_id)
-                try:
-                    ext, reviews = scrape_extension(
-                        browser, ext_id, category=category,
-                        review_scrolls=opts.review_scrolls, multi_sort=opts.multi_sort,
-                    )
-                except RobotsDisallowed:
-                    log.warning("robots.txt disallows %s; skipping", ext_id)
-                    continue
-                except Exception as exc:  # one bad page shouldn't kill the crawl
-                    log.exception("failed to scrape %s: %s", ext_id, exc)
-                    continue
-                written = persist(ext, reviews, write_db=opts.write_db)
-                stats["extensions"] += 1
-                stats["reviews"] += written if opts.write_db else len(reviews)
-                log.info(
-                    "  %s '%s' rating=%s installs=%s reviews=%d%s",
-                    ext_id, ext.name, ext.rating, ext.install_count, len(reviews),
-                    "" if opts.write_db else " (dry-run)",
+            new_here = sum(1 for ext_id in ids if enqueue(ext_id, category))
+            log.info(
+                "category '%s' -> %d extensions (%d new; frontier=%d)",
+                category, len(ids), new_here, len(frontier),
+            )
+
+        while frontier:
+            ext_id, category = frontier.popleft()
+            if ext_id in seen:
+                stats["skipped"] += 1
+                continue
+            seen.add(ext_id)
+            try:
+                ext, reviews, related = scrape_extension(
+                    browser, ext_id, category=category,
+                    review_scrolls=opts.review_scrolls, multi_sort=opts.multi_sort,
                 )
+            except RobotsDisallowed:
+                log.warning("robots.txt disallows %s; skipping", ext_id)
+                continue
+            except Exception as exc:  # one bad page shouldn't kill the crawl
+                log.exception("failed to scrape %s: %s", ext_id, exc)
+                continue
+            written = persist(ext, reviews, write_db=opts.write_db)
+            stats["extensions"] += 1
+            stats["reviews"] += written if opts.write_db else len(reviews)
+            new_related = 0
+            if opts.follow_related:
+                new_related = sum(1 for rid in related if enqueue(rid, None))
+            log.info(
+                "  %s '%s' rating=%s installs=%s reviews=%d%s [+%d related, frontier=%d]",
+                ext_id, ext.name, ext.rating, ext.install_count, len(reviews),
+                "" if opts.write_db else " (dry-run)", new_related, len(frontier),
+            )
+    stats["discovered"] = len(discovered)
     log.info("done: %s", stats)
     return stats

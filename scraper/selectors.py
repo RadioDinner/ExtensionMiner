@@ -65,18 +65,22 @@ SEL_REVIEWS_MORE = "text=See all reviews"
 
 # --- Reviews sort control ---------------------------------------------------
 # The store shows only ~10 reviews per sort order, so to gather MORE we re-sort
-# the reviews page (recent / highest / lowest) and merge the results. The default
-# page sort ("Most relevant") is captured before any of these are applied.
+# the reviews page and merge the results. The default page sort is captured
+# before any of these are applied.
 #
-# These are BEST-EFFORT and almost certainly need a quick tune against the live
-# reviews page — open it, find the sort dropdown button and its option items, and
-# set the two selectors + the option labels below. If the trigger isn't found,
-# the crawler gracefully falls back to a single (default-sort) pass.
-SEL_REVIEW_SORT_TRIGGER = "button[aria-label*='Sort' i], [aria-label*='Sort by' i]"
-SEL_REVIEW_SORT_OPTION_ROLE = "option"   # ARIA role of each sort choice
-# (key, visible label). Labels are matched against each option's accessible name.
+# Confirmed against the live reviews page (the new chromewebstore.google.com):
+# the sort control is a `<div role="combobox" aria-haspopup="listbox">` labelled
+# "Sort by", and each option is a `<li role="option" title="...">` inside a
+# `<ul role="listbox" aria-label="Sort by">`. We open the combobox and click the
+# option by its exact `title`. If the control can't be driven, the crawler
+# gracefully falls back to a single (default-sort) pass.
+SEL_REVIEW_SORT_TRIGGER = '[role="combobox"][aria-haspopup="listbox"]'
+SEL_REVIEW_SORT_OPTION = 'li[role="option"][title="{label}"]'
+# (key, exact option title). "Lowest to highest rating" is the strategic gold —
+# the 1-star "I'd pay if it worked" complaints surface first.
 REVIEW_SORTS = [
-    ("recent", "Most recent"),
-    ("highest", "Highest rating"),
-    ("lowest", "Lowest rating"),
+    ("recent", "Recent"),
+    ("helpful", "Helpful"),
+    ("highest", "Highest to lowest rating"),
+    ("lowest", "Lowest to highest rating"),
 ]

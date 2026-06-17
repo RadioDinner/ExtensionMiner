@@ -39,23 +39,25 @@ python -m scraper.run --categories productivity developer-tools --max-extensions
 python -m scraper.run --preset daily --log-dir logs
 ```
 
-Useful flags: `--preset daily` (full refresh crawl of the **whole** taxonomy),
-`--all-categories` (discover & crawl every category from the store nav),
+Useful flags: `--preset daily` (full refresh crawl of the **whole** taxonomy +
+related graph), `--all-categories` (discover & crawl every category from the
+store nav), `--follow-related` (graph-crawl past category pages via each
+extension's related links), `--max-total N` (cap total discovered),
 `--no-db` (dry run), `--no-headless` (watch it), `--refresh` (ignore cache),
 `--skip-existing`, `--refresh-after-days N`, `--log-dir DIR`, `--no-robots`,
 `--log-level DEBUG`, `--category-scrolls` (max passes to exhaust a category) /
 `--discovery-patience` (stop after N empty passes) / `--review-scrolls`.
 
-> Discovery: `--all-categories` reads the category list from the store's own nav,
-> then scrolls each category until no new extensions appear (capped by
-> `--category-scrolls`). Coverage is bounded by what the store's category pages
-> lazy-load — there is no public index of *all* extensions.
+> Discovery: `--all-categories` reads the category list from the store's own nav
+> and scrolls each until no new extensions appear; `--follow-related` then turns
+> the crawl into a breadth-first graph walk over "related" links, which reaches
+> far more than category pages alone (those are capped and partly curated). There
+> is still no public index of *all* extensions, so 100% isn't guaranteed.
 
 > Reviews: the store caps each sort order at ~10 reviews, so by default the
-> crawler re-sorts the reviews page (recent / highest / lowest) and merges the
-> results to get ~25–30 distinct reviews/extension (`--no-multi-sort` to disable).
-> The sort-dropdown selector is best-effort — see *Tuning selectors* below; if it
-> can't be driven, the crawl falls back to a single default-sort pass.
+> crawler re-sorts the reviews page (Recent / Helpful / Highest / Lowest rating)
+> and merges to get ~25–30 distinct reviews/extension (`--no-multi-sort` to
+> disable). Selectors for the sort dropdown are confirmed against the live store.
 
 > Tip: never run `python scraper/run.py` directly — relative imports break.
 > Use `python -m scraper.run …` or the top-level `python run_scraper.py …`.
