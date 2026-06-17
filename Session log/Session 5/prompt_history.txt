@@ -98,3 +98,5 @@ After you add the feature to the list, help me download a new copy of the script
 
 19. What is next on the feature list
 
+20. [pasted --all-categories --max-extensions 5 --category-scrolls 1 --no-db --refresh run: all 18 categories returned 5 each (all slugs valid); now scraping ~84 extensions' reviews single-threaded, frontier=37 remaining] This is still running. What is it doing? is it almost done?
+
