@@ -1,6 +1,7 @@
 import { getDashboardData } from "../lib/queries";
 import { RatingHistogram, OpportunityScatter } from "./charts";
 import OpportunitiesCard from "./OpportunitiesCard";
+import OpportunityZoneCard from "./OpportunityZoneCard";
 
 // Always render at request time so the build never needs Supabase credentials.
 export const dynamic = "force-dynamic";
@@ -205,9 +206,9 @@ export default async function Page() {
       </section>
 
       <section className="zone">
-        <h2>★ Opportunity zone (2.5–3.5★, by installs)</h2>
-        <p className="sub">Real demand, unhappy users — the targets to overtake. Click a name to read its saved reviews. Pricing/revenue is researched by the ranking layer.</p>
-        <ExtTable rows={d.opportunityZone} showCategory linkReviews showMoney money={d.monetization} />
+        <h2>★ Opportunity zone (2.5–3.5★)</h2>
+        <p className="sub">Real demand, unhappy users — the targets to overtake. Click any column to sort, or filter below. Click a name to read its saved reviews. Pricing/revenue is researched by the ranking layer.</p>
+        <OpportunityZoneCard rows={d.opportunityZone} monetization={d.monetization} />
       </section>
 
       <section>

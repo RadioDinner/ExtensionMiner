@@ -11,29 +11,7 @@
 
 ---
 
-## 1. 🆕 Sortable + filterable "Opportunity zone" card
-Make the dashboard's **★ Opportunity zone** card interactive, like the "Scored
-opportunities" card already is:
-
-- **Sort by any column** — Extension, Category, Rating, Ratings (store count),
-  Saved (reviews we've collected), Installs, Pricing, Est. /mo (estimated
-  monthly revenue). Currently it's fixed to installs (high→low).
-- **Toggle sort direction** per column — high→low or low→high (e.g. click the
-  column header to sort, click again to flip).
-- **Filter options** for the data shown — e.g. min installs, rating band within
-  the zone, pricing model (paid / free·ads / unknown), has saved reviews,
-  category. (Pick a sensible set.)
-
-Implementation hints: mirror the existing client-side pattern in
-`dashboard/app/OpportunitiesCard.js` (sort/filter happen in the browser over the
-rows the server already fetched — no new query). The zone table is rendered by
-the shared `ExtTable` in `dashboard/app/page.js`, which is **also** used for the
-Lowest/Highest tables, so either add an opt-in sortable/filterable client
-variant or split the zone out into its own client component so the other tables
-stay untouched. Monetization columns (Pricing / Est. /mo) come from the
-`monetization` map already passed in.
-
-## 2. 🆕 Sort displayed reviews by date or rating (everywhere reviews show)
+## 1. 🆕 Sort displayed reviews by date or rating (everywhere reviews show)
 **Anywhere a list of reviews is displayed in the dashboard**, let the user sort
 the reviews by **date** or by **rating (stars)** — and toggle the direction
 (newest/oldest, highest/lowest).
@@ -50,7 +28,7 @@ reuses one control instead of duplicating it. Sort keys: `reviewed_at` (date)
 and `stars` (rating), each asc/desc. Reviews already carry `reviewed_at` +
 `stars`.
 
-## 3. 🆕 "Competitors" card — Obsidian-style graph on the detail page
+## 2. 🆕 "Competitors" card — Obsidian-style graph on the detail page
 On the **extension detail page** (`/reviews/<ext_id>`), add a **Competitors**
 card that shows an **Obsidian-like graph**: the current extension as a central
 node with its **competitors as linked nodes** around it.
