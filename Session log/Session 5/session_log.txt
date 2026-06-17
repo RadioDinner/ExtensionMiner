@@ -1,154 +1,178 @@
 SESSION 5 — HANDOFF LOG
 =======================
 Date: 2026-06-17 (UTC). WEB session (Claude-Code-on-the-web).
-Branch: assigned claude/intelligent-wozniak-gjt2g9 (started in sync with main,
-        0 ahead / 0 behind). ALL work pushed to this feature branch. NOTE: unlike
-        Session 4, this session did NOT fast-forward main — everything lives on
-        claude/intelligent-wozniak-gjt2g9. Merge to main if/when desired.
 
-Theme: "wrap all open items before adding more features." Went through the
-Session 4 open-items list and closed the code-side ones (#4 concurrency + sort
-trim, #6 dashboard polish). The rest are environment/config checks on the user's
-side (#1 migration re-run, #2 done, #3 pending their DOM paste, #5 they're doing).
+BRANCH / WORKFLOW (changed mid-session):
+  - Started on the assigned feature branch claude/intelligent-wozniak-gjt2g9 and
+    fast-forwarded main after every push (kept 0/0).
+  - At prompt 18 the user said "commit directly to main instead of making a new
+    branch" — so from that point on, ALL work is committed straight to main. No
+    feature branch going forward.
+  - main HEAD at handoff time is the latest commit (this session's work + this
+    log). The two old feature branches are fully contained in main:
+      * claude/great-cray-i6q77i        (Session 4) — 0 ahead / 18 behind main
+      * claude/intelligent-wozniak-gjt2g9 (this session) — behind main now
+    Both are safe to delete; the USER is deleting them himself (chose "Don't
+    delete, I'll do it" at prompt 16). Don't recreate them — commit to main.
+
+MIGRATIONS: count DOWN from 999. Lowest is now 995. NEXT NEW = 994.
+  Applied (user confirmed): 999, 998, 997, 996, and 995 (monetization, this session).
 
 ================================================================================
 WHAT THE USER ASKED (prompt by prompt)
 ================================================================================
-1. "lets start session 5, what are the open issues" -> set up Session 5 folder;
-   read Session 4 handoff; reported the 6 carried-over open items + confirmed
-   there are NO open GitHub issues. Branch in sync with main (0/0).
-2. Big one: migration 996 failed with a NetworkError to api.supabase.com (997 is
-   already run); Vercel dashboard is FIXED; unsure on #3; for #4 concurrency they
-   want only Recent + Helpful sorts (NOT highest/lowest) but still every extension
-   scanned for new ones; they'll run #5 themselves; add #6 polish to this session.
+1.  "lets start session 5, what are the open issues" -> reported Session-4 open items.
+2.  996 failed (transient network); Vercel fixed; for concurrency wanted only
+    Recent+Helpful sorts; still scan every extension; do #6 dashboard polish.
+3-4. (recap/merge questions) — merged Session-4 work to main per user.
+5.  "Saved" column: show count of reviews WE'VE saved next to store ratings.
+6.  bs4 ModuleNotFoundError -> they used system python, not the .venv.
+7.  Ran the 1-category --refresh test -> productivity/tools 32 -> 1312 (fix worked).
+8.  996 applied; review Load-more working; dashboard verified. Then: "fix the
+    categorization" -> match the store's real category taxonomy.
+9.  Build the feature-list file + rule: "add to the feature list" = capture only.
+    Seeded 4 items.
+10. "once shipped, remove it" (feature-list rule). + asked if the slug test output
+    was expected (it was old code, only 5 cats).
+11. "are there outstanding issues" -> reported status.
+12. "Let's tackle the feature list. What is the first one" -> feature #1.
+13. (AskUserQuestion) ranking trigger -> "Desktop button (local)".
+14. "Let's work on monetization / pricing intel" -> built feature #2 (monetization).
+15. Add feature: richer extension detail page (problem clusters, "what it is",
+    profitability). Then: "help me download a new copy of the scripts folder".
+16. "migration run, merge everything to main so I can delete stale branches" ->
+    everything already on main; user deletes branches himself.
+17. Make the "Run Ranking" button run ALL Claude tasks (ranking + monetization).
+18. "commit directly to main instead of making a new branch" -> workflow switch.
+19. "What is next on the feature list" -> #1 (sort/filter Scored opportunities).
+20. Pasted the full --all-categories test run -> explained discovery + ETA.
+21. "Why 5 extensions? I want ALL extensions from EVERY category" -> the 5 was
+    just the test flags (--max-extensions 5 --category-scrolls 1); --preset daily
+    has no cap.
+22. "the daily scraper is currently running. Wrap this session." -> this handoff.
 
 ================================================================================
-WHAT WAS BUILT (all on branch claude/intelligent-wozniak-gjt2g9)
+WHAT WAS BUILT THIS SESSION (all on main)
 ================================================================================
-SCRAPER — CONCURRENCY (open item #4)   commit a69a30e
-  scraper/crawl.py — rewrote crawl() from a single-threaded deque loop to a
-    thread-safe worker pool:
-      * CrawlOptions.concurrency (default 1).
-      * build_worker_browser(s, opts, shared_rl): builds a browser per worker and
-        injects ONE shared RateLimiter (real browser only; the test fake has no
-        .rate_limiter attr so it's left untouched). The on-disk cache is already
-        shared by directory, so only the limiter needs sharing.
-      * Seed phase (serial, main thread): discover categories + collect ids ->
-        enqueue. Running it in the main thread means a broken browser env (no
-        Playwright/Chromium) still raises up to main() -> explain_failure, before
-        any worker spins up.
-      * Process phase: N daemon threads, each its OWN browser (Playwright sync API
-        is thread-affine — a browser canNOT be shared across threads). Frontier is
-        a queue.Queue; --follow-related pushes new ids back on as workers run;
-        completion = frontier.join() + one None sentinel per worker.
-      * Thread-safety: discovered/seen/stats each behind a Lock; enqueue() guards
-        discovered + max_total atomically; process_one() fully wraps scrape+persist
-        so one bad page never kills a worker.
-      * Hang guard: if EVERY worker fails to start a browser, the last one drains
-        the queue so frontier.join() can't block forever (unreachable in practice
-        because the seed phase already validated the browser, but cheap insurance).
-    WHY shared limiter + many workers still helps AND stays polite: per-extension
-    wall-time is dominated by on-page work (scroll / "Load more" up to 40 clicks /
-    "Show more"), NOT navigation. Workers overlap that on-page time; the shared
-    limiter paces only goto() so the aggregate request rate is unchanged. Rough
-    ceiling at the polite 3s rate is ~nav-bound; concurrency turns a ~24/hr serial
-    crawl into ~hundreds/hr.
-  scraper/run.py — --concurrency N (default None -> 1 interactive, 4 under
-    --preset daily; explicit value wins over the preset). Daily log line now
-    reports worker count + "Recent + Helpful". --no-multi-sort help text updated.
+SCRAPER
+  * Concurrency: --concurrency N (default 1; 4 under --preset daily). crawl() is
+    now a thread-safe worker pool — N workers, each its OWN Playwright browser
+    (sync API is thread-affine), shared ONE RateLimiter (polite), shared frontier
+    queue (queue.join + sentinels), discovered/seen/stats lock-guarded. Seed phase
+    runs in the main thread so a broken browser env still surfaces to main().
+  * Review sorts trimmed to Recent + Helpful only (dropped Highest/Lowest) —
+    scraper/selectors.py REVIEW_SORTS.
+  * Category "Load more" discovery fix (THE big one): collect_scrolling now clicks
+    a "Load more"/"Show more" button between scroll passes (CATEGORY_LOAD_MORE_TEXTS
+    in selectors.py; browser._click_more). This took productivity/tools from 32 ->
+    1312. Confirmed live.
+  * "[cached]" marker on the category log line when a count came from disk (no
+    --refresh) — stops stale cached counts looking like live results.
+  * Canonical category taxonomy: NEW scraper/categories.py — all 18 group/sub
+    categories (Productivity / Lifestyle / Make Chrome Yours). discover_categories
+    now crawls the whole taxonomy (canonical + any extra the nav exposes).
+    EVERY extension is tagged with a clean "Group / Sub" name via
+    categories.display_for() (from the crawl path; detail-breadcrumb fallback for
+    related-only finds). ALL 18 SLUGS ARE CONFIRMED VALID (the prompt-20 live run
+    returned 5 from every category — including the ones marked "# ?" in
+    categories.py; those comments are now stale-but-harmless — every slug works).
+  * common/config.py default target_categories -> valid full paths.
+  * run_scraper.py: friendly hint when run with the wrong Python (missing deps).
 
-SCRAPER — REVIEW SORTS trimmed (open item #4, user's explicit ask) commit a69a30e
-  scraper/selectors.py — REVIEW_SORTS is now ONLY [("recent","Recent"),
-    ("helpful","Helpful")]. Dropped "Highest to lowest rating" + "Lowest to
-    highest rating". Rationale (documented in the file): with "Load more"
-    paginating the full Recent list, the low-star complaints already come through,
-    so the two extra re-sort passes per extension weren't worth the time on a
-    full-store crawl. Discovery is unchanged — still scans every extension.
-  NOTE: a "default" snapshot is still captured before the sorts (the fetch_review_
-    sorts safety net), so per reviews-page it's now 3 passes (default + recent +
-    helpful) instead of 5. merge_reviews dedupes default vs recent, so no dup rows.
+ANALYSIS / CLAUDE LAYER
+  * Ranker desktop button: scripts/run_ranker.cmd (mirrors run_scraper.cmd: shared
+    .venv, git auto-update, logs, friendly .env check; no Chromium). run_ranker.py
+    top-level shim. analysis/run.py gained --log-dir, friendly preflight
+    (ANTHROPIC/Supabase), exit codes. create_desktop_shortcut.cmd now drops BOTH
+    Desktop buttons (Scraper + Ranking).
+  * Monetization (feature shipped): NEW analysis/monetize.py — MonetizationProfile
+    pydantic schema + research_monetization(): one Claude call (claude-opus-4-8,
+    adaptive thinking) using the web_search/web_fetch SERVER tools + structured
+    output to find pricing (free/freemium/paid/subscription/ads) and estimate
+    monthly revenue (low/point/high + confidence + sources). monetize_all() +
+    `python -m analysis.monetize` CLI. NEW migration 995_extension_monetization.sql
+    (monetization table, RLS service-role only). common/db.upsert_monetization;
+    fetch_extensions_for_analysis now also selects website.
+  * --monetize flag on analysis/run.py runs the monetization pass alongside ranking.
+  * "Run Ranking" button now runs ALL Claude tasks by default: run_ranker.cmd
+    RUN_ARGS = "--monetize --log-dir logs" (ranking + monetization in one click).
+    Drop --monetize for ranking-only.
 
-DASHBOARD — POLISH (open item #6)   commit 643e4c2
-  dashboard/lib/queries.js —
-    * opportunities select now includes extensions(ext_id, ...) so rows can link.
-    * NEW helpfulReviews query: reviews where helpful_ranked=true, lowest-star
-      first, joined to extensions(ext_id,name,store_category), limit 20. It's in
-      the Promise.all for parallelism BUT excluded from firstError, so if
-      reviews.helpful_ranked doesn't exist yet (migration 996 not applied) the
-      query just returns null/[] and the section hides — it does NOT error the page.
-  dashboard/app/page.js —
-    * reviewLinkFor(extId,label) helper; reviewLink() refactored onto it.
-    * "Scored opportunities" extension names now link to /reviews/<ext_id>.
-    * NEW "Community-upvoted reviews" section (StarRow + author + 👍 Helpful badge
-      + extension link + date + body), rendered ONLY when helpfulReviews non-empty.
-  dashboard/app/globals.css — .review-head .ext-ref styles (right-aligned ext link
-    + category pill in the helpful-review header).
+DASHBOARD (dashboard/)
+  * "Saved" column: reviews/ratings we've collected per extension, next to the
+    store's Ratings count (PostgREST embedded reviews(count) — no migration).
+  * Opportunity-zone table: Pricing + "Est. /mo" columns from the monetization
+    table (hover = range + confidence + summary). Monetization is fetched
+    resiliently (own query, excluded from error-gating) so a missing table
+    (migration 995 not applied) shows "—" instead of erroring the page.
+  * (From earlier in the session) Scored-opportunities rows link to /reviews/<ext_id>;
+    "Community-upvoted reviews" section (helpful_ranked); both degrade gracefully.
 
-TESTS — 71 pass (was 68)   tests/test_scraper_util.py
-  + test_crawl_parallel_follows_related_graph (concurrency=3; same A->C->A graph,
-    every node scraped exactly once via the thread-safe guards).
-  + test_concurrency_flag_wires_through (default 1, daily 4, explicit wins).
-  + test_review_sorts_are_recent_and_helpful_only.
+PROCESS / DOCS
+  * docs/FEATURE_LIST.md (running backlog) + CLAUDE.md §6 rule: "add to the feature
+    list" = append + STOP (capture only); shipped items are REMOVED from the list.
+  * docs/RUNNING_THE_RANKER.md (+ README/analysis README pointers); scraper README
+    updated for the taxonomy + Load-more.
 
-DOCS
-  scraper/README.md + docs/RUNNING_THE_SCRAPER.md — documented --concurrency
-    (default 1 / daily 4, RAM note, shared-limiter politeness) and the Recent +
-    Helpful sort trim.
+TESTS: 79 passing (added monetization tests, category-taxonomy tests, concurrency
+  + category Load-more wiring tests). Dashboard `next build` succeeds.
 
-VERIFICATION (web env — store is egress-blocked, so behavior verified by tests)
-  * python -m pytest -> 71 passed.
-  * dashboard `npm run build` (Next 14.2.35) -> compiled; routes /, /diagnostics,
-    /reviews/[extId] all ƒ dynamic. node_modules + .next are gitignored.
+================================================================================
+CURRENT PROJECT STATE
+================================================================================
+* The user is RIGHT NOW running the full daily scraper on their machine:
+    run_scraper.py --preset daily --log-dir logs
+  = all 18 categories, NO per-category cap (exhaust-scroll + Load-more), follow
+  related, 4 workers, writing to Supabase, full Recent+Helpful reviews. This is a
+  multi-hour / overnight run.
+* After scraping, the flow is: click "Run ExtensionMiner Ranking" (now does
+  ranking + monetization) -> dashboard fills in scores, pricing, est. revenue.
+* Live-verified this session: 18-category discovery, the 32->1312 Load-more fix,
+  review pagination (~410/ext), all slugs valid, dashboard build.
+* NOT yet verified live: the monetization web-search + structured-output call
+  (new; verified only by mocked tests here). Confirm on the user's machine once
+  there's data and a --monetize run completes.
 
 ================================================================================
 OPEN ITEMS / FOR NEXT SESSION (priority order)
 ================================================================================
-1. MIGRATION 996 — STILL NOT APPLIED. The user's run failed with a transient
-   "NetworkError when attempting to fetch resource (api.supabase.com)" — that is a
-   Supabase-side network blip, NOT a SQL error. The SQL is correct and idempotent
-   (add column IF NOT EXISTS / create index IF NOT EXISTS). FIX: just re-run
-   996_reviews_helpful_flag.sql in the Supabase SQL editor. Until it's applied:
-   - the scraper logs a skip when flagging helpful reviews (db.mark_reviews_helpful),
-   - the dashboard's "Community-upvoted reviews" section stays hidden (by design).
-   997 is confirmed applied. (Alternative: the Supabase MCP could apply it, but it
-   needs OAuth via /mcp which can't be completed in the web env.)
-2. VERCEL DASHBOARD KEY — user reports FIXED (was the publishable key under RLS).
-   If the dashboard ever shows zeros again, re-check /diagnostics.
-3. "LOAD MORE" REVIEWS BUTTON SELECTOR — still UNCONFIRMED against the live DOM.
-   The per-review "Show more" expander is confirmed; the reviews "Load more"
-   pagination button is text-matched best-effort (REVIEW_LOAD_MORE_TEXTS =
-   ["Load more","Show more reviews","More reviews"]). If the bot isn't paginating
-   past ~10 reviews per sort, ask the user to paste the button's DOM.
-4. AUTO-UPDATE BOOTSTRAP (#5) — user said they'd run it. One-time, in their clone:
-   git fetch origin && git checkout main && git reset --hard origin/main
-   (After that the Desktop button + scheduled task self-update each run.) BUT NOTE
-   the merge caveat below — this session's work is on the feature branch, not main.
-5. MERGE TO MAIN — DONE. User chose to merge (prompt 3). main was fast-forwarded
-   to the feature branch and pushed (main and claude/intelligent-wozniak-gjt2g9
-   are 0/0 again, Sessions 1-4 pattern). The launcher (UPDATE_BRANCH=main) will
-   pick up Session 5's code on its next run — once the user has run the one-time
-   auto-update bootstrap (#4 above).
-
-POSSIBLE NEXT FEATURES (only after the above; user wanted items wrapped first)
-  - Parallelize category discovery too (seed phase is still serial; minor vs the
-    extension crawl, but matters at full-store scale).
-  - Run the Claude ranking layer to populate `opportunities` so the scored table +
-    its new review links actually have rows.
+1. FEATURE BACKLOG (docs/FEATURE_LIST.md) — build only when the user asks:
+   #1 Sort & filter the "Scored opportunities" card (by complaint_type + paid/
+      unpaid). NEXT UP, mostly dashboard; data already exists (opportunities.
+      complaint_type + monetization.pricing_model).
+   #2 Recency-weighted review scoring (decay old reviews in the ranker; curve in
+      the file: <=3mo highest ... >3yr much lower). Ranking-layer change.
+   #3 Richer extension detail page (/reviews/<ext_id>): clustered user-problem
+      summary, a "what it does" summary, detailed profitability. Hint: ranker
+      builds the summaries (reuse opportunities.details clusters + add a NEW
+      "what it does" field), dashboard displays; show full monetization breakdown.
+2. VERIFY MONETIZATION END-TO-END once the scrape finishes and a `--monetize` /
+   Ranking-button run completes — confirm the monetization table fills and the
+   dashboard Pricing/Est-/mo columns populate. (migration 995 must be applied.)
+3. BRANCH CLEANUP: user is deleting claude/great-cray-i6q77i and
+   claude/intelligent-wozniak-gjt2g9 (both behind main). Don't recreate them.
+4. Optional tidy: scraper/categories.py still has "# ?" comments on slugs that are
+   now CONFIRMED valid — could drop the markers for clarity.
 
 ================================================================================
 KEY CONTEXT / GOTCHAS
 ================================================================================
-* Migrations count DOWN from 999; lowest existing is 996. Next NEW one = 995.
-* Concurrency model: each worker = its own Playwright browser (sync API is
-  thread-affine — do NOT try to share a browser across threads). Shared state is
-  ONLY the RateLimiter (injected) + the dir-based cache; everything mutable is
-  lock-guarded. Default concurrency 1 keeps the interactive path + tests
-  deterministic; daily preset uses 4.
-* helpful_ranked is sticky (set true, never auto-cleared), written by a separate
-  UPDATE, kept OUT of Review.to_row(). Requires migration 996 (see open item #1).
-* The dashboard helpful-reviews query is deliberately NON-gating: a missing
-  helpful_ranked column hides the section rather than erroring the whole page.
-* Egress: the Chrome Web Store is HTTP 403 in the web env — scraper must run on
-  the user's machine. PyPI + Anthropic API are reachable here (tests + ranking).
-* This session's deps had to be pip-installed ad hoc in the web env (bs4, lxml,
-  python-dateutil, python-dotenv, pydantic, pytest) to run the suite.
+* WORKFLOW: commit DIRECTLY to main now (user instruction, prompt 18). No feature
+  branch. Push to origin main.
+* Migrations count DOWN; lowest is 995; NEXT NEW = 994.
+* "Get ALL extensions" = --preset daily (no cap). The "5" the user saw was the
+  slug-test flags --max-extensions 5 --category-scrolls 1 ONLY. There is no public
+  full index of every extension, so "all" = everything categories + related expose.
+* Both launchers (run_scraper.cmd / run_ranker.cmd) AUTO-UPDATE from main (git
+  pull) before each run; the user stays current automatically.
+* "Run Ranking" button = ALL Claude tasks (ranking + monetization). "Run Scraper"
+  button = scraping only.
+* Monetization needs migration 995 + ANTHROPIC_API_KEY; dashboard + scraper
+  degrade gracefully if 995/996 absent.
+* Egress: the Chrome Web Store is HTTP 403 in the web env — scraper runs on the
+  user's machine. Anthropic API + PyPI are reachable here (tests/ranking run).
+* This session's Python deps were pip-installed ad hoc in the web env to run the
+  suite (bs4, lxml, python-dateutil, python-dotenv, pydantic, pytest, anthropic).
+* The Claude API surface for monetization was grounded via the claude-api skill:
+  model claude-opus-4-8, web_search_20260209 / web_fetch_20260209 server tools,
+  messages.parse(output_format=PydanticModel) -> .parsed_output, adaptive thinking.

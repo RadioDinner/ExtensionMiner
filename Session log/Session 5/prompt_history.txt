@@ -102,3 +102,5 @@ After you add the feature to the list, help me download a new copy of the script
 
 21. Why 5 extensions? I don't want that limit. I want ALL extensions from EVERY category
 
+22. the daily scraper is currently running, Let's wrap this session. Write a handoff, commit it to main and close the session.
+
