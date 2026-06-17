@@ -27,3 +27,22 @@ Otherwise, 997 is run. Vercel dashboard is fixed, not sure about item #3 yet. on
    merge claude/intelligent-wozniak-gjt2g9 into main and push so the launcher
    (which pulls main) picks up Session 5's code.
 
+4. [update] Checking for the latest scraper code (main) ...
+HEAD is now at ca4e35b Session 4 handoff: full session_log + log prompts 16-17
+[update] Updated to the latest main.
+[setup] Code updated - refreshing Python dependencies ...
+
+[run] C:\Users\derrick.wengerd\Downloads\ExtensionMiner\.venv\Scripts\python.exe -m scraper.run --preset daily --log-dir logs
+
+2026-06-17 11:45:34,610 INFO logging to logs\scraper-20260617-114534.log
+2026-06-17 11:45:34,610 INFO preset 'daily': full refresh crawl of the WHOLE category taxonomy + related-link graph (no cap, cache bypassed); already-stored extensions only gain new reviews
+2026-06-17 11:45:47,791 INFO discovered 5 categories from the store nav
+2026-06-17 11:45:47,792 INFO crawling 5 categories
+2026-06-17 11:45:51,978 INFO category 'lifestyle/shopping' -> 32 extensions (32 new; frontier=32)
+2026-06-17 11:45:56,160 INFO category 'lifestyle/entertainment' -> 32 extensions (32 new; frontier=64)
+2026-06-17 11:46:00,270 INFO category 'productivity/tools' -> 32 extensions (32 new; frontier=96)
+2026-06-17 11:46:04,317 INFO category 'lifestyle/art' -> 32 extensions (32 new; frontier=128)
+2026-06-17 11:46:08,426 INFO category 'make_chrome_yours/accessibility' -> 32 extensions (32 new; frontier=160)
+
+Why does it cap at 32 extensions? I wanted all extensions...
+
