@@ -9,6 +9,9 @@ REM    1. RANKING      - mines reviews for fixable complaints + "I'd pay" signal
 REM                      scores each extension, writes the `opportunities` table.
 REM    2. MONETIZATION - web-searches each extension's pricing and estimates
 REM                      monthly revenue, writes the `monetization` table.
+REM    3. DEEP DIVE    - processes the hand-picked deep-dive POOL: for each
+REM                      extension you queued on the dashboard, researches the
+REM                      reviews + competitors and writes the `deep_dives` table.
 REM  (This is the analysis step - it does NOT scrape; run the scraper first so
 REM  there are reviews to analyze.)
 REM
@@ -35,17 +38,20 @@ if not exist "%REPO%\analysis\run.py"  goto :norepo
 REM ===========================================================================
 REM  EDITABLE KNOBS
 REM  RUN_ARGS     - what to run. Default = ALL Claude tasks on the top 25
-REM                 extensions by installs: ranking (--> opportunities) AND
-REM                 monetization research (--monetize --> monetization). Tweak it:
+REM                 extensions by installs: ranking (--> opportunities),
+REM                 monetization research (--monetize --> monetization) AND the
+REM                 deep-dive pool (--deep-dive --> deep_dives). Tweak it:
 REM                   --limit 50      do more extensions
 REM                   (drop --monetize) ranking only, no web-search/pricing pass
+REM                   (drop --deep-dive) skip the queued deep-dive pool
 REM                   --no-db         dry run, write nothing
-REM                 Heads-up: --monetize web-searches per extension, so it costs
-REM                 more and takes longer than ranking alone.
+REM                 Heads-up: --monetize and --deep-dive web-search per extension,
+REM                 so they cost more and take longer than ranking alone. The
+REM                 deep dive only touches extensions you queued on the dashboard.
 REM  AUTO_UPDATE  - 1 = git pull the latest code before running; 0 = don't.
 REM  UPDATE_BRANCH- which branch to track (main is the canonical, current one).
 REM ===========================================================================
-set "RUN_ARGS=--monetize --log-dir logs"
+set "RUN_ARGS=--monetize --deep-dive --log-dir logs"
 set "AUTO_UPDATE=1"
 set "UPDATE_BRANCH=main"
 
@@ -138,7 +144,7 @@ set "RC=%ERRORLEVEL%"
 
 echo.
 if "%RC%"=="0" (
-  echo [done] Claude analysis finished OK. Opportunities + monetization updated; logs are in %REPO%\logs
+  echo [done] Claude analysis finished OK. Opportunities + monetization + deep dives updated; logs are in %REPO%\logs
 ) else (
   echo [done] Claude analysis exited with code %RC%. See the message above; full log in %REPO%\logs
 )

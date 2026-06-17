@@ -22,7 +22,8 @@ opportunities  (score, top complaint, WTP evidence, brief)  → Supabase
 | `prompt.py` | System + per-extension user prompt |
 | `rank.py` | `analyze_extension` (the one Claude call) + `score_opportunity` (pure, tested) + `rank_all` orchestration |
 | `monetize.py` | Monetization research: `research_monetization` (one **web-search** Claude call → `MonetizationProfile`) + `monetize_all`; writes the `monetization` table the dashboard shows |
-| `run.py` | CLI (`python -m analysis.run`; `--monetize` also runs the monetization pass) |
+| `deepdive.py` | **Deep-dive pool**: `research_deep_dive` (one web-search call → `DeepDiveReport`: reviews + competitors + verdict) + `deep_dive_all`; processes only the extensions queued from the dashboard, writes the `deep_dives` table |
+| `run.py` | CLI (`python -m analysis.run`; `--monetize` and `--deep-dive` add those passes) |
 
 ### Monetization (is it making money?)
 
@@ -38,6 +39,24 @@ python -m analysis.run --limit 25 --monetize      # rank AND research monetizati
 
 The dashboard's opportunity-zone table shows the pricing model + an estimated
 monthly revenue per extension once this has run.
+
+### Deep-dive pool (hand-picked, token-frugal)
+
+The full deep dive — read the reviews closely **and** research the competitors —
+is expensive, so it only runs on extensions you **hand-pick**. On a detail page
+click **"🔬 Add to deep-dive pool"**; that queues a row in `deep_dives`
+(migration **993**). Then the analysis layer processes just the queue:
+
+```bash
+python -m analysis.deepdive               # process everything queued
+python -m analysis.run --deep-dive        # rank, then also process the pool
+```
+
+Each queued extension gets one web-search-backed Claude call → `DeepDiveReport`
+(what it is, a deep review read, the **competitors** with pricing/strengths/
+weaknesses, the opportunity, and a build/maybe/avoid verdict), written back to
+its `deep_dives` row and shown on the detail page. The "Run Ranking" desktop
+button runs this pass too (`--deep-dive`).
 
 ### Extension detail digest (`/reviews/<ext_id>`)
 

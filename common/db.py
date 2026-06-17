@@ -181,3 +181,65 @@ def upsert_monetization(row: dict[str, Any]) -> dict[str, Any]:
     """Upsert one extension's monetization profile (one row per extension)."""
     res = get_client().table("monetization").upsert(row, on_conflict="extension_id").execute()
     return res.data[0] if res.data else {}
+
+
+# --- Deep-dive pool (hand-picked extensions for comprehensive research) ------
+
+def queue_deep_dive(extension_pk: int) -> dict[str, Any]:
+    """Add an extension to the deep-dive pool (or re-queue a done/errored one).
+
+    Upserts a `deep_dives` row to status='queued' without clobbering any prior
+    result columns, so re-queueing keeps the last research visible until the
+    next run overwrites it.
+    """
+    res = (
+        get_client()
+        .table("deep_dives")
+        .upsert(
+            {"extension_id": extension_pk, "status": "queued", "error": None},
+            on_conflict="extension_id",
+        )
+        .execute()
+    )
+    return res.data[0] if res.data else {}
+
+
+def remove_deep_dive(extension_pk: int) -> int:
+    """Remove an extension from the deep-dive pool entirely."""
+    res = get_client().table("deep_dives").delete().eq("extension_id", extension_pk).execute()
+    return len(res.data or [])
+
+
+def fetch_deep_dive_queue(limit: int = 25) -> list[dict[str, Any]]:
+    """Queued pool entries (oldest request first) with their extension joined in."""
+    res = (
+        get_client()
+        .table("deep_dives")
+        .select(
+            "extension_id,requested_at,"
+            "extensions(id,ext_id,name,store_category,rating,rating_count,install_count,website)"
+        )
+        .eq("status", "queued")
+        .order("requested_at", desc=False)
+        .limit(limit)
+        .execute()
+    )
+    return res.data or []
+
+
+def upsert_deep_dive(row: dict[str, Any]) -> dict[str, Any]:
+    """Write a completed deep-dive result (one row per extension)."""
+    res = get_client().table("deep_dives").upsert(row, on_conflict="extension_id").execute()
+    return res.data[0] if res.data else {}
+
+
+def mark_deep_dive_error(extension_pk: int, message: str) -> int:
+    """Flag a queued deep dive as failed so it doesn't silently re-run forever."""
+    res = (
+        get_client()
+        .table("deep_dives")
+        .update({"status": "error", "error": message[:2000]})
+        .eq("extension_id", extension_pk)
+        .execute()
+    )
+    return len(res.data or [])

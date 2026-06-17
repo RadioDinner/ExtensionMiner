@@ -11,32 +11,7 @@
 
 ---
 
-## 1. 🆕 "Deep dive research" pool — hand-pick extensions for a comprehensive Claude deep dive
-Let the user curate a small pool of extensions to research deeply, instead of
-running expensive deep research on every extension (which burns tokens).
-
-- **On the extension detail page**, add a button to **add that extension to a
-  "Deep dive research" pool/list**. (Toggle to add/remove; the page shows
-  whether the extension is already queued.)
-- When the **Claude ranking layer** runs, build a **tool that iterates over that
-  pool** and does a **comprehensive deep dive per extension** — e.g. thorough
-  analysis of the reviews, the **competitors** that exist, and related signals —
-  rather than doing all of that for *every* extension.
-
-Rationale (from the user): the full deep dive (reviews + competitor research,
-etc.) is token-expensive, so it should only run on a **hand-picked pool**, not
-the whole catalog. The lightweight ranking/monetization passes still run across
-everything; this deep dive is opt-in per extension.
-
-Implementation hints: needs a way to flag/queue an extension (likely a new
-column/table, e.g. a `deep_dive` flag on `extensions` or a small
-`deep_dive_queue` table the dashboard writes to and the ranker reads). The
-dashboard button writes the flag; a new analysis task (sibling to the existing
-ranking/monetization passes) processes only flagged extensions and likely uses
-Claude with web search/fetch for competitor research, writing results to a new
-table the detail page can display.
-
-## 2. 🆕 Decline / complaint-trend detection — surface extensions getting WEAKER
+## 1. 🆕 Decline / complaint-trend detection — surface extensions getting WEAKER
 Have the ranking algorithm flag extensions that are **declining in quality** or
 showing an **uptick of complaints in recent reviews**, so the user can **target
 the weak ones and pick them off**.
@@ -59,7 +34,7 @@ without new scraping; `rating_snapshots` (aggregate rating over time) can back
 the store-level trajectory. Likely a new score/signal the ranker writes (e.g. a
 `trend`/`decline_score` field on `opportunities`) that the dashboard sorts on.
 
-## 3. 🆕 Sortable + filterable "Opportunity zone" card
+## 2. 🆕 Sortable + filterable "Opportunity zone" card
 Make the dashboard's **★ Opportunity zone** card interactive, like the "Scored
 opportunities" card already is:
 

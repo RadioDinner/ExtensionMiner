@@ -138,6 +138,9 @@ const MON_DETAIL_COLS =
   "pricing_model,makes_money,has_paid_tier,price_min_usd,price_max_usd,estimated_users," +
   "estimated_monthly_revenue_usd,revenue_low_usd,revenue_high_usd,confidence," +
   "monetization_summary,pricing_notes,sources";
+// The deep-dive pool entry + its results (migration 993).
+const DEEP_DIVE_COLS =
+  "status,what_it_is,review_summary,competitors,opportunity,recommendation,sources,error,analyzed_at,requested_at";
 
 // One row by extension_id, tolerating a missing table/column (e.g. the
 // opportunities/monetization migration not applied yet) by returning null
@@ -178,7 +181,7 @@ export async function getExtensionReviews(extId) {
       return { configured: true, error: null, notFound: true, extension: null, reviews: [], opportunity: null, monetization: null };
     }
 
-    const [reviewsRes, opportunity, monetization] = await Promise.all([
+    const [reviewsRes, opportunity, monetization, deepDive] = await Promise.all([
       supabase
         .from("reviews")
         .select(REVIEW_COLS)
@@ -187,6 +190,7 @@ export async function getExtensionReviews(extId) {
         .limit(REVIEW_LIMIT),
       maybeRowByExtension(supabase, "opportunities", OPP_DETAIL_COLS, ext.id),
       maybeRowByExtension(supabase, "monetization", MON_DETAIL_COLS, ext.id),
+      maybeRowByExtension(supabase, "deep_dives", DEEP_DIVE_COLS, ext.id),
     ]);
 
     return {
@@ -197,6 +201,7 @@ export async function getExtensionReviews(extId) {
       reviews: reviewsRes.data || [],
       opportunity,
       monetization,
+      deepDive,
     };
   } catch (err) {
     return {
@@ -207,6 +212,7 @@ export async function getExtensionReviews(extId) {
       reviews: [],
       opportunity: null,
       monetization: null,
+      deepDive: null,
     };
   }
 }

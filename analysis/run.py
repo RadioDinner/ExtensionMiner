@@ -44,6 +44,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--monetize", action="store_true",
                    help="also research each extension's monetization (pricing / revenue) with web "
                         "search and write the monetization table (see analysis/monetize.py)")
+    p.add_argument("--deep-dive", action="store_true",
+                   help="also process the deep-dive pool: comprehensively research each extension "
+                        "the dashboard queued (reviews + competitors) and write the deep_dives "
+                        "table (see analysis/deepdive.py). Needs the DB (ignored with --no-db).")
     p.add_argument("--log-level", default="INFO")
     p.add_argument("--log-dir", metavar="DIR", default=None,
                    help="also write a timestamped log file into DIR (e.g. 'logs'). The "
@@ -142,6 +146,19 @@ def main(argv=None) -> int:
             print(f"\nMonetization researched: {len(money)} extensions.")
         except Exception as exc:  # never let monetization sink an otherwise-good ranking run
             log.warning("monetization pass skipped (%s)", exc)
+
+    # Optional: process the hand-picked deep-dive pool (needs the DB to read the queue).
+    if args.deep_dive and not args.no_db:
+        from .deepdive import deep_dive_all
+
+        log.info("processing the deep-dive pool (reviews + competitor research, web search)")
+        try:
+            dives = deep_dive_all(settings, limit=args.limit, max_reviews=args.max_reviews, model=args.model)
+            print(f"\nDeep dives completed: {len(dives)} (from the queued pool).")
+        except Exception as exc:  # never let the deep dive sink an otherwise-good run
+            log.warning("deep-dive pass skipped (%s)", exc)
+    elif args.deep_dive and args.no_db:
+        log.info("--deep-dive ignored under --no-db (the pool/queue lives in Supabase)")
 
     return EXIT_OK
 

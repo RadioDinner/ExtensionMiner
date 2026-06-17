@@ -9,6 +9,11 @@ over the extensions + reviews you've scraped, in one click:
 2. **Monetization** — web-searches each extension's pricing and estimates monthly
    revenue, writes the **`monetization`** table (the dashboard's *Pricing* +
    *Est. /mo* columns).
+3. **Deep dive** — processes the **deep-dive pool**: for each extension you
+   queued on the dashboard (the *🔬 Add to deep-dive pool* button on a detail
+   page), it researches the reviews + competitors and writes the **`deep_dives`**
+   table (shown as the detail page's *Deep dive* section). Skips everything you
+   didn't queue, so it stays token-frugal.
 
 It's a separate step from scraping — run the **scraper first** so there are
 reviews to analyze, then run this.
@@ -32,25 +37,28 @@ Double-click **"Run ExtensionMiner Ranking"** on your Desktop (or
 and installs dependencies; after that it's quick. It also auto-updates the code
 (`git pull` of `main`) before each run, just like the scraper launcher.
 
-When it finishes, the `opportunities` **and** `monetization` tables are updated,
-and the dashboard reflects the new scores, pricing, and revenue estimates.
+When it finishes, the `opportunities`, `monetization`, **and** `deep_dives`
+tables are updated, and the dashboard reflects the new scores, pricing, revenue
+estimates, and any completed deep dives.
 
 ## What it does by default
-Runs **both** Claude tasks (ranking + monetization, via `--monetize`) over the
-**top 25 extensions by install count** — ranking covers those with at least 5
-saved reviews. To change that, edit the `RUN_ARGS` line near the top of
-`scripts\run_ranker.cmd`, or run by hand:
+Runs **all three** Claude tasks (ranking + monetization via `--monetize` + the
+deep-dive pool via `--deep-dive`) over the **top 25 extensions by install
+count** — ranking covers those with at least 5 saved reviews; the deep dive only
+touches extensions you queued. To change that, edit the `RUN_ARGS` line near the
+top of `scripts\run_ranker.cmd`, or run by hand:
 
 ```bat
-.venv\Scripts\python.exe run_ranker.py --monetize --log-dir logs   :: the default (rank + monetize)
-.venv\Scripts\python.exe run_ranker.py --log-dir logs              :: ranking only (no web-search pass)
+.venv\Scripts\python.exe run_ranker.py --monetize --deep-dive --log-dir logs :: the default (rank + monetize + deep-dive pool)
+.venv\Scripts\python.exe run_ranker.py --log-dir logs              :: ranking only (no web-search passes)
 .venv\Scripts\python.exe run_ranker.py --limit 50 --monetize       :: do more extensions
 .venv\Scripts\python.exe run_ranker.py --limit 5 --no-db --monetize :: dry run, no writes
 ```
 
-> Heads-up: `--monetize` web-searches per extension, so the full run costs more
-> and takes longer than ranking alone. Drop `--monetize` from `RUN_ARGS` if you
-> want the button to do ranking only.
+> Heads-up: `--monetize` and `--deep-dive` web-search per extension, so the full
+> run costs more and takes longer than ranking alone. Drop them from `RUN_ARGS`
+> if you want the button to do ranking only. (`--deep-dive` only researches the
+> extensions you queued, so it's cheap unless the pool is large.)
 
 ### Handy flags
 | Flag | What it does |
@@ -59,6 +67,7 @@ saved reviews. To change that, edit the `RUN_ARGS` line near the top of
 | `--min-reviews N` | Skip extensions with fewer than N saved reviews. Default 5. |
 | `--max-reviews N` | How many reviews to send Claude per extension. Default 120. |
 | `--monetize` | Also research each extension's **pricing / revenue** (web search) and write the `monetization` table the dashboard shows. |
+| `--deep-dive` | Also process the **deep-dive pool** — comprehensively research (reviews + competitors) each extension you queued on the dashboard, writing the `deep_dives` table. Needs the DB (ignored with `--no-db`). |
 | `--no-db` | Dry run: analyze + score, but don't write `opportunities`. |
 | `--model NAME` | Anthropic model (default `ANTHROPIC_MODEL` or `claude-opus-4-8`). |
 | `--log-dir logs` | Also write a timestamped log file. |
@@ -71,6 +80,16 @@ The default button already runs monetization (it populates the dashboard's
 
 ```bat
 .venv\Scripts\python.exe -m analysis.monetize --limit 25
+```
+
+## Deep-dive pool on its own
+
+To process *only* the hand-picked deep-dive pool (needs migration **993**
+applied; queue extensions with the *🔬 Add to deep-dive pool* button on a detail
+page):
+
+```bat
+.venv\Scripts\python.exe -m analysis.deepdive --limit 25
 ```
 
 ### Exit codes

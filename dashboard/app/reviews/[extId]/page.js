@@ -1,4 +1,5 @@
 import { getExtensionReviews } from "../../../lib/queries";
+import DeepDiveButton from "./DeepDiveButton";
 
 // Render at request time so the build never needs Supabase credentials.
 export const dynamic = "force-dynamic";
@@ -59,6 +60,11 @@ export default async function ReviewsPage({ params }) {
   const clusters = Array.isArray(details.clusters) ? details.clusters : [];
   const mon = d.monetization;
 
+  // Deep-dive pool entry + (once run) its comprehensive research.
+  const dd = d.deepDive;
+  const ddStatus = dd && dd.status;
+  const competitors = dd && Array.isArray(dd.competitors) ? dd.competitors : [];
+
   return (
     <main className="wrap">
       <p className="back"><a href="/">← Back to dashboard</a></p>
@@ -79,6 +85,11 @@ export default async function ReviewsPage({ params }) {
         {href ? (
           <p className="store-link">
             <a href={href} target="_blank" rel="noreferrer">View on Chrome Web Store ↗</a>
+          </p>
+        ) : null}
+        {d.configured && ext ? (
+          <p className="deepdive-bar">
+            <DeepDiveButton extId={ext.ext_id} status={ddStatus} />
           </p>
         ) : null}
       </header>
@@ -104,6 +115,81 @@ export default async function ReviewsPage({ params }) {
           <strong>Query failed:</strong> {d.error}{" "}
           <strong><a href="/diagnostics">→ Run diagnostics</a></strong>
         </div>
+      )}
+
+      {d.configured && dd && dd.status === "error" && (
+        <div className="banner">
+          <strong>Deep dive failed:</strong> {dd.error || "unknown error"}. Use{" "}
+          <strong>“Re-run deep dive”</strong> above to try again.
+        </div>
+      )}
+
+      {d.configured && !d.notFound && !d.error && dd && dd.status === "done" && (
+        <section className="digest deepdive">
+          <h2>
+            🔬 Deep dive{" "}
+            {dd.recommendation ? (
+              <span className={`verdict verdict-${dd.recommendation}`}>{dd.recommendation}</span>
+            ) : null}
+          </h2>
+          <p className="sub">
+            Comprehensive research by the Claude layer (reviews + competitors)
+            {dd.analyzed_at ? <> · {fmtDate(dd.analyzed_at)}</> : null}.
+          </p>
+
+          {dd.what_it_is ? (
+            <div className="card digest-card">
+              <h3>What it is</h3>
+              <p className="digest-text">{dd.what_it_is}</p>
+            </div>
+          ) : null}
+
+          {dd.review_summary ? (
+            <div className="card digest-card">
+              <h3>Deep review read</h3>
+              <p className="digest-text">{dd.review_summary}</p>
+            </div>
+          ) : null}
+
+          {competitors.length > 0 ? (
+            <div className="card digest-card">
+              <h3>Competitors ({competitors.length})</h3>
+              <ul className="competitors">
+                {competitors.map((c, i) => (
+                  <li key={i} className="competitor">
+                    <div className="competitor-head">
+                      <span className="competitor-name">
+                        {c.url ? <a href={c.url} target="_blank" rel="noreferrer">{c.name}</a> : c.name}
+                      </span>
+                      {c.pricing ? <span className="pill">{c.pricing}</span> : null}
+                    </div>
+                    {c.strengths ? <p className="comp-line"><span className="l">Strengths:</span> {c.strengths}</p> : null}
+                    {c.weaknesses ? <p className="comp-line"><span className="l">Weaknesses:</span> {c.weaknesses}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {dd.opportunity ? (
+            <div className="card digest-card">
+              <h3>The opportunity</h3>
+              <p className="digest-text">{dd.opportunity}</p>
+            </div>
+          ) : null}
+
+          {Array.isArray(dd.sources) && dd.sources.length > 0 ? (
+            <p className="digest-sources">
+              Sources:{" "}
+              {dd.sources.slice(0, 8).map((s, i) => (
+                <span key={i}>
+                  {i ? " · " : ""}
+                  <a href={s} target="_blank" rel="noreferrer">{i + 1}</a>
+                </span>
+              ))}
+            </p>
+          ) : null}
+        </section>
       )}
 
       {d.configured && !d.notFound && !d.error && (whatItDoes || clusters.length > 0 || mon) && (

@@ -29,3 +29,6 @@ build it
 
 9.
 Add a feature, in the "Opportunity Zone" card/list, I want to be able to sort by all of those columns and toggle the sort direction, from high to low or low to high. Also, give me some options to filter the data there.
+
+10.
+build the next one
