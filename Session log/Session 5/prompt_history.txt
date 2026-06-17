@@ -46,3 +46,5 @@ HEAD is now at ca4e35b Session 4 handoff: full session_log + log prompts 16-17
 
 Why does it cap at 32 extensions? I wanted all extensions...
 
+5. On the dashboard, I see a count of ratings according to the google web store page. I like that and want to keep it, but I also want a count of ratings that I have saved for that extension per my own data, in a column next to it
+

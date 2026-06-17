@@ -23,6 +23,10 @@ const POINT_COLS = "ext_id,name,rating,rating_count,install_count,store_category
 const POINT_LIMIT = 1500;
 
 const EXT_COLS = "ext_id,name,store_category,rating,rating_count,install_count,listing_url";
+// Same columns, plus the count of reviews/ratings WE'VE saved for each extension.
+// `reviews(count)` is a PostgREST embedded aggregate — it rides along in the one
+// query (no migration, no N+1) and comes back as `reviews: [{ count: N }]`.
+const EXT_SELECT = `${EXT_COLS},reviews(count)`;
 
 // The opportunity sweet spot: mid-rated with real demand.
 const ZONE_MIN = 2.5;
@@ -36,21 +40,21 @@ export async function getDashboardData() {
     const [zone, lowest, highest, opps, points, extCount, revCount, helpful] = await Promise.all([
       supabase
         .from("extensions")
-        .select(EXT_COLS)
+        .select(EXT_SELECT)
         .gte("rating", ZONE_MIN)
         .lte("rating", ZONE_MAX)
         .order("install_count", { ascending: false, nullsFirst: false })
         .limit(25),
       supabase
         .from("extensions")
-        .select(EXT_COLS)
+        .select(EXT_SELECT)
         .not("rating", "is", null)
         .order("rating", { ascending: true })
         .order("install_count", { ascending: false, nullsFirst: false })
         .limit(10),
       supabase
         .from("extensions")
-        .select(EXT_COLS)
+        .select(EXT_SELECT)
         .not("rating", "is", null)
         .order("rating", { ascending: false })
         .limit(10),

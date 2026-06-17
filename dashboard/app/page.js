@@ -15,6 +15,11 @@ function fmtDate(s) {
   const d = new Date(s);
   return isNaN(d.getTime()) ? "—" : d.toISOString().slice(0, 10);
 }
+// How many reviews/ratings we've actually saved for this extension, from the
+// embedded `reviews(count)` aggregate (shape: reviews: [{ count: N }]).
+function savedCount(row) {
+  return row?.reviews?.[0]?.count ?? null;
+}
 function extLink(row) {
   const href = row.listing_url || (row.ext_id ? `https://chromewebstore.google.com/detail/x/${row.ext_id}` : null);
   return href ? <a href={href} target="_blank" rel="noreferrer">{row.name || row.ext_id}</a> : (row.name || row.ext_id);
@@ -76,7 +81,8 @@ function ExtTable({ rows, showCategory, linkReviews }) {
           <th>Extension</th>
           {showCategory ? <th>Category</th> : null}
           <th className="num">Rating</th>
-          <th className="num">Ratings</th>
+          <th className="num" title="Total ratings on the Chrome Web Store">Ratings</th>
+          <th className="num" title="Reviews/ratings saved in your own data">Saved</th>
           <th className="num">Installs</th>
         </tr>
       </thead>
@@ -87,6 +93,7 @@ function ExtTable({ rows, showCategory, linkReviews }) {
             {showCategory ? <td><span className="pill">{r.store_category || "—"}</span></td> : null}
             <td className="num">{stars(r.rating)}</td>
             <td className="num">{fmt(r.rating_count)}</td>
+            <td className="num">{fmt(savedCount(r))}</td>
             <td className="num">{fmt(r.install_count)}</td>
           </tr>
         ))}
