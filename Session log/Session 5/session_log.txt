@@ -1,0 +1,153 @@
+SESSION 5 — HANDOFF LOG
+=======================
+Date: 2026-06-17 (UTC). WEB session (Claude-Code-on-the-web).
+Branch: assigned claude/intelligent-wozniak-gjt2g9 (started in sync with main,
+        0 ahead / 0 behind). ALL work pushed to this feature branch. NOTE: unlike
+        Session 4, this session did NOT fast-forward main — everything lives on
+        claude/intelligent-wozniak-gjt2g9. Merge to main if/when desired.
+
+Theme: "wrap all open items before adding more features." Went through the
+Session 4 open-items list and closed the code-side ones (#4 concurrency + sort
+trim, #6 dashboard polish). The rest are environment/config checks on the user's
+side (#1 migration re-run, #2 done, #3 pending their DOM paste, #5 they're doing).
+
+================================================================================
+WHAT THE USER ASKED (prompt by prompt)
+================================================================================
+1. "lets start session 5, what are the open issues" -> set up Session 5 folder;
+   read Session 4 handoff; reported the 6 carried-over open items + confirmed
+   there are NO open GitHub issues. Branch in sync with main (0/0).
+2. Big one: migration 996 failed with a NetworkError to api.supabase.com (997 is
+   already run); Vercel dashboard is FIXED; unsure on #3; for #4 concurrency they
+   want only Recent + Helpful sorts (NOT highest/lowest) but still every extension
+   scanned for new ones; they'll run #5 themselves; add #6 polish to this session.
+
+================================================================================
+WHAT WAS BUILT (all on branch claude/intelligent-wozniak-gjt2g9)
+================================================================================
+SCRAPER — CONCURRENCY (open item #4)   commit a69a30e
+  scraper/crawl.py — rewrote crawl() from a single-threaded deque loop to a
+    thread-safe worker pool:
+      * CrawlOptions.concurrency (default 1).
+      * build_worker_browser(s, opts, shared_rl): builds a browser per worker and
+        injects ONE shared RateLimiter (real browser only; the test fake has no
+        .rate_limiter attr so it's left untouched). The on-disk cache is already
+        shared by directory, so only the limiter needs sharing.
+      * Seed phase (serial, main thread): discover categories + collect ids ->
+        enqueue. Running it in the main thread means a broken browser env (no
+        Playwright/Chromium) still raises up to main() -> explain_failure, before
+        any worker spins up.
+      * Process phase: N daemon threads, each its OWN browser (Playwright sync API
+        is thread-affine — a browser canNOT be shared across threads). Frontier is
+        a queue.Queue; --follow-related pushes new ids back on as workers run;
+        completion = frontier.join() + one None sentinel per worker.
+      * Thread-safety: discovered/seen/stats each behind a Lock; enqueue() guards
+        discovered + max_total atomically; process_one() fully wraps scrape+persist
+        so one bad page never kills a worker.
+      * Hang guard: if EVERY worker fails to start a browser, the last one drains
+        the queue so frontier.join() can't block forever (unreachable in practice
+        because the seed phase already validated the browser, but cheap insurance).
+    WHY shared limiter + many workers still helps AND stays polite: per-extension
+    wall-time is dominated by on-page work (scroll / "Load more" up to 40 clicks /
+    "Show more"), NOT navigation. Workers overlap that on-page time; the shared
+    limiter paces only goto() so the aggregate request rate is unchanged. Rough
+    ceiling at the polite 3s rate is ~nav-bound; concurrency turns a ~24/hr serial
+    crawl into ~hundreds/hr.
+  scraper/run.py — --concurrency N (default None -> 1 interactive, 4 under
+    --preset daily; explicit value wins over the preset). Daily log line now
+    reports worker count + "Recent + Helpful". --no-multi-sort help text updated.
+
+SCRAPER — REVIEW SORTS trimmed (open item #4, user's explicit ask) commit a69a30e
+  scraper/selectors.py — REVIEW_SORTS is now ONLY [("recent","Recent"),
+    ("helpful","Helpful")]. Dropped "Highest to lowest rating" + "Lowest to
+    highest rating". Rationale (documented in the file): with "Load more"
+    paginating the full Recent list, the low-star complaints already come through,
+    so the two extra re-sort passes per extension weren't worth the time on a
+    full-store crawl. Discovery is unchanged — still scans every extension.
+  NOTE: a "default" snapshot is still captured before the sorts (the fetch_review_
+    sorts safety net), so per reviews-page it's now 3 passes (default + recent +
+    helpful) instead of 5. merge_reviews dedupes default vs recent, so no dup rows.
+
+DASHBOARD — POLISH (open item #6)   commit 643e4c2
+  dashboard/lib/queries.js —
+    * opportunities select now includes extensions(ext_id, ...) so rows can link.
+    * NEW helpfulReviews query: reviews where helpful_ranked=true, lowest-star
+      first, joined to extensions(ext_id,name,store_category), limit 20. It's in
+      the Promise.all for parallelism BUT excluded from firstError, so if
+      reviews.helpful_ranked doesn't exist yet (migration 996 not applied) the
+      query just returns null/[] and the section hides — it does NOT error the page.
+  dashboard/app/page.js —
+    * reviewLinkFor(extId,label) helper; reviewLink() refactored onto it.
+    * "Scored opportunities" extension names now link to /reviews/<ext_id>.
+    * NEW "Community-upvoted reviews" section (StarRow + author + 👍 Helpful badge
+      + extension link + date + body), rendered ONLY when helpfulReviews non-empty.
+  dashboard/app/globals.css — .review-head .ext-ref styles (right-aligned ext link
+    + category pill in the helpful-review header).
+
+TESTS — 71 pass (was 68)   tests/test_scraper_util.py
+  + test_crawl_parallel_follows_related_graph (concurrency=3; same A->C->A graph,
+    every node scraped exactly once via the thread-safe guards).
+  + test_concurrency_flag_wires_through (default 1, daily 4, explicit wins).
+  + test_review_sorts_are_recent_and_helpful_only.
+
+DOCS
+  scraper/README.md + docs/RUNNING_THE_SCRAPER.md — documented --concurrency
+    (default 1 / daily 4, RAM note, shared-limiter politeness) and the Recent +
+    Helpful sort trim.
+
+VERIFICATION (web env — store is egress-blocked, so behavior verified by tests)
+  * python -m pytest -> 71 passed.
+  * dashboard `npm run build` (Next 14.2.35) -> compiled; routes /, /diagnostics,
+    /reviews/[extId] all ƒ dynamic. node_modules + .next are gitignored.
+
+================================================================================
+OPEN ITEMS / FOR NEXT SESSION (priority order)
+================================================================================
+1. MIGRATION 996 — STILL NOT APPLIED. The user's run failed with a transient
+   "NetworkError when attempting to fetch resource (api.supabase.com)" — that is a
+   Supabase-side network blip, NOT a SQL error. The SQL is correct and idempotent
+   (add column IF NOT EXISTS / create index IF NOT EXISTS). FIX: just re-run
+   996_reviews_helpful_flag.sql in the Supabase SQL editor. Until it's applied:
+   - the scraper logs a skip when flagging helpful reviews (db.mark_reviews_helpful),
+   - the dashboard's "Community-upvoted reviews" section stays hidden (by design).
+   997 is confirmed applied. (Alternative: the Supabase MCP could apply it, but it
+   needs OAuth via /mcp which can't be completed in the web env.)
+2. VERCEL DASHBOARD KEY — user reports FIXED (was the publishable key under RLS).
+   If the dashboard ever shows zeros again, re-check /diagnostics.
+3. "LOAD MORE" REVIEWS BUTTON SELECTOR — still UNCONFIRMED against the live DOM.
+   The per-review "Show more" expander is confirmed; the reviews "Load more"
+   pagination button is text-matched best-effort (REVIEW_LOAD_MORE_TEXTS =
+   ["Load more","Show more reviews","More reviews"]). If the bot isn't paginating
+   past ~10 reviews per sort, ask the user to paste the button's DOM.
+4. AUTO-UPDATE BOOTSTRAP (#5) — user said they'd run it. One-time, in their clone:
+   git fetch origin && git checkout main && git reset --hard origin/main
+   (After that the Desktop button + scheduled task self-update each run.) BUT NOTE
+   the merge caveat below — this session's work is on the feature branch, not main.
+5. MERGE TO MAIN — this session pushed to claude/intelligent-wozniak-gjt2g9 only.
+   The user's launcher auto-updates from main (UPDATE_BRANCH=main). So to actually
+   get Session 5's code on their machine, this branch must be merged to main
+   (Sessions 1-4 pattern). Confirm with the user, then merge + push main.
+
+POSSIBLE NEXT FEATURES (only after the above; user wanted items wrapped first)
+  - Parallelize category discovery too (seed phase is still serial; minor vs the
+    extension crawl, but matters at full-store scale).
+  - Run the Claude ranking layer to populate `opportunities` so the scored table +
+    its new review links actually have rows.
+
+================================================================================
+KEY CONTEXT / GOTCHAS
+================================================================================
+* Migrations count DOWN from 999; lowest existing is 996. Next NEW one = 995.
+* Concurrency model: each worker = its own Playwright browser (sync API is
+  thread-affine — do NOT try to share a browser across threads). Shared state is
+  ONLY the RateLimiter (injected) + the dir-based cache; everything mutable is
+  lock-guarded. Default concurrency 1 keeps the interactive path + tests
+  deterministic; daily preset uses 4.
+* helpful_ranked is sticky (set true, never auto-cleared), written by a separate
+  UPDATE, kept OUT of Review.to_row(). Requires migration 996 (see open item #1).
+* The dashboard helpful-reviews query is deliberately NON-gating: a missing
+  helpful_ranked column hides the section rather than erroring the whole page.
+* Egress: the Chrome Web Store is HTTP 403 in the web env — scraper must run on
+  the user's machine. PyPI + Anthropic API are reachable here (tests + ranking).
+* This session's deps had to be pip-installed ad hoc in the web env (bs4, lxml,
+  python-dateutil, python-dotenv, pydantic, pytest) to run the suite.
