@@ -12,6 +12,7 @@ python-dateutil        # robust parsing of store/review dates
 playwright
 beautifulsoup4
 lxml
+requests               # robots.txt fetch (scraper/robots.py)
 
 # --- Storage ---
 supabase               # Supabase (Postgres) client

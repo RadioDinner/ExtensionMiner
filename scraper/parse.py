@@ -163,6 +163,10 @@ def detail_url(ext_id: str, slug: str = "x") -> str:
     return selectors.DETAIL_URL.format(slug=slug, ext_id=ext_id)
 
 
+def reviews_url(ext_id: str, slug: str = "x") -> str:
+    return selectors.REVIEWS_URL.format(slug=slug, ext_id=ext_id)
+
+
 def category_url(category: str) -> str:
     return selectors.CATEGORY_URL.format(category=category.strip("/"))
 
@@ -206,12 +210,16 @@ def parse_detail(html: str, ext_id: str, *, page_text: Optional[str] = None) -> 
     icon = soup.find("img")
     icon_url = icon.get("src") if icon and icon.get("src", "").startswith("http") else None
 
+    # Prefer the visible-text "Overview" body (robust to DOM churn); fall back to
+    # the CSS-selected section only if the text anchor isn't found.
+    description = extract_description(text) or _text(soup.select_one(selectors.SEL_DESCRIPTION))
+
     return Extension(
         ext_id=ext_id,
         name=name,
-        developer=_developer_from_text(text),
-        summary=None,
-        description=_text(soup.select_one(selectors.SEL_DESCRIPTION)),
+        developer=extract_developer(text, name),
+        summary=extract_summary(description),
+        description=description,
         install_count=parse_install_count(text),
         install_count_raw=_first_match(_INSTALL_RE, text),
         rating=parse_rating(text),
@@ -234,16 +242,79 @@ def _first_match(pattern: re.Pattern, text: str) -> Optional[str]:
     return m.group(0) if m else None
 
 
-_DEVELOPER_RE = re.compile(r"offered by\s+([^\n]+)", re.I)
+_OFFERED_BY_RE = re.compile(r"offered by\s+([^\n]+)", re.I)
+# The Details panel lists "Developer" on its own line, value on the next line.
+_DEV_LABEL_RE = re.compile(r"(?im)^[ \t]*Developer[ \t]*\n+[ \t]*([^\n]+)")
+# When a publisher gives no company name, the Details "Developer" block leads
+# with one of these field labels instead — reject them and use the title line.
+_DEV_LABEL_STOP = {"website", "email", "phone", "address", "support"}
 
 
-def _developer_from_text(text: str) -> Optional[str]:
-    m = _DEVELOPER_RE.search(text or "")
+def _publisher_after_name(text: str, name: Optional[str]) -> Optional[str]:
+    """The publisher line shown directly under the extension title."""
+    if not name:
+        return None
+    lines = [ln.strip() for ln in (text or "").splitlines()]
+    for i, line in enumerate(lines):
+        if line != name:
+            continue
+        for nxt in lines[i + 1 : i + 4]:
+            if not nxt:
+                continue
+            low = nxt.lower()
+            if low == "featured" or nxt.startswith("(") or nxt[0].isdigit() or "out of 5" in low:
+                continue
+            return nxt
+        break
+    return None
+
+
+def extract_developer(text: str, name: Optional[str] = None) -> Optional[str]:
+    """Best-effort developer/publisher from the detail page's visible text.
+
+    Tries, in order: a legacy "offered by X" line; the Details "Developer"
+    label; the publisher line shown under the title (used when the Details block
+    leads with a Website/Email field instead of a company name).
+    """
+    if not text:
+        return None
+    m = _OFFERED_BY_RE.search(text)
+    if m:
+        return re.split(r"\s{2,}", m.group(1).strip())[0].strip() or None
+    m = _DEV_LABEL_RE.search(text)
+    if m:
+        value = m.group(1).strip()
+        if value and value.lower() not in _DEV_LABEL_STOP:
+            return value
+    return _publisher_after_name(text, name)
+
+
+# The Overview body sits between the "Overview" heading and the trailing chrome
+# ("See more" toggle, the ratings summary, or the "Details" panel).
+_DESCRIPTION_RE = re.compile(
+    r"\bOverview\b\s*(.*?)\s*(?:\bSee more\b|\bSee all reviews\b|\bDetails\b|\d(?:\.\d)?\s*out of\s*5)",
+    re.S | re.I,
+)
+
+
+def extract_description(text: str) -> Optional[str]:
+    """The extension's Overview/description from the page's visible text."""
+    if not text:
+        return None
+    m = _DESCRIPTION_RE.search(text)
     if not m:
         return None
-    # Some layouts pack several fields on one line; cut at a run of 2+ spaces.
-    value = re.split(r"\s{2,}", m.group(1).strip())[0].strip()
-    return value or None
+    body = re.sub(r"[ \t]+", " ", m.group(1)).strip()
+    body = re.sub(r"\n{3,}", "\n\n", body)
+    return body or None
+
+
+def extract_summary(description: Optional[str]) -> Optional[str]:
+    """A short summary: the first sentence/line of the description."""
+    if not description:
+        return None
+    first = re.split(r"(?<=[.!?])\s|\n", description.strip(), maxsplit=1)[0].strip()
+    return first[:300] or None
 
 
 _UPDATED_RE = re.compile(r"Updated[:\s]+([A-Za-z0-9,\s]+?\d{4}|\d+\s+\w+\s+ago)", re.I)
@@ -255,26 +326,74 @@ def _updated_phrase(text: str) -> Optional[str]:
 
 
 def parse_reviews(html: str) -> List[Review]:
-    """Extract reviews from rendered HTML.
+    """Extract reviews from a rendered reviews-page.
 
-    Heuristic: any element carrying a star aria-label ('… out of 5') is treated
-    as a review's rating; its enclosing card supplies author/date/body. Selectors
-    live in scraper/selectors.py — tune them on first local run.
+    Primary path: iterate the review cards (``selectors.SEL_REVIEW_CARD``) and
+    read author/date/stars/body from each. A developer reply nested in the same
+    card is excluded because the review body selector targets only the review's
+    own body element.
+
+    Fallback: if no cards match (e.g. the store's classes changed), drop to a
+    generic star-aria-label heuristic so a class rename degrades instead of
+    returning nothing.
     """
     soup = BeautifulSoup(html or "", "lxml")
+    cards = soup.select(selectors.SEL_REVIEW_CARD)
+    if cards:
+        return _reviews_from_cards(cards)
+    return _reviews_generic(soup)
+
+
+def _reviews_from_cards(cards) -> List[Review]:
+    reviews: List[Review] = []
+    seen = set()
+    for card in cards:
+        star = card.select_one(selectors.SEL_REVIEW_STARS)
+        stars = parse_star_label(star.get("aria-label") if star else None)
+        if stars is None:
+            continue
+        author = _text(card.select_one(selectors.SEL_REVIEW_AUTHOR))
+        body = _text(card.select_one(selectors.SEL_REVIEW_BODY))
+        date_text = _text(card.select_one(selectors.SEL_REVIEW_DATE))
+
+        dedupe_key = (author, body)
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+
+        reviews.append(
+            Review(
+                review_uid=card.get("data-review-id"),
+                author=author,
+                stars=stars,
+                body=body,
+                reviewed_at=parse_date(date_text),
+                language=None,
+                helpful_count=None,
+                raw=None,
+            )
+        )
+    return reviews
+
+
+# Generic fallback selectors (used only when SEL_REVIEW_CARD matches nothing).
+_GENERIC_AUTHOR = "[data-author], h3, h4"
+_GENERIC_DATE = "[data-review-date], time"
+_GENERIC_BODY = "[data-review-text], p"
+
+
+def _reviews_generic(soup) -> List[Review]:
     reviews: List[Review] = []
     seen_bodies = set()
-
     for star_node in soup.select(selectors.SEL_REVIEW_STARS):
         stars = parse_star_label(star_node.get("aria-label") or star_node.get_text(" ", strip=True))
         if stars is None:
             continue
         card = _nearest_card(star_node)
-        author = _text(card.select_one(selectors.SEL_REVIEW_AUTHOR)) if card else None
-        date_text = _text(card.select_one(selectors.SEL_REVIEW_DATE)) if card else None
-        body = _text(card.select_one(selectors.SEL_REVIEW_BODY)) if card else None
+        author = _text(card.select_one(_GENERIC_AUTHOR)) if card else None
+        date_text = _text(card.select_one(_GENERIC_DATE)) if card else None
+        body = _text(card.select_one(_GENERIC_BODY)) if card else None
 
-        # Avoid emitting the same review twice when selectors overlap.
         dedupe_key = (author, body)
         if body and dedupe_key in seen_bodies:
             continue

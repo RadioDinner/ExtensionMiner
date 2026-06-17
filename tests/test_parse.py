@@ -127,6 +127,50 @@ def test_parse_detail():
     assert ext.listing_url.endswith(ext_id)
 
 
+# Real-store-shaped visible text (chromewebstore.google.com), where the
+# description lives under an "Overview" heading and the publisher is shown both
+# under the title and in a "Developer" Details row.
+REAL_DETAIL_HTML = "<html><body><h1>Wordtune: AI Grammar Tool</h1></body></html>"
+REAL_DETAIL_TEXT = (
+    "Install Chrome\n"
+    "Wordtune: AI Grammar Tool\n"
+    "AI21 LABS, INC.\n"
+    "Featured\n"
+    "4.6\n"
+    "( 2.4K ratings )\n"
+    "1,000,000 users\n"
+    "Add to Chrome\n"
+    "Overview\n"
+    "Paraphrase, rewrite, and fix grammar for free. "
+    "Wordtune is your AI writing companion.\n"
+    "See more\n"
+    "4.6 out of 5\n"
+    "Details\n"
+    "Version\n9.20.0\n"
+    "Updated\nApril 19, 2026\n"
+    "Developer\nAI21 LABS, INC.\n"
+)
+
+
+def test_parse_detail_real_store():
+    ext = parse.parse_detail(REAL_DETAIL_HTML, "e" * 32, page_text=REAL_DETAIL_TEXT)
+    assert ext.developer == "AI21 LABS, INC."
+    assert ext.description.startswith("Paraphrase, rewrite, and fix grammar")
+    assert "See more" not in ext.description
+    assert ext.summary == "Paraphrase, rewrite, and fix grammar for free."
+
+
+def test_extract_developer_falls_back_to_title_line():
+    # Details block leads with a "Website" field (no company name) -> use the
+    # publisher line shown under the title instead.
+    text = (
+        "Install Chrome\nJetwriter AI\njetwriter.ai\nFeatured\n4.6\n"
+        "Overview\nWrite emails with AI.\nSee more\n"
+        "Details\nDeveloper\nWebsite\nhttps://jetwriter.ai\n"
+    )
+    assert parse.extract_developer(text, "Jetwriter AI") == "jetwriter.ai"
+
+
 REVIEWS_HTML = """
 <ul>
   <li data-review-id="r1">
@@ -156,3 +200,42 @@ def test_parse_reviews():
     assert alice.reviewed_at == date(2024, 9, 5)
     assert reviews[1].stars == 5
     assert reviews[1].author == "Bob"
+
+
+# Real reviews-page shape (chromewebstore.google.com): one section.T7rvce per
+# review; the first card embeds a developer reply that must NOT be captured.
+REAL_REVIEWS_HTML = """
+<main>
+  <section class="T7rvce" data-review-id="rv1">
+    <div class="U47jjf"><h3 class="PCeALe">
+      <span class="LfYwpe">Rayyan Yousaf</span>
+      <span class="ydlbEf">May 20, 2026</span>
+    </h3><div aria-label="1 out of 5 stars"></div></div>
+    <div class="fzDEpf">What a joke of an extension, everything is paywalled.</div>
+    <div class="fPNqW">Ela Tumang Developer May 21, 2026 Hi Rayyan, we hear you...</div>
+  </section>
+  <section class="T7rvce" data-review-id="rv2">
+    <div class="U47jjf"><h3 class="PCeALe">
+      <span class="LfYwpe">Dr. Ali</span>
+      <span class="ydlbEf">Apr 24, 2026</span>
+    </h3><div aria-label="5 out of 5 stars"></div></div>
+    <div class="fzDEpf">Great for research writing.</div>
+  </section>
+</main>
+"""
+
+
+def test_parse_reviews_real_store():
+    reviews = parse.parse_reviews(REAL_REVIEWS_HTML)
+    assert len(reviews) == 2
+    r0 = reviews[0]
+    assert r0.author == "Rayyan Yousaf"
+    assert r0.stars == 1
+    assert r0.review_uid == "rv1"
+    assert r0.reviewed_at == date(2026, 5, 20)
+    assert "joke of an extension" in r0.body
+    # the nested developer reply must be excluded from the review body
+    assert "Developer" not in r0.body
+    assert "Ela Tumang" not in r0.body
+    assert reviews[1].author == "Dr. Ali"
+    assert reviews[1].stars == 5

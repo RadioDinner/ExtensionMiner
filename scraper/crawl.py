@@ -62,15 +62,23 @@ def collect_extension_ids(
 def scrape_extension(
     browser: CWSBrowser, ext_id: str, *, category: Optional[str] = None, review_scrolls: int = 6
 ) -> Tuple[Extension, List[Review]]:
+    # Detail page: metadata + description. Reviews are NOT here.
     html, text = browser.fetch(
         parse.detail_url(ext_id),
         wait_selector=selectors.SEL_DETAIL_READY,
-        scrolls=review_scrolls,
+        scrolls=2,
     )
     ext = parse.parse_detail(html, ext_id, page_text=text)
     if category:
         ext.store_category = category
-    return ext, parse.parse_reviews(html)
+
+    # Reviews live on a dedicated sub-page; scroll it to lazy-load more.
+    reviews_html, _ = browser.fetch(
+        parse.reviews_url(ext_id),
+        wait_selector=selectors.SEL_DETAIL_READY,
+        scrolls=review_scrolls,
+    )
+    return ext, parse.parse_reviews(reviews_html)
 
 
 def persist(ext: Extension, reviews: List[Review], *, write_db: bool) -> int:

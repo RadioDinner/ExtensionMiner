@@ -26,19 +26,35 @@ CATEGORY_URL = BASE_URL + "/category/extensions/{category}"
 # Detail page. The slug is cosmetic; the store redirects to the canonical slug,
 # so a placeholder works when crawling by id alone.
 DETAIL_URL = BASE_URL + "/detail/{slug}/{ext_id}"
+# Reviews live on a dedicated sub-page; the detail page itself shows none. Scroll
+# this page to lazy-load more reviews.
+REVIEWS_URL = DETAIL_URL + "/reviews"
 
 # --- Selectors (tune against the live DOM) ----------------------------------
 # Detail page.
 SEL_NAME = "h1"
-SEL_DESCRIPTION = "section"          # the "Overview" section; refine if noisy
+# Fallback only: the description is normally parsed from the page's visible text
+# (parse.extract_description, anchored on the "Overview" heading), which is far
+# more robust than this CSS selector. Used only when that text anchor is absent.
+SEL_DESCRIPTION = "section"
 SEL_DETAIL_READY = "h1"              # element whose presence means "page loaded"
 
-# Reviews. A review "card" container, then fields within it. The star rating is
-# read from an element carrying an aria-label like "Rated 3 out of 5".
-SEL_REVIEW_CARD = "[data-review-id], div[jsname]"   # candidates; tune to one
+# Reviews page (REVIEWS_URL). Each review is one card; the per-review star rating
+# carries an aria-label like "1 out of 5 stars". A developer's reply is nested in
+# the SAME card with a different body class (`div.fPNqW`), so selecting the review
+# body via `div.fzDEpf` naturally excludes the reply.
+#
+# These classes are obfuscated and churn-prone — if review fields go missing,
+# re-tune them here (open a cached reviews_page HTML and find the new classes).
+# parse.parse_reviews falls back to a generic heuristic when SEL_REVIEW_CARD
+# matches nothing, so a class rename degrades rather than crashes.
+SEL_REVIEW_CARD = "section.T7rvce"
 SEL_REVIEW_STARS = "[aria-label*='out of 5']"
-SEL_REVIEW_AUTHOR = "[data-author], h3, h4"
-SEL_REVIEW_DATE = "[data-review-date], time"
-SEL_REVIEW_BODY = "[data-review-text], p"
+SEL_REVIEW_AUTHOR = "span.LfYwpe"
+SEL_REVIEW_DATE = "span.ydlbEf"
+# Review body is a <p class="fzDEpf"> (the developer reply uses a different
+# class, .Iu8e1b, so this selects only the reviewer's own text). Tag-agnostic on
+# purpose — match by class so a tag change doesn't break it.
+SEL_REVIEW_BODY = ".fzDEpf"
 # Control that reveals the full review list / loads more.
 SEL_REVIEWS_MORE = "text=See all reviews"
