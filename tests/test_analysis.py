@@ -1,11 +1,22 @@
+import datetime as dt
+
 from analysis import prompt
 from analysis.rank import (
     PENALTY_JUST_BAD,
+    RECENCY_FLOOR,
     analyze_extension,
+    recency_factor,
+    recency_weight,
     score_opportunity,
     to_opportunity_row,
 )
 from analysis.schema import ExtensionAnalysis, ReviewCluster
+
+NOW = dt.date(2026, 6, 17)
+
+
+def _days_ago(n: int) -> str:
+    return (NOW - dt.timedelta(days=n)).isoformat()
 
 
 def _analysis(**kw):
@@ -81,6 +92,67 @@ def test_to_opportunity_row_shape():
     assert row["complaint_type"] in ("missing_feature", "bug", "pricing", "abandonment", "other")
     assert isinstance(row["wtp_evidence"], list)
     assert isinstance(row["details"], dict) and "clusters" in row["details"]
+
+
+def test_recency_weight_follows_the_decay_curve():
+    # Monotonically non-increasing across the buckets the user specified.
+    w_fresh = recency_weight(_days_ago(10), now=NOW)     # <= 3 months
+    w_6mo = recency_weight(_days_ago(150), now=NOW)       # <= 6 months
+    w_12mo = recency_weight(_days_ago(300), now=NOW)      # <= 12 months
+    w_2yr = recency_weight(_days_ago(600), now=NOW)       # <= 2 years
+    w_3yr = recency_weight(_days_ago(1000), now=NOW)      # <= 3 years
+    w_old = recency_weight(_days_ago(2000), now=NOW)      # > 3 years
+    assert w_fresh == 1.0
+    assert w_fresh > w_6mo > w_12mo > w_2yr > w_3yr > w_old
+    assert w_old == RECENCY_FLOOR
+
+
+def test_recency_weight_unknown_or_future_is_full_weight():
+    assert recency_weight(None, now=NOW) == 1.0
+    assert recency_weight("not-a-date", now=NOW) == 1.0
+    assert recency_weight((NOW + dt.timedelta(days=30)).isoformat(), now=NOW) == 1.0
+
+
+def test_recency_factor_is_judged_from_complaint_reviews():
+    # Fresh complaints (<=3 stars) -> high factor even if old 5-star praise exists.
+    reviews = [
+        {"stars": 1, "reviewed_at": _days_ago(20)},
+        {"stars": 2, "reviewed_at": _days_ago(40)},
+        {"stars": 5, "reviewed_at": _days_ago(2000)},  # old praise, ignored
+    ]
+    assert recency_factor(reviews, now=NOW) == 1.0
+
+    # Old complaints -> heavily discounted.
+    stale = [
+        {"stars": 1, "reviewed_at": _days_ago(1500)},
+        {"stars": 2, "reviewed_at": _days_ago(2000)},
+    ]
+    assert recency_factor(stale, now=NOW) == RECENCY_FLOOR
+
+
+def test_recency_factor_falls_back_and_defaults_to_one():
+    # No complaint reviews -> average over all dated reviews.
+    only_praise = [{"stars": 5, "reviewed_at": _days_ago(2000)}]
+    assert recency_factor(only_praise, now=NOW) == RECENCY_FLOOR
+    # Nothing dated -> no penalty.
+    assert recency_factor([{"stars": 1, "reviewed_at": None}], now=NOW) == 1.0
+    assert recency_factor([], now=NOW) == 1.0
+
+
+def test_recency_discounts_demand_but_not_the_raw_count():
+    ext = {"rating": 3.0, "install_count": 500_000}
+    fresh = score_opportunity(ext, _analysis(clusters=[STRONG_CLUSTER]), recency=1.0)
+    stale = score_opportunity(ext, _analysis(clusters=[STRONG_CLUSTER]), recency=RECENCY_FLOOR)
+    assert stale["score"] < fresh["score"]          # old complaints rank lower
+    assert stale["demand_intensity"] == fresh["demand_intensity"] == 8  # count unchanged
+    assert fresh["recency_weight"] == 1.0
+    assert stale["recency_weight"] == RECENCY_FLOOR
+
+
+def test_to_opportunity_row_threads_recency():
+    ext = {"rating": 3.0, "install_count": 500_000}
+    row = to_opportunity_row(7, ext, _analysis(clusters=[STRONG_CLUSTER]), model="m", recency=0.5)
+    assert row["recency_weight"] == 0.5
 
 
 def test_build_user_prompt_includes_reviews():

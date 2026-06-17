@@ -66,3 +66,14 @@ outcomes (see `docs/ROADMAP.md` Phase 3): demand intensity (# independent
 reviewers, heaviest) + willingness-to-pay + fixability + market size + a bonus
 for the ~3★ opportunity zone, minus penalties for "just bad / abandoned" and
 fixes that need a costly backend.
+
+### Review recency weighting (decay old reviews)
+
+Old reviews usually describe old releases, so the demand term is **discounted
+when the complaints driving it are stale**. `recency_factor(reviews)` averages a
+per-review age-decay weight (`recency_weight`, buckets in `RECENCY_BUCKETS`:
+≤3mo full weight → >3yr a 0.15 floor) over the extension's complaint reviews
+(≤3★), and `score_opportunity(..., recency=…)` multiplies the demand term by it.
+The multiplier is stored on `opportunities.recency_weight` (migration **994**)
+and shown as the dashboard's *Recency* column. Scoring only — every review is
+still stored regardless of age.

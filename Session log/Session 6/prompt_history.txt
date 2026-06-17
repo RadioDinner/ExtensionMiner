@@ -14,3 +14,6 @@ Add a feature to the list. I want the ranking algorithm to check for extensions 
 
 4.
 whats the next feature
+
+5.
+build it

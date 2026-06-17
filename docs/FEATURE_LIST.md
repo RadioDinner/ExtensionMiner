@@ -11,22 +11,7 @@
 
 ---
 
-## 1. 🆕 Recency-weighted review scoring (decay old reviews)
-Keep collecting older reviews, but **down-weight old ones** in the ranking
-algorithm, since very old reviews likely describe old releases. Apply a decay to
-a review's contribution based on age (tune the exact curve):
-
-- ≤ 3 months → highest weight
-- ≤ 6 months → slightly lower
-- ≤ 12 months → a bit lower than 6 months
-- > 2 years → lower
-- > 3 years → much lower
-- (…continue the gradient as makes sense)
-
-This affects scoring/ranking only — we still **store** all reviews regardless of
-age.
-
-## 2. 🆕 Richer extension detail page (problem clusters, "what it is", profitability)
+## 1. 🆕 Richer extension detail page (problem clusters, "what it is", profitability)
 When you open an extension from a list to read its reviews (`/reviews/<ext_id>`),
 show more than the raw review list:
 
@@ -44,7 +29,7 @@ displays them. Likely reuses what's already there — `opportunities.details`
 (complaint clusters + counts) and the `monetization` table — plus a NEW
 "what it does" summary field added to the ranking output.
 
-## 3. 🆕 "Deep dive research" pool — hand-pick extensions for a comprehensive Claude deep dive
+## 2. 🆕 "Deep dive research" pool — hand-pick extensions for a comprehensive Claude deep dive
 Let the user curate a small pool of extensions to research deeply, instead of
 running expensive deep research on every extension (which burns tokens).
 
@@ -69,7 +54,7 @@ ranking/monetization passes) processes only flagged extensions and likely uses
 Claude with web search/fetch for competitor research, writing results to a new
 table the detail page can display.
 
-## 4. 🆕 Decline / complaint-trend detection — surface extensions getting WEAKER
+## 3. 🆕 Decline / complaint-trend detection — surface extensions getting WEAKER
 Have the ranking algorithm flag extensions that are **declining in quality** or
 showing an **uptick of complaints in recent reviews**, so the user can **target
 the weak ones and pick them off**.

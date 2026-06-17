@@ -65,7 +65,7 @@ export async function getDashboardData() {
         .limit(10),
       supabase
         .from("opportunities")
-        .select("score,top_complaint,complaint_type,fixable,brief,extensions(ext_id,name,rating,install_count,listing_url)")
+        .select("score,top_complaint,complaint_type,fixable,recency_weight,brief,extensions(ext_id,name,rating,install_count,listing_url)")
         .order("score", { ascending: false, nullsFirst: false })
         .limit(200),
       supabase

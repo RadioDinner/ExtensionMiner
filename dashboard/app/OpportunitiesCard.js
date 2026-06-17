@@ -21,6 +21,18 @@ function reviewLinkFor(extId, label) {
   return <a href={`/reviews/${encodeURIComponent(extId)}`}>{label || extId}</a>;
 }
 
+// How fresh are the complaints behind this score? 1.0 = recent, lower = the
+// driving complaints are old (the ranker down-weights aged reviews).
+function recencyCell(w) {
+  if (w == null) return "—";
+  const pct = Math.round(Number(w) * 100);
+  const title =
+    pct >= 85 ? "Fresh complaints — full weight"
+    : pct >= 50 ? "Somewhat aged complaints — partly discounted"
+    : "Old complaints — heavily discounted (likely an old release)";
+  return <span className="pill" title={title}>{pct}%</span>;
+}
+
 // Interactive "Scored opportunities" card: filter by complaint type + paid/unpaid,
 // sort by score. All client-side over the rows the server already fetched.
 export default function OpportunitiesCard({ rows, monetization }) {
@@ -88,6 +100,7 @@ export default function OpportunitiesCard({ rows, monetization }) {
               <th>Top fixable complaint</th>
               <th>Type</th>
               <th>Fixable</th>
+              <th className="num" title="Recency of the complaints behind the score">Recency</th>
               <th>Pricing</th>
             </tr>
           </thead>
@@ -101,6 +114,7 @@ export default function OpportunitiesCard({ rows, monetization }) {
                   <td>{r.top_complaint || "—"}</td>
                   <td><span className="pill">{r.complaint_type || "—"}</span></td>
                   <td>{r.fixable || "—"}</td>
+                  <td className="num">{recencyCell(r.recency_weight)}</td>
                   <td>{m && m.pricing_model ? <span className="pill" title={m.monetization_summary || ""}>{m.pricing_model}</span> : "—"}</td>
                 </tr>
               );
