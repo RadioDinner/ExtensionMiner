@@ -49,13 +49,20 @@ run. (You can also just right-click `run_scraper.cmd` → *Send to* → *Desktop
 (create shortcut)*.)
 
 ### What the daily preset does
-By default the launcher runs `--preset daily`: a **full crawl** of every category
-in your `.env`. For an extension that's **already in the database**, the reviews
-are re-checked and **only new ones are added** (upserts dedupe on
-`extension_id + review_uid`); if there's nothing new, it effectively moves on.
-New extensions in those categories get picked up automatically. It also records a
-daily rating/install **snapshot** per extension so you can track trajectory over
-time.
+By default the launcher runs `--preset daily`: a **full crawl of the store's
+whole category taxonomy** — it reads the category list from the store's own nav
+(`--all-categories`) and scrolls each category until no new extensions appear, so
+it discovers as many extensions as the category pages will lazy-load. For an
+extension that's **already in the database**, the reviews are re-checked and
+**only new ones are added** (upserts dedupe on `extension_id + review_uid`); if
+there's nothing new, it effectively moves on. Newly listed extensions get picked
+up automatically. It also records a daily rating/install **snapshot** per
+extension so you can track trajectory over time.
+
+> Heads-up: the whole-taxonomy crawl is **long** (polite 3s/page rate limit). A
+> first full run can take hours — that's expected for an overnight scheduled job.
+> Set `TARGET_CATEGORIES` + drop `--all-categories` in `RUN_ARGS` if you want a
+> smaller, faster run while testing.
 
 To change behavior, edit the `RUN_ARGS` line near the top of
 `scripts\run_scraper.cmd`. Examples are in the comments there.

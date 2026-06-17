@@ -5,7 +5,7 @@ from scraper.crawl import CrawlOptions
 from scraper.models import Extension, Review
 from scraper.ratelimit import RateLimiter
 from scraper.robots import make_checker
-from scraper.run import build_parser
+from scraper.run import build_parser, resolve_options
 
 
 def test_rate_limiter_sleeps_when_too_soon():
@@ -100,3 +100,25 @@ def test_refresh_after_days_flag_wires_through():
     # parses an int window
     args = build_parser().parse_args(["--refresh-after-days", "30"])
     assert args.refresh_after_days == 30
+
+
+def test_all_categories_flag_and_daily_preset():
+    # default off, both on the parser and the options dataclass
+    assert build_parser().parse_args([]).all_categories is False
+    assert CrawlOptions().all_categories is False
+
+    # the explicit flag turns it on
+    opts = resolve_options(build_parser().parse_args(["--all-categories"]))
+    assert opts.all_categories is True
+
+    # the daily preset implies the full taxonomy + no cap + cache bypass
+    daily = resolve_options(build_parser().parse_args(["--preset", "daily"]))
+    assert daily.all_categories is True
+    assert daily.max_extensions == 0
+    assert daily.refresh is True
+
+
+def test_discovery_scroll_knobs_default():
+    opts = resolve_options(build_parser().parse_args([]))
+    assert opts.category_scrolls == 40       # exhaust-scroll cap
+    assert opts.discovery_patience == 3

@@ -26,8 +26,10 @@ log = logging.getLogger("scraper")
 @dataclass
 class CrawlOptions:
     categories: List[str] = field(default_factory=list)
+    all_categories: bool = False      # discover & crawl the WHOLE store taxonomy
     max_extensions: int = 25          # per category; 0 = no cap
-    category_scrolls: int = 8         # lazy-load passes on a category page
+    category_scrolls: int = 40        # max scroll passes to exhaust a category page
+    discovery_patience: int = 3       # stop after N scrolls that surface no new ids
     review_scrolls: int = 6           # lazy-load passes on a detail page
     write_db: bool = True
     headless: bool = True
@@ -57,11 +59,41 @@ def build_browser(s: Settings, opts: CrawlOptions) -> CWSBrowser:
     )
 
 
+def discover_categories(browser: CWSBrowser) -> List[str]:
+    """Read the store's category taxonomy from its homepage nav.
+
+    Returns every ``/category/extensions/<slug>`` the nav links to, so a crawl
+    follows the store's own menu instead of a hardcoded list. Empty on failure
+    (the caller falls back to the configured categories).
+    """
+    try:
+        html, _ = browser.fetch(selectors.HOME_URL, scrolls=2)
+    except Exception as exc:  # discovery must never hard-fail the crawl
+        log.warning("category discovery failed (%s); using configured categories", exc)
+        return []
+    slugs = parse.extract_category_slugs(html)
+    log.info("discovered %d categories from the store nav", len(slugs))
+    return slugs
+
+
 def collect_extension_ids(
-    browser: CWSBrowser, category: str, *, max_extensions: int, scrolls: int
+    browser: CWSBrowser, category: str, *, max_extensions: int, opts: "CrawlOptions"
 ) -> List[str]:
-    html, _ = browser.fetch(parse.category_url(category), scrolls=scrolls)
-    ids = parse.extract_extension_ids(html)
+    """Every extension id a category page is willing to lazy-load (capped).
+
+    Uses progressive scrolling to exhaust the list rather than a fixed number of
+    passes. A non-refresh run reuses the cached category HTML if present.
+    """
+    url = parse.category_url(category)
+    if not browser.refresh and browser.cache.has(url, "html"):
+        ids = parse.extract_extension_ids(browser.cache.get(url, "html") or "")
+    else:
+        ids = browser.collect_scrolling(
+            url,
+            parse.extract_extension_ids,
+            max_scrolls=opts.category_scrolls,
+            patience=opts.discovery_patience,
+        )
     return ids[:max_extensions] if max_extensions else ids
 
 
@@ -113,8 +145,6 @@ def persist(ext: Extension, reviews: List[Review], *, write_db: bool) -> int:
 def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = None) -> dict:
     s = settings or default_settings
     opts = opts or CrawlOptions()
-    if not opts.categories:
-        opts.categories = list(s.target_categories)
     if opts.write_db:
         s.require_supabase()
 
@@ -142,9 +172,18 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
         log.info("skip-existing: %d extensions already in the DB will be skipped", len(seen))
 
     with build_browser(s, opts) as browser:
-        for category in opts.categories:
+        # Resolve which categories to crawl. --all-categories follows the store's
+        # own nav (the whole taxonomy); otherwise use what was asked for, falling
+        # back to the configured TARGET_CATEGORIES.
+        if opts.all_categories:
+            categories = discover_categories(browser) or opts.categories or list(s.target_categories)
+        else:
+            categories = opts.categories or list(s.target_categories)
+        log.info("crawling %d categories", len(categories))
+
+        for category in categories:
             ids = collect_extension_ids(
-                browser, category, max_extensions=opts.max_extensions, scrolls=opts.category_scrolls
+                browser, category, max_extensions=opts.max_extensions, opts=opts
             )
             stats["categories"] += 1
             stats["ids"] += len(ids)

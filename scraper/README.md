@@ -39,10 +39,17 @@ python -m scraper.run --categories productivity developer-tools --max-extensions
 python -m scraper.run --preset daily --log-dir logs
 ```
 
-Useful flags: `--preset daily` (full refresh crawl), `--no-db` (dry run),
-`--no-headless` (watch it), `--refresh` (ignore cache), `--skip-existing`,
-`--refresh-after-days N`, `--log-dir DIR`, `--no-robots`, `--log-level DEBUG`,
-`--category-scrolls` / `--review-scrolls` (how hard to lazy-load).
+Useful flags: `--preset daily` (full refresh crawl of the **whole** taxonomy),
+`--all-categories` (discover & crawl every category from the store nav),
+`--no-db` (dry run), `--no-headless` (watch it), `--refresh` (ignore cache),
+`--skip-existing`, `--refresh-after-days N`, `--log-dir DIR`, `--no-robots`,
+`--log-level DEBUG`, `--category-scrolls` (max passes to exhaust a category) /
+`--discovery-patience` (stop after N empty passes) / `--review-scrolls`.
+
+> Discovery: `--all-categories` reads the category list from the store's own nav,
+> then scrolls each category until no new extensions appear (capped by
+> `--category-scrolls`). Coverage is bounded by what the store's category pages
+> lazy-load — there is no public index of *all* extensions.
 
 > Tip: never run `python scraper/run.py` directly — relative imports break.
 > Use `python -m scraper.run …` or the top-level `python run_scraper.py …`.

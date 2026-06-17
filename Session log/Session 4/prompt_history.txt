@@ -74,3 +74,7 @@ Merge made by the 'ort' strategy.
 2026-06-17 10:12:28,309 INFO preset 'daily': full refresh crawl (no cap, cache bypassed); already-stored extensions only gain new reviews
 
 this is what I get so far when I click the button on the desktop
+
+9. Ok, now we work on the scraper itself. Is it set up to get every extension on the google chrome web store
+
+[answer to my coverage question, verbatim]: "I want every, single, review. I will not mince my words. I don't care if I need to multi-thread the crawler, or run it all day and all night. I want every single one, and I want reviews checked daily"

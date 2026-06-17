@@ -19,6 +19,10 @@ from __future__ import annotations
 # --- URLs -------------------------------------------------------------------
 BASE_URL = "https://chromewebstore.google.com"
 ROBOTS_URL = f"{BASE_URL}/robots.txt"
+# The store homepage carries the full category nav. We read category slugs from
+# its links (parse.extract_category_slugs) rather than hardcoding the taxonomy,
+# so --all-categories follows the store's own menu and survives reorganizations.
+HOME_URL = BASE_URL + "/"
 # A category landing page. `category` may be a single slug ("productivity") or a
 # nested path ("productivity/tools") — verify the live taxonomy and set
 # TARGET_CATEGORIES accordingly.

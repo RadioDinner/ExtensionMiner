@@ -159,6 +159,24 @@ def extract_extension_ids(html: Optional[str]) -> List[str]:
     return out
 
 
+# Category links look like /category/extensions/<slug>, where <slug> may be a
+# nested path (e.g. "make_chrome_yours/accessibility"). Old-store /category/ext/…
+# links are intentionally not matched.
+_CATEGORY_RE = re.compile(r"/category/extensions/([a-z0-9][a-z0-9_\-/]*)", re.I)
+
+
+def extract_category_slugs(html: Optional[str]) -> List[str]:
+    """All distinct category slugs linked from a page (its nav), in page order."""
+    out: List[str] = []
+    seen = set()
+    for m in _CATEGORY_RE.finditer(html or ""):
+        slug = m.group(1).rstrip("/")
+        if slug and slug not in seen:
+            seen.add(slug)
+            out.append(slug)
+    return out
+
+
 def detail_url(ext_id: str, slug: str = "x") -> str:
     return selectors.DETAIL_URL.format(slug=slug, ext_id=ext_id)
 

@@ -2,9 +2,12 @@
 
 Examples
 --------
-    # The daily scheduled run (full refresh crawl of your configured
-    # categories; upserts dedupe so only NEW reviews/ratings land):
+    # The daily scheduled run (full refresh crawl of the WHOLE store taxonomy;
+    # upserts dedupe so only NEW reviews/ratings land):
     python -m scraper.run --preset daily --log-dir logs
+
+    # Crawl every category once, capped at 50 each, into Supabase:
+    python -m scraper.run --all-categories --max-extensions 50
 
     # Dry run (no DB writes), just 2 extensions, keep the browser visible:
     python -m scraper.run --max-extensions 2 --no-db --no-headless
@@ -53,11 +56,18 @@ def build_parser() -> argparse.ArgumentParser:
                         "for the daily scheduled task.")
     p.add_argument("--categories", nargs="+", metavar="SLUG",
                    help="category slugs to crawl (default: TARGET_CATEGORIES from env)")
+    p.add_argument("--all-categories", action="store_true",
+                   help="discover and crawl the store's WHOLE category taxonomy (from its "
+                        "nav), not just --categories. Implied by --preset daily.")
     p.add_argument("--max-extensions", type=int, default=None,
                    help="max extensions per category (0 = no cap; default 25, or 0 under "
                         "--preset daily)")
-    p.add_argument("--category-scrolls", type=int, default=8,
-                   help="lazy-load scroll passes on a category page (default 8)")
+    p.add_argument("--category-scrolls", type=int, default=40,
+                   help="max scroll passes to exhaust a category's extension list "
+                        "(default 40; stops early once no new ids appear)")
+    p.add_argument("--discovery-patience", type=int, default=3,
+                   help="stop scrolling a category after this many passes surface no new "
+                        "extensions (default 3)")
     p.add_argument("--review-scrolls", type=int, default=6,
                    help="lazy-load scroll passes on a detail page (default 6)")
     p.add_argument("--no-db", action="store_true",
@@ -111,22 +121,26 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
     """Turn parsed args (+ any preset) into CrawlOptions."""
     max_extensions = args.max_extensions
     refresh = args.refresh
+    all_categories = args.all_categories
 
     if args.preset == "daily":
-        # Full crawl of every configured category, re-checking everything for new
+        # Full crawl of the WHOLE store taxonomy, re-checking everything for new
         # reviews. Cache is bypassed so we actually see new reviews; upserts dedupe
         # so an already-stored extension just gains its new reviews and moves on.
         if max_extensions is None:
             max_extensions = 0  # no per-category cap
         refresh = True
+        all_categories = True
 
     if max_extensions is None:
         max_extensions = 25  # the interactive default
 
     return CrawlOptions(
         categories=args.categories or [],
+        all_categories=all_categories,
         max_extensions=max_extensions,
         category_scrolls=args.category_scrolls,
+        discovery_patience=args.discovery_patience,
         review_scrolls=args.review_scrolls,
         write_db=not args.no_db,
         headless=not args.no_headless,
@@ -193,8 +207,8 @@ def main(argv=None) -> int:
 
     if args.preset == "daily":
         log.info(
-            "preset 'daily': full refresh crawl (no cap, cache bypassed); "
-            "already-stored extensions only gain new reviews"
+            "preset 'daily': full refresh crawl of the WHOLE category taxonomy "
+            "(no cap, cache bypassed); already-stored extensions only gain new reviews"
         )
 
     # Friendly preflight for the most common stumble: missing Supabase creds.
