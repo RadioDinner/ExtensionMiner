@@ -76,3 +76,5 @@ While that is running, I want you to fix the categorization in the data that we'
 
 Is this what you were expecting to see for that command? [ran --all-categories --max-extensions 5 --category-scrolls 1 --no-db --refresh; log showed "discovered 5 categories from the store nav" and only 5 categories crawled, 5 ext each]
 
+11. are there outstanding issues
+
