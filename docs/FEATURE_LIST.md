@@ -27,16 +27,51 @@ can drill into any of them.
   to `/reviews/<ext_id>`; a multi-extension point → a small popover/list of the
   extensions at that point, each linking to its detail page.
 
-### 2. 🆕 Opportunity zone: show ALL extensions in the zone + a limit filter
-The **Opportunity zone** card currently caps at ~25 extensions. Let it **display
-every extension that falls in the zone**, and add a **filter/limit control** so
-the user can cap it to a chosen number (e.g. 25) when they want a shorter list.
-- _Hints (user's words):_ "I want the opportunity zone to be more than 25
-  extensions … display all the ones in the zone and then a filter to limit it to
-  a certain amount, like 25."
-- _Impl notes (capture-only, for when it's built):_ the home query currently
-  limits the zone set (server-side) and `OpportunityZoneCard.js` renders/sorts/
-  filters it client-side. Need to (a) raise/remove the server-side cap that
-  feeds the zone, and (b) add a "Show N" limit selector (e.g. 25 / 50 / 100 /
-  All) to the existing filter row so the default stays manageable but the user
-  can expand to the full zone.
+### 2. 🆕 Curate the opportunity zone: dismiss with a reason + auto-backfill to 25
+_(Supersedes the earlier "show more than 25" idea — the user pivoted: instead of
+a longer list, keep a curated **top 25** and let the user prune it.)_
+
+Keep the **Opportunity zone** at a working list of **25**, but let the user
+**remove** an extension that isn't a realistic target and have the zone
+**backfill** with the next-best candidate so the list stays full at 25.
+- **Per-row "Remove from zone" control** on every opportunity-zone row. Clicking
+  it asks for a **reason** from a small preset list:
+  **"Too large"**, **"Too complex"**, **"Uninterested"**, **"Publisher owned"**
+  (e.g. Chrome Remote Desktop — 35M installs, published by Google itself; not a
+  realistic target right now).
+- **Auto-backfill:** when one is removed, pull in the next-highest-ranked
+  extension not already in (or dismissed from) the zone, so the displayed list
+  stays at 25.
+- **Restore / "bring back to the pool":** a way to view dismissed extensions
+  (with their reason) and **un-dismiss** them, returning them to consideration.
+- _Hints (user's words):_ "a button on each row of the extensions in the
+  opportunity zone where I can click 'Remove from zone' and add a cause … options
+  for removal reason 'Too large','Too complex','Uninterested' and 'Publisher
+  owned'. Then … the option to also bring them back to the pool, but whenever one
+  is eliminated from the 25, I want more added to keep a list of 25."
+- _Impl notes (capture-only, for when it's built):_
+  - New persistence: a `zone_exclusions` table (ext_id/extension_id + reason +
+    dismissed_at), service-role only like the rest. **Next migration = 991.**
+  - Writes go through Next.js **server actions** (service-role, server-side
+    only) — same pattern as the deep-dive queue (`app/actions.js`).
+  - The home zone query (`getDashboardData`) excludes dismissed ext_ids and
+    fetches **>25** candidates so it can backfill up to 25 after exclusions.
+  - `OpportunityZoneCard.js` gets the per-row Remove control + a reason picker,
+    plus a "Dismissed" view (list with reason + Restore). Keep existing
+    sort/filter behavior.
+
+### 3. 🆕 Seamless / incremental ranking re-runs (don't re-burn tokens)
+Make re-running the ranking layer **seamless** — today the ranking + monetization
+passes **re-analyze the same top-N every run** (one Claude call each, every time)
+with no diffing, so back-to-back runs re-spend tokens (only the deep-dive pool is
+incremental). Especially relevant now that the zone is curated/backfilled and the
+candidate set shifts.
+- _Hints (user's words):_ "I want the re-run behavior to be more seemless …
+  especially since we're adding in more than 25 opportunity extensions."
+- _Impl notes (capture-only, for when it's built):_ add skip-if-unchanged to
+  `rank_all` / `monetize_all` (e.g. skip an extension whose newest review is
+  older than its existing `opportunities`/`monetization` row's timestamp, or
+  whose review set is unchanged since last scored), with a `--force` flag to
+  override. Optionally prioritize newly-surfaced/backfilled zone extensions. The
+  deep-dive pass is already incremental (only `status='queued'`) — mirror that
+  feel for the core passes.
