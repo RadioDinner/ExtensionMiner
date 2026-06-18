@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, List, Optional, Tuple
 
@@ -55,6 +55,17 @@ class CrawlOptions:
     # extension AND its rating_count hasn't grown since the last scrape, skip the
     # (expensive) review fetch. 0 disables the optimization.
     skip_reviews_if_saved: int = 0
+    # Prefer the Opportunity Zone: before the normal crawl, exhaustively fetch
+    # EVERY review for the extensions currently in the zone (deep-loading review
+    # signal on the exact targets we care about), then continue as usual.
+    prefer_zone: bool = False
+    zone_first_limit: int = 25      # how many current-zone extensions to deep-load
+
+
+# Exhaustive review paging for the zone-first pass: crank the lazy-load so we pull
+# the COMPLETE review list, not just the first few pages.
+ZONE_EXHAUSTIVE_REVIEW_SCROLLS = 40
+ZONE_EXHAUSTIVE_LOAD_MORE_MAX = 1000
 
 
 def should_fetch_reviews(
@@ -330,13 +341,77 @@ def persist(ext: Extension, reviews: List[Review], *, write_db: bool) -> int:
     return written
 
 
+def scrape_zone_first(s: Settings, opts: CrawlOptions, seen: set, bump) -> None:
+    """Deep-load EVERY review for the current Opportunity-Zone extensions, first.
+
+    Runs serially (main thread) before the category crawl. Uses its OWN browser
+    forced to refresh (so it pulls the complete review list, not a partial cached
+    snapshot) with the review paging cranked right up. Scrapes regardless of
+    --skip-existing (deep-loading is the whole point), then adds each id to
+    ``seen`` so the normal crawl doesn't re-scrape it.
+    """
+    from common import db  # lazy: only needed when this mode is on
+
+    try:
+        targets = db.fetch_zone_targets(limit=opts.zone_first_limit)
+    except Exception as exc:  # never let a zone lookup sink the whole crawl
+        log.warning("prefer-zone: couldn't read the Opportunity Zone (%s); skipping the zone pass", exc)
+        return
+    if not targets:
+        log.info("prefer-zone: no Opportunity-Zone extensions found yet — skipping the zone pass")
+        return
+
+    log.info("prefer-zone: deep-loading every review for %d zone extension(s) first", len(targets))
+    zone_opts = replace(
+        opts,
+        refresh=True,
+        review_scrolls=max(opts.review_scrolls, ZONE_EXHAUSTIVE_REVIEW_SCROLLS),
+        load_more_max=max(opts.load_more_max, ZONE_EXHAUSTIVE_LOAD_MORE_MAX),
+        multi_sort=True,
+    )
+    with build_browser(s, zone_opts) as browser:
+        for t in targets:
+            ext_id = t.get("ext_id")
+            if not ext_id:
+                continue
+            try:
+                ext, reviews, _ = scrape_extension(
+                    browser, ext_id, category=None,
+                    review_scrolls=zone_opts.review_scrolls,
+                    multi_sort=True,
+                    load_more_max=zone_opts.load_more_max,
+                    reviews_zone_only=False,    # never gate — we want ALL reviews
+                    should_skip_reviews=None,   # never skip — exhaustive
+                )
+                # Keep the known store category if the detail page didn't yield one.
+                if not ext.store_category and t.get("store_category"):
+                    ext.store_category = t.get("store_category")
+                written = persist(ext, reviews, write_db=opts.write_db)
+            except RobotsDisallowed:
+                log.warning("prefer-zone: robots.txt disallows %s; skipping", ext_id)
+                continue
+            except Exception as exc:  # one bad page must never kill the zone pass
+                log.exception("prefer-zone: failed to deep-load %s: %s", ext_id, exc)
+                continue
+            seen.add(ext_id)  # so the normal crawl skips what we just deep-loaded
+            bump("zone_extensions")
+            bump("extensions")
+            bump("reviews", written if opts.write_db else len(reviews))
+            log.info(
+                "  [zone] %s '%s' rating=%s reviews=%d%s",
+                ext_id, ext.name, ext.rating, len(reviews),
+                "" if opts.write_db else " (dry-run)",
+            )
+
+
 def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = None) -> dict:
     s = settings or default_settings
     opts = opts or CrawlOptions()
     if opts.write_db:
         s.require_supabase()
 
-    stats = {"categories": 0, "ids": 0, "extensions": 0, "reviews": 0, "skipped": 0, "reviews_fresh": 0}
+    stats = {"categories": 0, "ids": 0, "extensions": 0, "reviews": 0, "skipped": 0,
+             "reviews_fresh": 0, "zone_extensions": 0}
     stats_lock = threading.Lock()
 
     def bump(key: str, n: int = 1) -> None:
@@ -364,6 +439,15 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
         seen = db.existing_ext_ids()
         log.info("skip-existing: %d extensions already in the DB will be skipped", len(seen))
     seen_lock = threading.Lock()
+
+    # Prefer the Opportunity Zone: deep-load every review for the current zone
+    # targets FIRST (serial, before the workers), then fall through to the normal
+    # crawl. Needs the DB (the zone is read from Supabase).
+    if opts.prefer_zone:
+        if not opts.write_db:
+            log.info("prefer-zone ignored under --no-db (the zone is read from Supabase)")
+        else:
+            scrape_zone_first(s, opts, seen, bump)
 
     # One rate limiter shared by every worker so the aggregate navigation rate
     # stays polite no matter how high --concurrency goes (see build_worker_browser).

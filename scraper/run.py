@@ -62,6 +62,8 @@ DEFAULT_SCRAPER_SETTINGS = {
     "zone_min": 2.5,
     "zone_max": 3.5,
     "skip_reviews_if_saved": 0,
+    "prefer_zone": False,
+    "zone_first_limit": 25,
 }
 
 # Exit codes the launcher / Task Scheduler can read (0 = success).
@@ -104,6 +106,13 @@ def build_parser() -> argparse.ArgumentParser:
                         "already have >= N reviews saved AND its rating_count hasn't grown "
                         "since the last scrape (no new ratings => no new reviews). 0 = off "
                         "(default). Needs the DB.")
+    p.add_argument("--prefer-zone", action="store_true",
+                   help="before the normal crawl, exhaustively fetch EVERY review for the "
+                        "extensions currently in the Opportunity Zone (read from Supabase), "
+                        "then continue as usual. Needs the DB.")
+    p.add_argument("--zone-first-limit", type=int, default=25, metavar="N",
+                   help="how many current-zone extensions to deep-load with --prefer-zone "
+                        "(default 25).")
     p.add_argument("--no-multi-sort", dest="multi_sort", action="store_false",
                    help="only scrape the default review sort; skip the Recent + Helpful "
                         "re-sort passes that gather past the store's ~10-per-sort cap")
@@ -237,6 +246,8 @@ def options_from_saved(args: argparse.Namespace) -> CrawlOptions:
         zone_min=float(saved["zone_min"]),
         zone_max=float(saved["zone_max"]),
         skip_reviews_if_saved=int(saved["skip_reviews_if_saved"]),
+        prefer_zone=bool(saved["prefer_zone"]),
+        zone_first_limit=int(saved["zone_first_limit"]),
     )
 
 
@@ -288,6 +299,8 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
         skip_existing=args.skip_existing,
         refresh_after_days=args.refresh_after_days,
         skip_reviews_if_saved=args.skip_reviews_if_saved,
+        prefer_zone=args.prefer_zone,
+        zone_first_limit=args.zone_first_limit,
     )
 
 

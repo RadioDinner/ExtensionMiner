@@ -146,6 +146,12 @@ an on-disk HTML cache, robots.txt respected, dedupe on re-runs.
 Full control over the crawl, saved in Supabase (`app_settings.scraper_settings`)
 and read by the scraper with `--use-saved-settings`. Key settings:
 
+- **Prefer the Opportunity Zone (deep-load first)** — before the normal crawl,
+  exhaustively fetch **every** review for the extensions **currently in the zone**
+  (the same curated top-N you see on the dashboard, dismissals + Layer-0 demotion
+  applied), then continue as usual. This is the best way to load real review
+  *signal* onto your actual targets — it's what feeds the ranker, Layer 0, and the
+  deep dives (CLI: `--prefer-zone [--zone-first-limit N]`). Needs the DB.
 - **Only save reviews for in-zone extensions** (the *zone review-gate*) — the big
   speedup. The scraper still reads each extension's cheap detail page, but only
   pays the **expensive review fetch** when the overall rating is inside the zone

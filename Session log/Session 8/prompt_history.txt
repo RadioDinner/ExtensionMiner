@@ -22,3 +22,9 @@ Where are we at on the features? I still don't see a "Publisher" column in the o
 
 5.
 I just ran the ranker and it looks like this [pasted ranker log: full re-run override ON, ranked 25 of 25 candidates by install_count, every extension "skip '<name>' — only 0 reviews (< 5)"; "Top opportunities (0 scored)"; note "0 extensions scored... none have enough reviews yet (--min-reviews=5)"; then proceeded into the monetization pass]
+
+6.
+[Answered the "how to proceed on the 0-reviews issue" question with: "Build scraper prefer-zone".]
+
+7.
+Continue from where you left off.

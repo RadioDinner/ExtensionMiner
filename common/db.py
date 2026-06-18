@@ -309,6 +309,67 @@ def fetch_zone_extensions(limit: int = 25, *, min_rating: float = ZONE_MIN_RATIN
     return res.data or []
 
 
+# How many zone candidates to pull so the curated top-N can survive dismissals +
+# the legitimacy re-rank (mirrors the dashboard's ZONE_FETCH).
+ZONE_CANDIDATE_FETCH = 200
+
+
+def select_zone_targets(
+    candidates: list[dict[str, Any]],
+    dismissed_ids,
+    legitimacy_by_id: dict[int, Any] | None,
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """The curated zone, the same way the dashboard computes it (pure; unit-tested).
+
+    Drops dismissed extensions, then ranks by install_count DEMOTED by Layer 0
+    review legitimacy (install_count * legitimacy; missing legitimacy => neutral
+    x1), and keeps the top ``limit``. So the scraper's "current zone" matches what
+    the user sees on the dashboard.
+    """
+    dismissed = set(dismissed_ids or ())
+    legit = legitimacy_by_id or {}
+    kept = [c for c in candidates if c.get("id") not in dismissed]
+
+    def key(c: dict[str, Any]) -> float:
+        installs = c.get("install_count") or 0
+        lg = legit.get(c.get("id"))
+        mult = 1.0 if lg is None else float(lg)
+        return installs * mult
+
+    kept.sort(key=key, reverse=True)
+    return kept[:limit]
+
+
+def fetch_zone_targets(limit: int = 25) -> list[dict[str, Any]]:
+    """The current curated Opportunity Zone (matches the dashboard) — the scraper's
+    "prefer the zone" targets. Resilient to the optional tables (zone_exclusions
+    990, review_analysis 988) being absent: it just falls back to install order.
+    """
+    candidates = fetch_zone_extensions(limit=ZONE_CANDIDATE_FETCH)
+
+    dismissed: set[int] = set()
+    try:
+        res = get_client().table("zone_exclusions").select("extension_id").limit(5000).execute()
+        dismissed = {r["extension_id"] for r in (res.data or []) if r.get("extension_id") is not None}
+    except Exception:
+        dismissed = set()
+
+    legitimacy: dict[int, Any] = {}
+    try:
+        res = get_client().table("review_analysis").select("extension_id,legitimacy").limit(5000).execute()
+        legitimacy = {
+            r["extension_id"]: r.get("legitimacy")
+            for r in (res.data or [])
+            if r.get("extension_id") is not None
+        }
+    except Exception:
+        legitimacy = {}
+
+    return select_zone_targets(candidates, dismissed, legitimacy, limit=limit)
+
+
 def fetch_reviews_for_layer0(extension_id: int, limit: int = 120) -> list[dict[str, Any]]:
     """Reviews for Layer 0 — includes the helpful flags so it can weight by them."""
     res = (

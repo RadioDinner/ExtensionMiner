@@ -22,11 +22,17 @@ export const DEFAULT_SCRAPER_SETTINGS = {
   zone_min: 2.5,
   zone_max: 3.5,
   skip_reviews_if_saved: 0,
+  prefer_zone: false,
+  zone_first_limit: 25,
 };
 
 // Field metadata drives both the form UI and server-side coercion, so the two
 // can never drift. `type`: bool | int | float | intNull | floatNull | csv.
 export const SCRAPER_FIELDS = [
+  { key: "prefer_zone", type: "bool", label: "Prefer the Opportunity Zone (deep-load first)",
+    help: "Before the normal crawl, exhaustively fetch EVERY review for the extensions currently in the Opportunity Zone, then continue. The best way to load real review signal onto your actual targets (feeds the ranker, Layer 0, and deep dives). Needs the DB." },
+  { key: "zone_first_limit", type: "int", label: "Zone extensions to deep-load",
+    help: "How many of the current zone extensions to exhaustively scrape first (default 25)." },
   { key: "reviews_zone_only", type: "bool", label: "Only save reviews for in-zone extensions",
     help: "Skip the (slow) review fetch for extensions whose overall rating is outside the zone below. Their metadata is still saved." },
   { key: "zone_min", type: "float", label: "Zone min rating", help: "Lower bound of the opportunity zone (stars)." },
