@@ -14,3 +14,8 @@ Add an additional feature to the feature list, I want the scraper to prefer, or 
 
 3.
 i ran the migrations but  Ican t find the reload schema option. Is restrating the project enough? I did that. Go ahead and wire up diagnostics
+
+4.
+I want add an elimination reason to the drop down on the opportunity zone. Name it "Oversaturated" and place it with the "Too complex" and "Uninterested". Also add "Non-English".
+
+Where are we at on the features? I still don't see a "Publisher" column in the opportunity zone

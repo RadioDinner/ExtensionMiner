@@ -210,3 +210,21 @@ ADDENDUM — prompt 3 (session resumed)
 UPDATED STATE: migrations 988 + 989 APPLIED by the user; project restarted. The two
 diagnostics panels are the quick way to confirm Layer 0 rows appear after the next
 ranking run and that Layer 2/3 studies are readable. NEXT NEW migration = 987.
+
+================================================================================
+ADDENDUM — prompt 4
+================================================================================
+4.  "add an elimination reason ... 'Oversaturated' ... with 'Too complex' and
+    'Uninterested'. Also add 'Non-English'." + "Where are we at on features? I still
+    don't see a 'Publisher' column."
+    -> BUILT (commit 1619a03, pushed):
+       • OpportunityZoneCard REASONS now: Too large, Too complex, Oversaturated,
+         Uninterested, Non-English, Publisher owned.
+       • PUBLISHER COLUMN shipped: added `developer` to EXT_COLS (queries.js) and a
+         sortable "Publisher" column in OpportunityZoneCard (after Extension name).
+         This was capture-only item #1 — now built and REMOVED from FEATURE_LIST.md.
+    -> Explained the Publisher column hadn't existed because it was captured (prompt
+       2) as capture-only per CLAUDE.md §6, and prompt 4 was the explicit ask to build.
+
+BACKLOG NOW (docs/FEATURE_LIST.md): 1 item left —
+   #1 Scraper "prefer the Opportunity Zone" mode (capture-only, NOT built).
