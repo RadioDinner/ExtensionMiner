@@ -77,6 +77,38 @@ export default async function Diagnostics() {
     sampleErr = r.error ? r.error.message : null;
   }
 
+  // Deep-dive pool state — this is what decides whether the 🔬 marker can show.
+  // Probed separately from the core tables so a missing/empty 993 never flips the
+  // main verdict to FAIL; it only explains the marker.
+  let deepDive = null;
+  if (supabase) {
+    const counts = {};
+    let readErr = null;
+    for (const st of ["queued", "done", "error"]) {
+      const { count, error } = await supabase
+        .from("deep_dives")
+        .select("*", { count: "exact", head: true })
+        .eq("status", st);
+      if (error) { readErr = error.message; break; }
+      counts[st] = count ?? 0;
+    }
+    // Run the EXACT read the home page uses to place the marker, so a stale
+    // PostgREST schema cache (embed can't resolve) shows up here as an error
+    // instead of silently blanking the 🔬 on the dashboard.
+    let markIds = [];
+    let embedErr = null;
+    if (!readErr) {
+      const e = await supabase
+        .from("deep_dives")
+        .select("extensions(ext_id)")
+        .eq("status", "done")
+        .limit(2000);
+      if (e.error) embedErr = e.error.message;
+      else markIds = (e.data || []).map((d) => d.extensions?.ext_id).filter(Boolean);
+    }
+    deepDive = { counts, readErr, markIds, embedErr };
+  }
+
   const extProbe = probes.find((p) => p.table === "extensions");
   const firstProbeErr = probes.map((p) => p.error).find(Boolean);
 
@@ -198,6 +230,73 @@ export default async function Diagnostics() {
           </table>
         ) : (
           <p className="empty">No rows returned (see the verdict above for why).</p>
+        )}
+      </section>
+
+      <section>
+        <h2>Deep-dive pool (🔬 marker)</h2>
+        <p className="sub">
+          Why the <span className="dd-mark">🔬</span> does / doesn&apos;t appear on the dashboard. The
+          marker only shows for dives that have <strong>completed</strong> (status <code>done</code>),
+          and the home page reads them through the <code>deep_dives → extensions(ext_id)</code> embed
+          tested here.
+        </p>
+        {!supabase ? (
+          <p className="empty">Can&apos;t probe — no client (env vars not set).</p>
+        ) : deepDive.readErr ? (
+          <div className="banner">
+            <span className="status fail">FAIL</span> Couldn&apos;t read <code>deep_dives</code>:{" "}
+            {deepDive.readErr}
+            <br />
+            Apply <code>supabase/migrations/993_deep_dive_pool.sql</code> to this project (then the
+            marker becomes possible once a dive completes).
+          </div>
+        ) : (
+          <>
+            <table>
+              <tbody>
+                <tr><td>Queued (waiting to run)</td><td className="num">{deepDive.counts.queued}</td></tr>
+                <tr><td>Done (these get the 🔬)</td><td className="num">{deepDive.counts.done}</td></tr>
+                <tr><td>Error (failed last run)</td><td className="num">{deepDive.counts.error}</td></tr>
+                <tr>
+                  <td>ext_ids the home page will mark</td>
+                  <td className="num">
+                    {deepDive.embedErr ? <span className="status fail">embed error</span> : deepDive.markIds.length}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div className={`banner diag-summary ${
+              deepDive.embedErr ? "fail"
+              : deepDive.counts.done === 0 ? "warn"
+              : deepDive.markIds.length === deepDive.counts.done ? "ok" : "warn"
+            }`}>
+              {deepDive.embedErr ? (
+                <><Pill verdict="fail" /> {deepDive.counts.done} dive(s) are <code>done</code>, but the
+                home-page embed failed: <em>{deepDive.embedErr}</em>. This is almost always a stale
+                PostgREST schema cache — reload it (Supabase → Project Settings → API → “Reload schema”,
+                or run <code>NOTIFY pgrst, &apos;reload schema&apos;</code>), then refresh the dashboard.</>
+              ) : deepDive.counts.done === 0 ? (
+                <><Pill verdict="warn" /> No completed deep dives yet, so there&apos;s nothing to mark.{" "}
+                {deepDive.counts.queued > 0
+                  ? <>You have {deepDive.counts.queued} <code>queued</code> — run the ranking layer with{" "}
+                    <code>--deep-dive</code> (the “Run ExtensionMiner Ranking” button already includes it)
+                    to complete them.</>
+                  : deepDive.counts.error > 0
+                    ? <>{deepDive.counts.error} dive(s) <code>errored</code> last run — re-queue them and
+                      re-run; check the ranker log for why.</>
+                    : <>Open an extension, click <strong>🔬 Add to deep-dive pool</strong>, then run the
+                      ranking layer with <code>--deep-dive</code>.</>}</>
+              ) : deepDive.markIds.length === deepDive.counts.done ? (
+                <><Pill verdict="ok" /> {deepDive.counts.done} completed dive(s); the dashboard should show
+                a 🔬 on those extensions. If you still don&apos;t see it, hard-refresh the page and confirm
+                Vercel deployed the latest <code>main</code>.</>
+              ) : (
+                <><Pill verdict="warn" /> {deepDive.counts.done} done but only {deepDive.markIds.length}{" "}
+                resolved an <code>ext_id</code> — some completed rows point at extensions missing an ext_id.</>
+              )}
+            </div>
+          </>
         )}
       </section>
 
