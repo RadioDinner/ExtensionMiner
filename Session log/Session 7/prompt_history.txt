@@ -27,3 +27,5 @@ Once your done with these feature list additions, I want to start working on cha
 10. next feature
 
 11. next feature
+
+12. all migrations are run
