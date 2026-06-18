@@ -120,6 +120,8 @@ export default async function Page() {
         <h1>ExtensionMiner</h1>
         <p>Extensions worth building a competitor against — the ~3★ opportunity zone.</p>
         <p className="topnav">
+          <a href="/help">Help / guide →</a>
+          {" · "}
           <a href="/scraper-settings">Scraper settings →</a>
           {" · "}
           <a href="/diagnostics">Diagnostics →</a>

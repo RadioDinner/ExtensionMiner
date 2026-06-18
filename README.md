@@ -3,6 +3,11 @@
 Scrape the **Chrome Web Store**, catalog every extension and its reviews, and
 surface **competitive opportunities** through an interactive dashboard.
 
+> 📖 **New here, or coming back after a while? Read [`docs/GUIDE.md`](./docs/GUIDE.md)** —
+> the complete manual (workflow, how to run it, every dashboard feature, quick
+> tips, troubleshooting, glossary). There's also an in-app version at **`/help`**
+> on the dashboard.
+
 ## The idea
 
 Most extension catalogs tell you what's popular. ExtensionMiner is built to find
