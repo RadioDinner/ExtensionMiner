@@ -31,3 +31,5 @@ Once your done with these feature list additions, I want to start working on cha
 12. all migrations are run
 
 13. I want the "Ratings vs installs" graph to be more visually fluid and beautiful when clicked. Like, when there are multiple extensions that land on the same one, rather than opening a drop down, pop the grid into a more detailed grid of those extensions. Make sense? Good
+
+14. I want this system thorough documented so when I come back to it later, I understand it. Think help menu, documentation, quick tips, how to use x tool, that kind of thing. Build it off all the system prompts and context I've given you. Then write a handoff, merge everything to main and wrap the session
