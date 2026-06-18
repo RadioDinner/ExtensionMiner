@@ -268,8 +268,11 @@ the pricing web-search; `--skip-deep-dive` to skip the pool this run.
 ### Diagnostics (`/diagnostics`)
 Connection check: which env vars/keys are set, per-table row counts + errors, and
 a **Deep-dive pool** panel (queued/done/error counts + the exact embed the home
-page uses) that explains why the 🔬 does or doesn't appear. Your first stop when
-something looks wrong.
+page uses) that explains why the 🔬 does or doesn't appear. Two more panels confirm
+the new migrations applied + the schema cache is fresh: **Layer 0 — review
+legitimacy** (rows screened, how many were demoted for low legitimacy, and the zone
+embed test) and **Deep-dive studies — Layer 2 & 3** (queued/done per layer). Your
+first stop when something looks wrong.
 
 ---
 
