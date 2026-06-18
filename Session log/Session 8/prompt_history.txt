@@ -1,0 +1,13 @@
+1.
+Let's kick off a new session. Session 008. Commit to main for this entire session.
+
+I want to start working on a new feature, building out on the deep dive data. Firstly, I want to make the "Queue Deep Dive" system into layers. What we have as our current deep dive system will be layer 1. Layer 2 will be a study of all existing competitors. I want Layer 2 to use claudes deep research skill to give a comprehensive analysis report of opportunities for specific extensions that I queue for layer 2 research. I want it to take in competitors, highlight their strengths and weaknesses and give more depth to the opportunities.
+
+2.
+Layer 3 of the deep dive tool will cover the financial aspect of the opportunity. I want claude deep research on how the extension makes money, and how competitors are attacking it, if they're offering free alternatives to capture market, etc. Make the deep dive system layers so that you can't run layer 2 without layer 1. And so on.
+
+Actually, I want to add a "pre layer 1" level to the deep dive. Every extension that lands on the opportunity zone should go through "Layer 0" of a pre-emptive deep dive research. It isn't as much of a deep dive as much as it is an analysis of the reviews. I want layer zero to analyize the current reviews, weighted most heavily on recent and most helpful reviews, to tell me WHY the reviews are good or bad. For instance, some extensions go review bombed by kids in school, simply because they hate school. Or some are competitor attacks. Whatever the case, I want the layer zero research to affect what lands on the opportunity zone. If its a bad extension because of things like kids review bombing it, score it lower.
+
+Add the following to the feature list, I want a "Publisher" column on the opportunity zone section of the dashboard.
+
+Add an additional feature to the feature list, I want the scraper to prefer, or have the ability to be set to prefer, the extensions currently in the opportunity zone. I want the scraper to look at the 25 extensions in there currently and then go get every single review for each one on the list before moving on to doing what the scraper does currently.

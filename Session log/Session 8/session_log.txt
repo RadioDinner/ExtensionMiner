@@ -1,0 +1,187 @@
+SESSION 8 — HANDOFF LOG
+=======================
+Date: 2026-06-18 (UTC). WEB session (Claude-Code-on-the-web).
+
+BRANCH / WORKFLOW:
+  - Session was ASSIGNED branch claude/loving-hypatia-ifv9fy. At prompt 1 the user
+    said "Commit to main for this entire session." So ALL work is committed to MAIN.
+  - There was no local `main` branch (only the assigned feature branch was fetched),
+    but origin/main existed at the same commit as HEAD (1cdfca8 = S7 handoff). Created
+    a local `main` at that commit and committed there. NEXT: push origin main.
+  - The assigned branch claude/loving-hypatia-ifv9fy still exists locally/remote but
+    is unused this session (same base commit). Safe to delete from GitHub if desired.
+
+MIGRATIONS: count DOWN from 999. Lowest is now 988. NEXT NEW = 987.
+  Added this session (NOT yet applied by the user — they must run them):
+    989_deep_dive_studies.sql  (Layer 2 + Layer 3 uploads)
+    988_review_analysis.sql    (Layer 0 review-legitimacy)
+  Prior: 999..990 applied. ACTION FOR USER: apply 989 + 988, then reload the
+  PostgREST schema cache (Supabase → API → Reload schema) so the new sections show.
+
+================================================================================
+WHAT THE USER ASKED (prompt by prompt — verbatim in prompt_history.txt)
+================================================================================
+1.  Kick off Session 8; commit to main all session. NEW FEATURE: make "Queue Deep
+    Dive" into LAYERS. Current deep dive = Layer 1. Layer 2 = a study of all
+    competitors using Claude's deep-research skill — a comprehensive opportunity
+    report (competitors + strengths/weaknesses + deeper opportunities).
+    -> Asked 3 clarifying questions. Answers:
+       • L2 engine: SKILL-DRIVEN in a session, BUT generate a paste-able prompt +
+         let the user UPLOAD the PDF export back to the dashboard.
+       • Report shape: narrative report + structured competitors.
+       • L1→L2: INDEPENDENT (L2 does not read L1).
+2.  Expanded the scope mid-build:
+       • Layer 3 = FINANCIAL study (how it makes money; how competitors attack it;
+         free alternatives capturing market). Skill-driven like L2.
+       • GATING: can't run L2 without L1, "and so on" (L3 needs L2).
+       • Layer 0 = a "pre-Layer-1" AUTOMATIC review analysis for every zone
+         extension. Reads reviews (recent + helpful weighted) to explain WHY the
+         rating is good/bad (review-bombing by kids, competitor attacks, etc.) and
+         AFFECTS the zone: review-bombed/illegitimate-bad => score LOWER.
+       • CAPTURE-ONLY (added to docs/FEATURE_LIST.md, NOT built):
+           #1 "Publisher" column on the Opportunity Zone.
+           #2 Scraper "prefer the Opportunity Zone" mode (exhaustively fetch every
+              review for the current 25 zone extensions before the normal crawl).
+
+================================================================================
+WHAT WAS BUILT THIS SESSION (all on main, commit 473abce)
+================================================================================
+THE LAYERED DEEP-DIVE SYSTEM (Layer 0–3; manual layers are sequential/gated):
+
+LAYER 0 — automatic review-legitimacy pre-screen (headless, Claude API, no web):
+  - analysis/layer0.py: Layer0Report (verdict, primary_cause, categories breakdown,
+    summary, sentiment_note, optional legitimacy override). classify_reviews (one
+    review-only Claude call, NO web tools). legitimacy_from_categories (PURE, tested)
+    = share-weighted legitimacy in [0,1] (product_issues=1.0 … review_bombing=0.0;
+    praise excluded). to_review_analysis_row (PURE). _sort_for_weighting orders
+    reviews helpful-then-recent first. layer0_all() runs over the zone, incremental
+    (honors the ranking_force_rerun toggle), writes review_analysis.
+  - common/db.py: fetch_zone_extensions, fetch_reviews_for_layer0 (incl. helpful
+    flags), fetch_review_analyzed_extension_ids, upsert_review_analysis,
+    mark_review_analysis_error. ZONE_MIN/MAX_RATING = 2.5/3.5.
+  - analysis/run.py: runs Layer 0 by DEFAULT when the DB is available (before the
+    deep-dive pool); --skip-layer0 opts out. Honors --force.
+  - migration 988 review_analysis (legitimacy real 0..1, primary_cause, verdict,
+    summary, categories jsonb, sentiment_note, details, status/error).
+  - ZONE EFFECT: dashboard/lib/queries.js getDashboardData fetches review_analysis,
+    attaches legitimacy/primary_cause/verdict to zone candidates, and RE-RANKS the
+    zone by install_count * legitimacy (null legitimacy => neutral x1). So a 3★
+    extension that's only low because it was review-bombed sinks out of the top-25.
+  - OpportunityZoneCard.js: new sortable "Legit" column (legitimacy %, ⚠ + red when
+    < 60%, tooltip = cause + verdict).
+
+LAYER 1 — unchanged (deep_dives pool, analysis/deepdive.py). Now surfaced inside the
+  new layers panel with a status chip + the existing Add/Re-run/Remove button.
+
+LAYER 2 & 3 — skill-driven, upload-backed, GATED (share deep_dive_studies):
+  - migration 989 deep_dive_studies (one row per extension+layer; layer in (2,3);
+    prompt, report_md, summary, recommendation, target_strengths/weaknesses,
+    competitors, opportunities, financials, sources, details, source_filename,
+    parse_warning, status/error). UNIQUE(extension_id, layer).
+  - dashboard/lib/layers.js: LAYER_META (0–3: name/icon/engine/blurb/requires),
+    STUDY_LAYERS, status meta.
+  - dashboard/lib/layerPrompts.js: buildStudyPrompt(ext, layer) — L2 = competitor
+    study, L3 = financial study. Each brief ends with a STRICT JSON block between
+    sentinels (LAYER_JSON_START/END) so the upload can be parsed. KEEP SENTINELS IN
+    SYNC with the parser.
+  - dashboard/lib/layerReport.js: parseStudyReport(rawText) — PURE, robust: tolerant
+    sentinel match, ```json fence stripping, brace-scan fallback, narrative = text
+    minus the block; normalizes competitors (objects OR bare strings) + opportunities
+    + financials + sources. Never throws; sets parse_warning if the block is missing.
+    Verified end-to-end with a Node harness (fence + string-competitor cases pass).
+  - dashboard/app/actions.js: queueStudy(extId,layer) [gated, stores prompt],
+    removeStudy, uploadStudyReport(extId,layer,formData) [gated; PDF via unpdf OR
+    pasted text; parses + upserts done]. Helpers: extForPrompt, prereqDone (L2 needs
+    deep_dives.status='done'; L3 needs deep_dive_studies layer2 status='done').
+  - UI: dashboard/app/reviews/[extId]/StudyLayer.js (client: generate prompt, copy,
+    show prompt, upload PDF / paste, remove) + StudyReport.js (server: summary,
+    verdict, strengths/weaknesses, financials for L3, competitor GRAPH + rich cards
+    incl. positioning/users, opportunities, sources, collapsible full narrative).
+  - reviews/[extId]/page.js: new "🧠 Deep-dive layers" panel (L0 result card, L1
+    button, L2/L3 StudyLayer with lock state) + renders completed L2/L3 StudyReports.
+    Moved the L1 button out of the header into the panel.
+  - dashboard/lib/queries.js getExtensionReviews: now also returns layer0
+    (review_analysis) + studies ({2:row,3:row}); maybeStudies is resilient to 989
+    being absent.
+  - dashboard/next.config.mjs: experimental.serverActions.bodySizeLimit = "15mb"
+    (PDF uploads). package.json: + unpdf ^0.12 (serverless PDF text extraction).
+  - globals.css: styles for .layers-panel/.study-layer/.study-status/.study-report
+    /.study-sw/.study-opps/.study-narrative + .legit-ok/.legit-low.
+
+CAPTURE-ONLY (docs/FEATURE_LIST.md — NOT built, per CLAUDE.md §6):
+  1. Publisher column on the Opportunity Zone.
+  2. Scraper "prefer the Opportunity Zone" mode (exhaustively fetch all reviews for
+     the current 25 zone extensions first).
+
+DOCS: docs/GUIDE.md (§6 Layer 0 pass; §7 the layers panel; §4 migration table; §10
+  data model; troubleshooting rows), dashboard /help (Deep-dive layers card + Run
+  Ranking note), analysis/README.md (layer0.py row + skill-driven note).
+
+================================================================================
+TESTS / BUILD
+================================================================================
+* pytest: 113 passing (S7 = 105; +8 in tests/test_layer0.py covering
+  legitimacy_from_categories, _sort_for_weighting, build_user_prompt,
+  classify_reviews wiring [no web tools], to_review_analysis_row).
+* dashboard `next build`: succeeds. Routes unchanged set: / , /reviews/[extId],
+  /diagnostics, /scraper-settings, /help. unpdf installs + bundles cleanly.
+* JS parser verified via a Node ESM harness (not committed): fence-stripping,
+  bare-string competitors, narrative cleaning, missing-block fallback, and both
+  prompt builders emitting the sentinels (L3 = financial).
+* WEB ENV CAVEAT: fresh container has NO deps. This session pip-installed pytest/
+  pydantic/python-dotenv/bs4/lxml/python-dateutil, and ran `npm install` in
+  dashboard/ (added unpdf). A new container must redo this.
+
+================================================================================
+HOW LAYER 2/3 WORK END-TO-END (the new manual flow)
+================================================================================
+1. Open an extension → "🧠 Deep-dive layers". Layer 2 unlocks once Layer 1 is done.
+2. Click "Generate research prompt" → "Copy research prompt".
+3. Paste it into a Claude session with the DEEP-RESEARCH SKILL; run it.
+4. Export the result as a PDF; back on the dashboard, upload the PDF (or paste the
+   report text). The report MUST end with the JSON block the prompt specifies
+   (between ===EXTENSIONMINER-JSON=== … ===END-EXTENSIONMINER-JSON===).
+5. The page renders the report + structured competitors/opportunities. Layer 3
+   (financial) unlocks once Layer 2 is done; same flow.
+
+================================================================================
+OPEN ITEMS / FOR NEXT SESSION
+================================================================================
+1. APPLY MIGRATIONS 989 + 988, then reload the PostgREST schema cache. Until then
+   the Layer 0 column / Layer 2-3 panel degrade to empty (resilient by design).
+2. VERIFY ON LIVE DATA (never possible in the web env):
+   - Run the ranker → Layer 0 writes review_analysis; confirm a review-bombed
+     extension shows low "Legit" and drops in the zone order.
+   - Layer 2/3: generate prompt → run deep research → upload a real PDF; confirm
+     unpdf extracts text and the JSON block parses (the paste box is the fallback).
+3. CAPTURE-ONLY backlog now has 2 items (Publisher column; scraper prefer-zone).
+   Build only when the user explicitly asks.
+4. POSSIBLE POLISH (not requested): add Layer 0 / Layer 2-3 counts to /diagnostics;
+   make Layer 0 a soft prerequisite hint before Layer 1; store the uploaded PDF in
+   Supabase Storage (today only extracted text is kept); let zone re-rank optionally
+   HARD-exclude very-low-legitimacy extensions instead of only demoting.
+
+================================================================================
+KEY CONTEXT / GOTCHAS
+================================================================================
+* WORKFLOW: commit DIRECTLY to main (user instruction, prompt 1). Push origin main.
+* Migrations count DOWN; lowest is 988; NEXT NEW = 987.
+* LAYER GATING lives in TWO places — server actions (prereqDone) AND the page UI
+  (locked flags). L2 needs deep_dives done; L3 needs deep_dive_studies(layer2) done.
+* PROMPT/PARSER SENTINELS: lib/layerPrompts.js (LAYER_JSON_START/END) and
+  lib/layerReport.js MUST agree. If you change the prompt's JSON schema, the parser
+  reads keys generically (summary/recommendation/target_*/competitors/opportunities/
+  financials/sources) — add new keys there + render them in StudyReport.js.
+* Layer 0 is REVIEW-ONLY (no web_search) — cheap. It honors the same
+  ranking_force_rerun toggle as the ranker (incremental by default).
+* ZONE RE-RANK multiplier = install_count * legitimacy; no Layer 0 row => x1 (never
+  penalised). This is the ONLY thing that reorders the zone besides dismissals.
+* RESILIENCE PATTERN (unchanged): all optional tables (review_analysis 988,
+  deep_dive_studies 989, plus the older ones) are fetched OUTSIDE the home-page
+  error gate / via maybeStudies, so a missing migration degrades to empty, not a
+  500. Reload the schema cache if a new section stays blank after applying.
+* unpdf is dynamically imported inside the upload action (serverless-safe). PDF
+  uploads need next.config serverActions.bodySizeLimit (set to 15mb).
+* Egress: Chrome Web Store = 403 in the web env (scraper runs locally). Anthropic
+  API + PyPI + npm reachable here (tests/build/Layer 0/1 ranking run fine).
+* DOCS: docs/GUIDE.md is canonical; /help is the in-app version — keep both current.
