@@ -51,6 +51,10 @@ class CrawlOptions:
     reviews_zone_only: bool = False
     zone_min: float = 2.5
     zone_max: float = 3.5
+    # Freshness skip: if we already have >= this many reviews saved for an
+    # extension AND its rating_count hasn't grown since the last scrape, skip the
+    # (expensive) review fetch. 0 disables the optimization.
+    skip_reviews_if_saved: int = 0
 
 
 def should_fetch_reviews(
@@ -68,6 +72,29 @@ def should_fetch_reviews(
     if rating is None:
         return False
     return zone_min <= float(rating) <= zone_max
+
+
+def reviews_are_fresh(
+    current_rating_count: Optional[int],
+    prior_rating_count: Optional[int],
+    saved_review_count: Optional[int],
+    *,
+    min_saved: int,
+) -> bool:
+    """Can we skip the review fetch because we already have them and nothing's new?
+
+    True (skip) only when the feature is enabled (``min_saved`` > 0), we already
+    have at least ``min_saved`` reviews saved, and the store's rating_count hasn't
+    grown since our last scrape (new ratings are the proxy for new reviews). Any
+    unknown count → False (fetch, to be safe). Pure; unit-tested.
+    """
+    if min_saved <= 0:
+        return False
+    if saved_review_count is None or saved_review_count < min_saved:
+        return False
+    if current_rating_count is None or prior_rating_count is None:
+        return False
+    return current_rating_count <= prior_rating_count
 
 
 def build_browser(s: Settings, opts: CrawlOptions) -> CWSBrowser:
@@ -192,6 +219,7 @@ def scrape_extension(
     reviews_zone_only: bool = False,
     zone_min: float = 2.5,
     zone_max: float = 3.5,
+    should_skip_reviews=None,
 ) -> Tuple[Extension, List[Review], List[str]]:
     """Scrape one extension. Returns (extension, reviews, related_ext_ids).
 
@@ -201,6 +229,11 @@ def scrape_extension(
     When ``reviews_zone_only`` is set, the (expensive) review sub-page is only
     fetched for extensions whose overall rating is in [zone_min, zone_max];
     out-of-zone extensions return no reviews (metadata is still scraped).
+
+    ``should_skip_reviews``, if given, is called with the freshly-parsed
+    ``Extension`` AFTER the zone gate; returning True skips the review fetch (used
+    for the "we already have its reviews and nothing's new" optimization). The
+    callback owns any DB lookup, keeping this function free of DB imports.
     """
     # Detail page: metadata + description. Reviews are NOT here.
     html, text = browser.fetch(
@@ -228,6 +261,12 @@ def scrape_extension(
             "  %s rating=%s outside zone [%s, %s] — skipping reviews",
             ext_id, ext.rating, zone_min, zone_max,
         )
+        return ext, [], related
+
+    # Freshness skip: we already have this extension's reviews and there's no sign
+    # of new ones (caller decides, via a cheap DB lookup).
+    if should_skip_reviews is not None and should_skip_reviews(ext):
+        log.debug("  %s reviews already saved and no new ratings — skipping reviews", ext_id)
         return ext, [], related
 
     # Reviews live on a dedicated sub-page; the store caps each sort at ~10, so we
@@ -297,7 +336,7 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
     if opts.write_db:
         s.require_supabase()
 
-    stats = {"categories": 0, "ids": 0, "extensions": 0, "reviews": 0, "skipped": 0}
+    stats = {"categories": 0, "ids": 0, "extensions": 0, "reviews": 0, "skipped": 0, "reviews_fresh": 0}
     stats_lock = threading.Lock()
 
     def bump(key: str, n: int = 1) -> None:
@@ -385,6 +424,29 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
     # drain the frontier in parallel. Concurrency overlaps the slow on-page work
     # (scroll / "Load more" / "Show more"); the shared rate limiter keeps the
     # request rate polite.
+    # Freshness skip: when enabled (and writing to the DB), a cheap per-extension
+    # lookup lets us skip re-fetching reviews we already have when no new ratings
+    # have appeared. Built once; the closure counts each skip into stats.
+    skip_reviews_pred = None
+    if opts.skip_reviews_if_saved > 0 and opts.write_db:
+        from common import db  # lazy: only needed when the optimization is on
+
+        def skip_reviews_pred(ext: Extension) -> bool:
+            try:
+                prior = db.fetch_review_freshness(ext.ext_id)
+            except Exception as exc:  # a lookup hiccup must never skip a real fetch
+                log.debug("freshness lookup failed for %s (%s); fetching reviews", ext.ext_id, exc)
+                return False
+            if prior is None:
+                return False
+            fresh = reviews_are_fresh(
+                ext.rating_count, prior.get("rating_count"), prior.get("review_count"),
+                min_saved=opts.skip_reviews_if_saved,
+            )
+            if fresh:
+                bump("reviews_fresh")
+            return fresh
+
     def process_one(browser: CWSBrowser, ext_id: str, category: Optional[str]) -> None:
         with seen_lock:
             if ext_id in seen:
@@ -398,6 +460,7 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
                 load_more_max=opts.load_more_max,
                 reviews_zone_only=opts.reviews_zone_only,
                 zone_min=opts.zone_min, zone_max=opts.zone_max,
+                should_skip_reviews=skip_reviews_pred,
             )
             written = persist(ext, reviews, write_db=opts.write_db)
         except RobotsDisallowed:

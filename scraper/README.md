@@ -65,6 +65,15 @@ passes) / `--review-scrolls`.
 > inside the zone (default 2.5–3.5★). Out-of-zone extensions still get their
 > metadata + rating snapshot saved, so they're tracked and can re-qualify later —
 > you just skip the bulk of review fetches. Set it in the Scraper settings tab.
+>
+> **Skip already-saved reviews** (`--skip-reviews-if-saved N`, or the *“Skip
+> reviews if ≥ N already saved”* setting). Before fetching reviews, the scraper
+> checks (one cheap query) whether it already has ≥ N saved reviews for the
+> extension **and** the store's `rating_count` hasn't grown since the last scrape
+> — if so, there are no new ratings (hence no new reviews) and it skips the fetch.
+> Great for repeat/refresh crawls: only extensions with fresh activity re-fetch
+> reviews. The run summary reports how many were skipped this way
+> (`reviews_fresh`). 0 = off.
 
 > Concurrency: `--concurrency N` runs N browser workers that drain the discovery
 > frontier in parallel (default **1**; **4** under `--preset daily`). Each worker

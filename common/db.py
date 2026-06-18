@@ -237,6 +237,30 @@ def fetch_monetized_extension_ids() -> set[int]:
     return _fetch_extension_ids("monetization")
 
 
+def fetch_review_freshness(ext_id: str) -> dict[str, Any] | None:
+    """Prior state for one extension, to decide if its reviews are worth re-fetching.
+
+    Returns ``{"rating_count": <last stored>, "review_count": <reviews we've saved>}``
+    for the extension, or ``None`` if we've never stored it. ``review_count`` rides
+    in on PostgREST's ``reviews(count)`` embedded aggregate, so it's one query.
+    """
+    res = (
+        get_client()
+        .table("extensions")
+        .select("rating_count,reviews(count)")
+        .eq("ext_id", ext_id)
+        .limit(1)
+        .execute()
+    )
+    rows = res.data or []
+    if not rows:
+        return None
+    row = rows[0]
+    embed = row.get("reviews") or []
+    review_count = embed[0].get("count", 0) if embed else 0
+    return {"rating_count": row.get("rating_count"), "review_count": review_count or 0}
+
+
 def fetch_reviews_for_extension(extension_id: int, limit: int = 120) -> list[dict[str, Any]]:
     """Most recent reviews for one extension (recent reviews carry the live signal)."""
     res = (

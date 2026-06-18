@@ -21,6 +21,7 @@ export const DEFAULT_SCRAPER_SETTINGS = {
   reviews_zone_only: false,
   zone_min: 2.5,
   zone_max: 3.5,
+  skip_reviews_if_saved: 0,
 };
 
 // Field metadata drives both the form UI and server-side coercion, so the two
@@ -30,6 +31,8 @@ export const SCRAPER_FIELDS = [
     help: "Skip the (slow) review fetch for extensions whose overall rating is outside the zone below. Their metadata is still saved." },
   { key: "zone_min", type: "float", label: "Zone min rating", help: "Lower bound of the opportunity zone (stars)." },
   { key: "zone_max", type: "float", label: "Zone max rating", help: "Upper bound of the opportunity zone (stars)." },
+  { key: "skip_reviews_if_saved", type: "int", label: "Skip reviews if ≥ N already saved",
+    help: "Speed: skip the review fetch when we already have ≥ N saved reviews for an extension AND its rating count hasn't grown since the last scrape (no new ratings → no new reviews). 0 = off. Try 10." },
   { key: "categories", type: "csv", label: "Categories", help: "Comma-separated category slugs (e.g. productivity/tools, lifestyle/shopping). Leave blank to use the scraper's configured default categories." },
   { key: "all_categories", type: "bool", label: "Crawl ALL categories", help: "Discover and crawl the whole store taxonomy (ignores the Categories list above). Big run." },
   { key: "max_extensions", type: "int", label: "Max extensions / category", help: "0 = no cap. The interactive default is 25." },

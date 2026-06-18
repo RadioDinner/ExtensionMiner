@@ -339,6 +339,77 @@ def test_scrape_extension_zone_gate_skips_reviews(monkeypatch):
     assert "REVIEW_SORTS" in fetched
 
 
+def test_reviews_are_fresh_logic():
+    from scraper.crawl import reviews_are_fresh
+
+    # Feature off (min_saved 0) -> never skip.
+    assert reviews_are_fresh(100, 100, 50, min_saved=0) is False
+    # Not enough saved yet -> fetch.
+    assert reviews_are_fresh(100, 100, 3, min_saved=10) is False
+    # Enough saved + rating_count steady (or dropped) -> skip.
+    assert reviews_are_fresh(100, 100, 50, min_saved=10) is True
+    assert reviews_are_fresh(98, 100, 50, min_saved=10) is True
+    # New ratings appeared -> fetch.
+    assert reviews_are_fresh(120, 100, 50, min_saved=10) is False
+    # Any unknown count -> fetch (be safe).
+    assert reviews_are_fresh(None, 100, 50, min_saved=10) is False
+    assert reviews_are_fresh(100, None, 50, min_saved=10) is False
+    assert reviews_are_fresh(100, 100, None, min_saved=10) is False
+
+
+def test_skip_reviews_if_saved_wires_through():
+    assert build_parser().parse_args([]).skip_reviews_if_saved == 0
+    assert CrawlOptions().skip_reviews_if_saved == 0
+    assert build_parser().parse_args(["--skip-reviews-if-saved", "10"]).skip_reviews_if_saved == 10
+    assert resolve_options(
+        build_parser().parse_args(["--skip-reviews-if-saved", "10"])
+    ).skip_reviews_if_saved == 10
+
+
+def test_scrape_extension_freshness_skip(monkeypatch):
+    import scraper.crawl as crawlmod
+    from scraper.models import Extension
+
+    fetched = []
+
+    class _Cache:
+        def has(self, *a, **k):
+            return False
+
+        def get(self, *a, **k):
+            return None
+
+    class _Browser:
+        refresh = True
+        cache = _Cache()
+
+        def fetch(self, url, **kw):
+            fetched.append(url)
+            return "<html></html>", ""
+
+        def fetch_review_sorts(self, *a, **k):
+            fetched.append("REVIEW_SORTS")
+            return []
+
+    monkeypatch.setattr(
+        crawlmod.parse, "parse_detail",
+        lambda html, ext_id, page_text=None: Extension(ext_id=ext_id, name="X", rating=3.0, rating_count=100),
+    )
+    # Predicate says "skip" -> reviews sub-page is never fetched.
+    _, reviews, _ = crawlmod.scrape_extension(
+        _Browser(), "a" * 32, category="productivity/tools", should_skip_reviews=lambda e: True
+    )
+    assert reviews == []
+    assert "REVIEW_SORTS" not in fetched
+
+    # Predicate says "don't skip" -> reviews ARE fetched.
+    fetched.clear()
+    crawlmod.scrape_extension(
+        _Browser(), "a" * 32, category="productivity/tools", should_skip_reviews=lambda e: False
+    )
+    assert "REVIEW_SORTS" in fetched
+
+
 def test_use_saved_settings_flag_parses():
     assert build_parser().parse_args([]).use_saved_settings is False
     assert build_parser().parse_args(["--use-saved-settings"]).use_saved_settings is True
@@ -352,6 +423,7 @@ def test_options_from_saved_maps_settings(monkeypatch):
         "max_extensions": 7, "concurrency": 3, "reviews_zone_only": True,
         "zone_min": 2.0, "zone_max": 4.0, "categories": "a/b, c/d",
         "rate_limit_seconds": 1.5, "refresh_after_days": 10, "all_categories": True,
+        "skip_reviews_if_saved": 8,
     }
     monkeypatch.setattr(dbmod, "get_setting", lambda key, default=None: saved)
     args = runmod.build_parser().parse_args(["--use-saved-settings"])
@@ -364,6 +436,7 @@ def test_options_from_saved_maps_settings(monkeypatch):
     assert opts.rate_limit_seconds == 1.5
     assert opts.refresh_after_days == 10
     assert opts.all_categories is True
+    assert opts.skip_reviews_if_saved == 8
 
 
 def test_options_from_saved_falls_back_to_defaults(monkeypatch):

@@ -61,6 +61,7 @@ DEFAULT_SCRAPER_SETTINGS = {
     "reviews_zone_only": False,
     "zone_min": 2.5,
     "zone_max": 3.5,
+    "skip_reviews_if_saved": 0,
 }
 
 # Exit codes the launcher / Task Scheduler can read (0 = success).
@@ -98,6 +99,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--load-more-max", type=int, default=40, metavar="N",
                    help="max 'Load more' clicks per review sort, to paginate past the "
                         "first ~10 (default 40; 0 disables)")
+    p.add_argument("--skip-reviews-if-saved", type=int, default=0, metavar="N",
+                   help="speed: skip the (expensive) review fetch for an extension when we "
+                        "already have >= N reviews saved AND its rating_count hasn't grown "
+                        "since the last scrape (no new ratings => no new reviews). 0 = off "
+                        "(default). Needs the DB.")
     p.add_argument("--no-multi-sort", dest="multi_sort", action="store_false",
                    help="only scrape the default review sort; skip the Recent + Helpful "
                         "re-sort passes that gather past the store's ~10-per-sort cap")
@@ -230,6 +236,7 @@ def options_from_saved(args: argparse.Namespace) -> CrawlOptions:
         reviews_zone_only=bool(saved["reviews_zone_only"]),
         zone_min=float(saved["zone_min"]),
         zone_max=float(saved["zone_max"]),
+        skip_reviews_if_saved=int(saved["skip_reviews_if_saved"]),
     )
 
 
@@ -280,6 +287,7 @@ def resolve_options(args: argparse.Namespace) -> CrawlOptions:
         respect_robots=not args.no_robots,
         skip_existing=args.skip_existing,
         refresh_after_days=args.refresh_after_days,
+        skip_reviews_if_saved=args.skip_reviews_if_saved,
     )
 
 

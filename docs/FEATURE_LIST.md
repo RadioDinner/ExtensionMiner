@@ -69,26 +69,7 @@ Keep the **Opportunity zone** at a working list of **25**, but let the user
     plus a "Dismissed" view (list with reason + Restore). Keep existing
     sort/filter behavior.
 
-### 3. 🆕 Faster scraper
-Make the scraper **a little faster**. The user's suggested lever: **check first
-whether an extension's reviews are already saved** and skip the (expensive)
-review fetch when nothing new is needed.
-- _Hints (user's words):_ "I want to make the scraper a little faster too. What
-  are my options to speed it up? Check first to see if reviews are saved?"
-- _Impl notes (capture-only, for when it's built):_ the slow part is the **review
-  sub-page** (multi-sort Recent+Helpful, up to `--load-more-max` clicks, review
-  scrolls) — the detail page is cheap. Speed levers that already exist:
-  `--concurrency` (overlaps on-page work), `--skip-existing` / `--refresh-after-
-  days` (don't re-scrape extensions already stored/fresh), the on-disk HTML cache,
-  and trimming `--review-scrolls` / `--load-more-max` / `--no-multi-sort`. The big
-  new idea = a **per-extension "do we already have its reviews?" check** before
-  fetching reviews (e.g. skip the review fetch if we have ≥N saved reviews and the
-  rating_count hasn't grown since `last_scraped`), and the **opportunity-zone
-  review gate** (see the active scraper work — only fetch/save reviews when the
-  rating is in-zone), which together avoid most review fetches. The lower-level
-  knob is `rate_limit_seconds` (politeness vs. speed).
-
-### 4. 🆕 Deep-dive status column in the extension list (4 icons)
+### 3. 🆕 Deep-dive status column in the extension list (4 icons)
 In the **list of extensions**, add a **"Deep dive" status column** with **4
 distinct icons**, one per state:
 1. **Queued** — in the deep-dive pool, not yet researched.
