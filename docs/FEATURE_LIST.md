@@ -26,6 +26,14 @@ can drill into any of them.
   when points are bucketed/clustered). A single-extension point → link straight
   to `/reviews/<ext_id>`; a multi-extension point → a small popover/list of the
   extensions at that point, each linking to its detail page.
+- **Expandable / resizable card** (added per the user): make the *Rating vs
+  installs* card **expandable to fill a larger space** — open it up to see more
+  detail (a bigger plot, more readable points), or shrink it back to take up less
+  room. _User's words:_ "I want that to be expandable to fill a larger space.
+  Then I can open it to see more detail or make it smaller to make it take up less
+  space." _Impl note:_ an expand/collapse toggle on the card (e.g. a normal vs.
+  full-width/taller mode, or a modal "expanded" view); the scatter SVG should
+  re-fit to the larger box. Pairs naturally with the clickable-points work above.
 
 ### 2. 🆕 Curate the opportunity zone: dismiss with a reason + auto-backfill to 25
 _(Supersedes the earlier "show more than 25" idea — the user pivoted: instead of
@@ -60,3 +68,38 @@ Keep the **Opportunity zone** at a working list of **25**, but let the user
   - `OpportunityZoneCard.js` gets the per-row Remove control + a reason picker,
     plus a "Dismissed" view (list with reason + Restore). Keep existing
     sort/filter behavior.
+
+### 3. 🆕 Faster scraper
+Make the scraper **a little faster**. The user's suggested lever: **check first
+whether an extension's reviews are already saved** and skip the (expensive)
+review fetch when nothing new is needed.
+- _Hints (user's words):_ "I want to make the scraper a little faster too. What
+  are my options to speed it up? Check first to see if reviews are saved?"
+- _Impl notes (capture-only, for when it's built):_ the slow part is the **review
+  sub-page** (multi-sort Recent+Helpful, up to `--load-more-max` clicks, review
+  scrolls) — the detail page is cheap. Speed levers that already exist:
+  `--concurrency` (overlaps on-page work), `--skip-existing` / `--refresh-after-
+  days` (don't re-scrape extensions already stored/fresh), the on-disk HTML cache,
+  and trimming `--review-scrolls` / `--load-more-max` / `--no-multi-sort`. The big
+  new idea = a **per-extension "do we already have its reviews?" check** before
+  fetching reviews (e.g. skip the review fetch if we have ≥N saved reviews and the
+  rating_count hasn't grown since `last_scraped`), and the **opportunity-zone
+  review gate** (see the active scraper work — only fetch/save reviews when the
+  rating is in-zone), which together avoid most review fetches. The lower-level
+  knob is `rate_limit_seconds` (politeness vs. speed).
+
+### 4. 🆕 Deep-dive status column in the extension list (4 icons)
+In the **list of extensions**, add a **"Deep dive" status column** with **4
+distinct icons**, one per state:
+1. **Queued** — in the deep-dive pool, not yet researched.
+2. **Done** — deep dive completed (today's 🔬).
+3. **Errored** — the deep dive failed on its last run.
+4. **Not queued / not in pool** — never added to the pool.
+- _Hints (user's words):_ "a deep dive complete column. I want 3 unique icons.
+  Queued, Done, and not queued or not in queue or not done. Actually make it 4
+  icons. Add one for errored out deep dives."
+- _Impl notes (capture-only, for when it's built):_ `deep_dives.status` already
+  has exactly `queued` / `done` / `error` (migration 993); "not queued" = no row.
+  The home query currently only fetches `status='done'` ext_ids (for the 🔬) —
+  it'd fetch the **status per ext_id** instead and the tables would render a
+  status icon column (with a legend), reusing the existing `.dd-mark` styling.
