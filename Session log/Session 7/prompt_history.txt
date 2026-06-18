@@ -5,3 +5,5 @@
 3. A feature to the feature list. On the dashboard, the "rating vs installs" card, I want to be able to click the circles and have it load into the extension that the data circle represents, or the group of extensions that are represented in the data.
 
 Add a second feature, I want the opportunity zone to be more than 25 extensions. I want it to be able to display all the ones in the zone adn then a filter to limit it to a certain amount, like 25.
+
+4. I am curious, for the ranking layer, what does it do, in order that it does it? If I run the ranking layer, and then immediately run it again, does it burn more tokens? or does it check for what is different?
