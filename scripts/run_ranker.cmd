@@ -40,18 +40,21 @@ REM  EDITABLE KNOBS
 REM  RUN_ARGS     - what to run. Default = ALL Claude tasks on the top 25
 REM                 extensions by installs: ranking (--> opportunities),
 REM                 monetization research (--monetize --> monetization) AND the
-REM                 deep-dive pool (--deep-dive --> deep_dives). Tweak it:
+REM                 deep-dive pool (--> deep_dives, processed by default). Runs are
+REM                 INCREMENTAL: only newly added extensions are analyzed unless the
+REM                 dashboard "Ranking mode" toggle is set to a full re-run. Tweak it:
 REM                   --limit 50      do more extensions
+REM                   --force         full re-run across the top-N (ignore the toggle)
 REM                   (drop --monetize) ranking only, no web-search/pricing pass
-REM                   (drop --deep-dive) skip the queued deep-dive pool
+REM                   --skip-deep-dive  skip the queued deep-dive pool this run
 REM                   --no-db         dry run, write nothing
-REM                 Heads-up: --monetize and --deep-dive web-search per extension,
-REM                 so they cost more and take longer than ranking alone. The
-REM                 deep dive only touches extensions you queued on the dashboard.
+REM                 Heads-up: --monetize and the deep-dive pool web-search per
+REM                 extension, so they cost more and take longer than ranking alone.
+REM                 The deep dive only touches extensions you queued on the dashboard.
 REM  AUTO_UPDATE  - 1 = git pull the latest code before running; 0 = don't.
 REM  UPDATE_BRANCH- which branch to track (main is the canonical, current one).
 REM ===========================================================================
-set "RUN_ARGS=--monetize --deep-dive --log-dir logs"
+set "RUN_ARGS=--monetize --log-dir logs"
 set "AUTO_UPDATE=1"
 set "UPDATE_BRANCH=main"
 

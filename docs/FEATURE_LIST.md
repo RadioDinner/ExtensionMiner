@@ -51,7 +51,8 @@ Keep the **Opportunity zone** at a working list of **25**, but let the user
   is eliminated from the 25, I want more added to keep a list of 25."
 - _Impl notes (capture-only, for when it's built):_
   - New persistence: a `zone_exclusions` table (ext_id/extension_id + reason +
-    dismissed_at), service-role only like the rest. **Next migration = 991.**
+    dismissed_at), service-role only like the rest. **Next migration = 990**
+    (991 is now used by `app_settings`).
   - Writes go through Next.js **server actions** (service-role, server-side
     only) — same pattern as the deep-dive queue (`app/actions.js`).
   - The home zone query (`getDashboardData`) excludes dismissed ext_ids and
@@ -59,19 +60,3 @@ Keep the **Opportunity zone** at a working list of **25**, but let the user
   - `OpportunityZoneCard.js` gets the per-row Remove control + a reason picker,
     plus a "Dismissed" view (list with reason + Restore). Keep existing
     sort/filter behavior.
-
-### 3. 🆕 Seamless / incremental ranking re-runs (don't re-burn tokens)
-Make re-running the ranking layer **seamless** — today the ranking + monetization
-passes **re-analyze the same top-N every run** (one Claude call each, every time)
-with no diffing, so back-to-back runs re-spend tokens (only the deep-dive pool is
-incremental). Especially relevant now that the zone is curated/backfilled and the
-candidate set shifts.
-- _Hints (user's words):_ "I want the re-run behavior to be more seemless …
-  especially since we're adding in more than 25 opportunity extensions."
-- _Impl notes (capture-only, for when it's built):_ add skip-if-unchanged to
-  `rank_all` / `monetize_all` (e.g. skip an extension whose newest review is
-  older than its existing `opportunities`/`monetization` row's timestamp, or
-  whose review set is unchanged since last scored), with a `--force` flag to
-  override. Optionally prioritize newly-surfaced/backfilled zone extensions. The
-  deep-dive pass is already incremental (only `status='queued'`) — mirror that
-  feel for the core passes.

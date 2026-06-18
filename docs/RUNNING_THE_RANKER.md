@@ -18,6 +18,24 @@ over the extensions + reviews you've scraped, in one click:
 It's a separate step from scraping — run the **scraper first** so there are
 reviews to analyze, then run this.
 
+### Incremental by default (re-runs are cheap)
+Runs are **incremental**: the ranking and monetization passes only analyze
+**newly added extensions** (ones without an `opportunities` / `monetization` row
+yet), and the deep-dive pass only touches what you queued. So **re-running right
+after a run burns no tokens** on extensions already done — it just picks up
+anything new. The mode is controlled by a **toggle saved in Supabase**
+(`app_settings.ranking_force_rerun`), flipped from the dashboard's **"Ranking
+mode"** control on the home page:
+
+- **⚡ Incremental — new only** (default): score only newly added extensions.
+- **🔁 Full re-run (override ON)**: re-analyze the **whole top-N**, overwriting
+  existing scores/pricing. Flip it on, run once, flip it back.
+
+The Python launcher reads that toggle at run time. To force a full re-run from
+the command line regardless of the toggle, pass **`--force`**. (The deep-dive
+pool is always queue-driven — to re-run a finished dive, re-queue it from its
+detail page.)
+
 > Why a desktop button and not a dashboard button? The ranker is Python and calls
 > the Anthropic API once per extension (slow), which can't run on Vercel. So it
 > runs on your machine, where your `ANTHROPIC_API_KEY` lives.
@@ -49,16 +67,20 @@ touches extensions you queued. To change that, edit the `RUN_ARGS` line near the
 top of `scripts\run_ranker.cmd`, or run by hand:
 
 ```bat
-.venv\Scripts\python.exe run_ranker.py --monetize --deep-dive --log-dir logs :: the default (rank + monetize + deep-dive pool)
-.venv\Scripts\python.exe run_ranker.py --log-dir logs              :: ranking only (no web-search passes)
+.venv\Scripts\python.exe run_ranker.py --monetize --log-dir logs   :: the default (rank + monetize + deep-dive pool)
+.venv\Scripts\python.exe run_ranker.py --skip-deep-dive --log-dir logs :: ranking only (no web-search passes)
+.venv\Scripts\python.exe run_ranker.py --monetize --force          :: full re-run across the whole top-N
 .venv\Scripts\python.exe run_ranker.py --limit 50 --monetize       :: do more extensions
 .venv\Scripts\python.exe run_ranker.py --limit 5 --no-db --monetize :: dry run, no writes
 ```
 
-> Heads-up: `--monetize` and `--deep-dive` web-search per extension, so the full
-> run costs more and takes longer than ranking alone. Drop them from `RUN_ARGS`
-> if you want the button to do ranking only. (`--deep-dive` only researches the
-> extensions you queued, so it's cheap unless the pool is large.)
+> Heads-up: `--monetize` and the deep-dive pool web-search per extension, so the
+> full run costs more and takes longer than ranking alone. Add `--skip-deep-dive`
+> / drop `--monetize` from `RUN_ARGS` if you want the button to do ranking only.
+> (The deep-dive pool only researches the extensions you queued, so it's cheap
+> unless the pool is large; runs are incremental, so re-runs don't re-pay for
+> extensions already done unless you flip the **Ranking mode** toggle to a full
+> re-run or pass `--force`.)
 
 ### Handy flags
 | Flag | What it does |
@@ -67,7 +89,9 @@ top of `scripts\run_ranker.cmd`, or run by hand:
 | `--min-reviews N` | Skip extensions with fewer than N saved reviews. Default 5. |
 | `--max-reviews N` | How many reviews to send Claude per extension. Default 120. |
 | `--monetize` | Also research each extension's **pricing / revenue** (web search) and write the `monetization` table the dashboard shows. |
-| `--deep-dive` | Also process the **deep-dive pool** — comprehensively research (reviews + competitors) each extension you queued on the dashboard, writing the `deep_dives` table. Needs the DB (ignored with `--no-db`). |
+| `--force` | Ignore the dashboard toggle and force a **full re-run** across the whole top-N — re-analyze (and re-monetize) even extensions already done. Without it, runs are incremental (new only). |
+| `--deep-dive` | *(now on by default)* Process the **deep-dive pool**. Kept for back-compat; the pool is processed automatically whenever the DB is available. |
+| `--skip-deep-dive` | Do **not** process the deep-dive pool this run. |
 | `--no-db` | Dry run: analyze + score, but don't write `opportunities`. |
 | `--model NAME` | Anthropic model (default `ANTHROPIC_MODEL` or `claude-opus-4-8`). |
 | `--log-dir logs` | Also write a timestamped log file. |

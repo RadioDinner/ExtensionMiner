@@ -2,6 +2,7 @@ import { getDashboardData } from "../lib/queries";
 import { RatingHistogram, OpportunityScatter } from "./charts";
 import OpportunitiesCard from "./OpportunitiesCard";
 import OpportunityZoneCard from "./OpportunityZoneCard";
+import RankingModeToggle from "./RankingModeToggle";
 import ReviewList from "./ReviewList";
 
 // Always render at request time so the build never needs Supabase credentials.
@@ -158,6 +159,8 @@ export default async function Page() {
         <div className="stat"><div className="n">{fmt(d.counts.reviews)}</div><div className="l">reviews</div></div>
         <div className="stat zone"><div className="n">{fmt(d.opportunityZone.length)}</div><div className="l">in the opportunity zone</div></div>
       </div>
+
+      {d.configured ? <RankingModeToggle initial={d.rankingForceRerun} /> : null}
 
       <section className="charts-section">
         <div className="charts">

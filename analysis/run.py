@@ -45,9 +45,15 @@ def build_parser() -> argparse.ArgumentParser:
                    help="also research each extension's monetization (pricing / revenue) with web "
                         "search and write the monetization table (see analysis/monetize.py)")
     p.add_argument("--deep-dive", action="store_true",
-                   help="also process the deep-dive pool: comprehensively research each extension "
-                        "the dashboard queued (reviews + competitors) and write the deep_dives "
-                        "table (see analysis/deepdive.py). Needs the DB (ignored with --no-db).")
+                   help="(now on by default; kept for back-compat) process the deep-dive pool.")
+    p.add_argument("--skip-deep-dive", action="store_true",
+                   help="do NOT process the deep-dive queue this run (it is processed by default "
+                        "whenever the DB is available; the queue is opt-in per extension).")
+    p.add_argument("--force", action="store_true",
+                   help="ignore the dashboard toggle and force a FULL re-run across the whole "
+                        "top-N — re-analyze (and re-monetize) even extensions already scored. "
+                        "Without this, runs are incremental: only newly added extensions are "
+                        "analyzed (the dashboard 'Ranking mode' toggle controls the default).")
     p.add_argument("--log-level", default="INFO")
     p.add_argument("--log-dir", metavar="DIR", default=None,
                    help="also write a timestamped log file into DIR (e.g. 'logs'). The "
@@ -109,6 +115,9 @@ def main(argv=None) -> int:
             )
             return EXIT_NO_SUPABASE
 
+    # --force overrides the saved toggle; otherwise rank_all reads it from Supabase.
+    force = True if args.force else None
+
     try:
         rows = rank_all(
             settings,
@@ -117,6 +126,7 @@ def main(argv=None) -> int:
             max_reviews=args.max_reviews,
             write_db=not args.no_db,
             model=args.model,
+            force=force,
         )
     except KeyboardInterrupt:
         log.warning("interrupted by user")
@@ -142,13 +152,21 @@ def main(argv=None) -> int:
 
         log.info("researching monetization for up to %d extensions (web search)", args.limit)
         try:
-            money = monetize_all(settings, limit=args.limit, write_db=not args.no_db, model=args.model)
+            money = monetize_all(
+                settings, limit=args.limit, write_db=not args.no_db, model=args.model, force=force
+            )
             print(f"\nMonetization researched: {len(money)} extensions.")
         except Exception as exc:  # never let monetization sink an otherwise-good ranking run
             log.warning("monetization pass skipped (%s)", exc)
 
-    # Optional: process the hand-picked deep-dive pool (needs the DB to read the queue).
-    if args.deep_dive and not args.no_db:
+    # Process the hand-picked deep-dive pool by default (it's inherently incremental
+    # — only status='queued' rows are touched). Needs the DB to read the queue.
+    if args.no_db:
+        if args.deep_dive:
+            log.info("deep-dive pool ignored under --no-db (the queue lives in Supabase)")
+    elif args.skip_deep_dive:
+        log.info("skipping the deep-dive pool this run (--skip-deep-dive)")
+    else:
         from .deepdive import deep_dive_all
 
         log.info("processing the deep-dive pool (reviews + competitor research, web search)")
@@ -157,8 +175,6 @@ def main(argv=None) -> int:
             print(f"\nDeep dives completed: {len(dives)} (from the queued pool).")
         except Exception as exc:  # never let the deep dive sink an otherwise-good run
             log.warning("deep-dive pass skipped (%s)", exc)
-    elif args.deep_dive and args.no_db:
-        log.info("--deep-dive ignored under --no-db (the pool/queue lives in Supabase)")
 
     return EXIT_OK
 

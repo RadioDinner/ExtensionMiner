@@ -142,7 +142,15 @@ def monetize_all(
     limit: int = 25,
     write_db: bool = True,
     model: Optional[str] = None,
+    force: Optional[bool] = None,
 ) -> List[Dict[str, Any]]:
+    """Research monetization for the top-N extensions.
+
+    Incremental like the ranker: ``force`` None reads the dashboard toggle
+    (``ranking_force_rerun``); False skips extensions that already have a
+    ``monetization`` row; True re-researches the whole top-N. Under ``--no-db``
+    it defaults to True.
+    """
     s = settings or default_settings
     model = model or s.anthropic_model
     s.require_anthropic()
@@ -150,10 +158,23 @@ def monetize_all(
         s.require_supabase()
 
     from common import db  # lazy: only needed when actually run
+    from .rank import select_for_analysis
+
+    if force is None:
+        force = db.get_ranking_force_rerun() if write_db else True
+
+    candidates = db.fetch_extensions_for_analysis(limit=limit)
+    done_ids = set() if (force or not write_db) else db.fetch_monetized_extension_ids()
+    todo = select_for_analysis(candidates, done_ids, force=force)
+    log.info(
+        "monetization: %d of %d candidates (%s)",
+        len(todo), len(candidates),
+        "full re-run — override ON" if force else "incremental — newly added only",
+    )
 
     client = get_anthropic_client()
     rows: List[Dict[str, Any]] = []
-    for ext in db.fetch_extensions_for_analysis(limit=limit):
+    for ext in todo:
         try:
             profile = research_monetization(client, ext, model=model)
         except Exception as exc:  # one bad extension shouldn't kill the run

@@ -142,6 +142,51 @@ def insert_rating_snapshot(row: dict[str, Any]) -> dict[str, Any]:
     return res.data[0] if res.data else {}
 
 
+# --- App settings (small shared key/value config) ---------------------------
+
+RANKING_FORCE_RERUN_KEY = "ranking_force_rerun"
+
+
+def get_setting(key: str, default: Any = None) -> Any:
+    """Read one app_settings JSON value, or `default` if absent/unreadable.
+
+    Resilient by design: if migration 991 isn't applied yet (table missing) the
+    read fails and we fall back to `default`, so the ranking layer still runs.
+    """
+    try:
+        res = (
+            get_client()
+            .table("app_settings")
+            .select("value")
+            .eq("key", key)
+            .limit(1)
+            .execute()
+        )
+    except Exception:  # table not there yet, network, etc. — degrade to default
+        return default
+    rows = res.data or []
+    if not rows:
+        return default
+    value = rows[0].get("value")
+    return default if value is None else value
+
+
+def set_setting(key: str, value: Any) -> dict[str, Any]:
+    """Upsert one app_settings key (value is stored as JSONB)."""
+    res = (
+        get_client()
+        .table("app_settings")
+        .upsert({"key": key, "value": value}, on_conflict="key")
+        .execute()
+    )
+    return res.data[0] if res.data else {}
+
+
+def get_ranking_force_rerun() -> bool:
+    """Is the dashboard's "full re-run" override turned on? (default False)."""
+    return bool(get_setting(RANKING_FORCE_RERUN_KEY, False))
+
+
 # --- Ranking layer reads/writes --------------------------------------------
 
 def fetch_extensions_for_analysis(limit: int = 25) -> list[dict[str, Any]]:
@@ -155,6 +200,40 @@ def fetch_extensions_for_analysis(limit: int = 25) -> list[dict[str, Any]]:
         .execute()
     )
     return res.data or []
+
+
+def _fetch_extension_ids(table: str) -> set[int]:
+    """All extension_ids present in `table` (paginated). Empty set if unreadable.
+
+    Used to make the ranking/monetization passes incremental — these are the
+    extensions already done, so a normal run can skip them. Resilient to a missing
+    optional table (e.g. monetization before migration 995): returns an empty set
+    so "nothing done yet" -> everything is treated as new.
+    """
+    ids: set[int] = set()
+    try:
+        client = get_client()
+        start, page = 0, 1000
+        while True:
+            res = client.table(table).select("extension_id").range(start, start + page - 1).execute()
+            rows = res.data or []
+            ids.update(r["extension_id"] for r in rows if r.get("extension_id") is not None)
+            if len(rows) < page:
+                break
+            start += page
+    except Exception:
+        return set()
+    return ids
+
+
+def fetch_scored_extension_ids() -> set[int]:
+    """extension_ids that already have an `opportunities` row (already ranked)."""
+    return _fetch_extension_ids("opportunities")
+
+
+def fetch_monetized_extension_ids() -> set[int]:
+    """extension_ids that already have a `monetization` row (already researched)."""
+    return _fetch_extension_ids("monetization")
 
 
 def fetch_reviews_for_extension(extension_id: int, limit: int = 120) -> list[dict[str, Any]]:

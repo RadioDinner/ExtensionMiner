@@ -12,6 +12,7 @@ const EMPTY = {
   monetization: {},
   deepDived: [],
   points: [],
+  rankingForceRerun: false,
 };
 
 // Monetization columns we surface in the tables (keyed by ext_id below).
@@ -43,7 +44,7 @@ export async function getDashboardData() {
   if (!supabase) return EMPTY;
 
   try {
-    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money, deepDives] = await Promise.all([
+    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money, deepDives, settings] = await Promise.all([
       supabase
         .from("extensions")
         .select(EXT_SELECT)
@@ -94,13 +95,19 @@ export async function getDashboardData() {
         .select("extensions(ext_id)")
         .eq("status", "done")
         .limit(2000),
+      supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "ranking_force_rerun")
+        .limit(1),
     ]);
 
     // Surface the first real error (e.g. schema not applied yet) without crashing.
-    // `helpful`, `money` and `deepDives` are intentionally excluded: they read
-    // columns/tables (reviews.helpful_ranked, monetization, deep_dives) that only
-    // exist once migrations 996 / 995 / 993 are applied, so a missing one degrades
-    // to an empty section instead of erroring the whole page.
+    // `helpful`, `money`, `deepDives` and `settings` are intentionally excluded:
+    // they read columns/tables (reviews.helpful_ranked, monetization, deep_dives,
+    // app_settings) that only exist once migrations 996 / 995 / 993 / 991 are
+    // applied, so a missing one degrades to an empty section / default instead of
+    // erroring the whole page.
     const firstError = [zone, lowest, highest, opps, points, extCount, revCount]
       .map((r) => r.error)
       .find(Boolean);
@@ -115,6 +122,9 @@ export async function getDashboardData() {
     // ext_ids that have a completed deep dive — to flag them in the lists.
     const deepDived = (deepDives.data || []).map((d) => d.extensions?.ext_id).filter(Boolean);
 
+    // The ranking-layer override toggle (default OFF when 991 isn't applied).
+    const rankingForceRerun = Boolean(settings.data?.[0]?.value);
+
     return {
       configured: true,
       error: firstError ? firstError.message : null,
@@ -127,6 +137,7 @@ export async function getDashboardData() {
       monetization,
       deepDived,
       points: points.data || [],
+      rankingForceRerun,
     };
   } catch (err) {
     return { ...EMPTY, configured: true, error: String(err && err.message ? err.message : err) };

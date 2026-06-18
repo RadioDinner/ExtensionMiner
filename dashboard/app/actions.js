@@ -32,6 +32,24 @@ export async function queueDeepDive(extId) {
   }
 }
 
+// Toggle the ranking-layer override. Persisted in Supabase (app_settings) so the
+// Python ranking layer reads it at run time: ON = full re-run across the top-N,
+// OFF = incremental (only newly added extensions). Server-side only.
+export async function setRankingForceRerun(value) {
+  const supabase = getServerClient();
+  if (!supabase) return { ok: false, error: "Supabase isn't configured." };
+  try {
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert({ key: "ranking_force_rerun", value: Boolean(value) }, { onConflict: "key" });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/");
+    return { ok: true, value: Boolean(value) };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+}
+
 // Remove an extension from the deep-dive pool entirely.
 export async function removeDeepDive(extId) {
   const supabase = getServerClient();

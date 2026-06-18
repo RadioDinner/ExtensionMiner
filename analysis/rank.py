@@ -252,6 +252,25 @@ def to_opportunity_row(
     }
 
 
+def select_for_analysis(
+    candidates: List[Dict[str, Any]], done_ids, *, force: bool
+) -> List[Dict[str, Any]]:
+    """Which candidates to actually send to Claude.
+
+    ``force`` True  -> the whole candidate list (a full re-run "across the board",
+                       driven by the dashboard's override toggle).
+    ``force`` False -> only the *newly added* ones: candidates whose extension id
+                       isn't in ``done_ids`` (the set already scored), so a re-run
+                       burns no tokens on extensions we've already analyzed.
+
+    Pure (no DB / network) so it's unit tested directly.
+    """
+    if force:
+        return list(candidates)
+    done = set(done_ids or ())
+    return [e for e in candidates if e.get("id") not in done]
+
+
 def get_anthropic_client():
     default_settings.require_anthropic()
     import anthropic  # lazy: tests pass a fake client and never import this
@@ -280,7 +299,16 @@ def rank_all(
     max_reviews: int = 120,
     write_db: bool = True,
     model: Optional[str] = None,
+    force: Optional[bool] = None,
 ) -> List[Dict[str, Any]]:
+    """Score the top-N extensions.
+
+    ``force`` controls incremental vs. full re-run:
+      * None  -> read the dashboard toggle from Supabase (``ranking_force_rerun``);
+                 under ``--no-db`` there's no toggle, so it defaults to True.
+      * True  -> re-analyze the whole top-N, overwriting existing rows.
+      * False -> only the newly added extensions (no ``opportunities`` row yet).
+    """
     s = settings or default_settings
     model = model or s.anthropic_model
     s.require_anthropic()
@@ -289,9 +317,22 @@ def rank_all(
 
     from common import db  # lazy: only needed when actually run
 
+    # Decide the run mode. The dashboard's saved toggle wins unless force is given.
+    if force is None:
+        force = db.get_ranking_force_rerun() if write_db else True
+
+    candidates = db.fetch_extensions_for_analysis(limit=limit)
+    done_ids = set() if (force or not write_db) else db.fetch_scored_extension_ids()
+    todo = select_for_analysis(candidates, done_ids, force=force)
+    log.info(
+        "ranking %d of %d candidates (%s)",
+        len(todo), len(candidates),
+        "full re-run — override ON" if force else "incremental — newly added only",
+    )
+
     client = get_anthropic_client()
     rows: List[Dict[str, Any]] = []
-    for ext in db.fetch_extensions_for_analysis(limit=limit):
+    for ext in todo:
         reviews = db.fetch_reviews_for_extension(ext["id"], limit=max_reviews)
         if len(reviews) < min_reviews:
             log.info("skip '%s' — only %d reviews (< %d)", ext.get("name"), len(reviews), min_reviews)

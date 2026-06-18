@@ -20,10 +20,28 @@ opportunities  (score, top complaint, WTP evidence, brief)  → Supabase
 |------|------|
 | `schema.py` | Pydantic structured-output schema for Claude |
 | `prompt.py` | System + per-extension user prompt |
-| `rank.py` | `analyze_extension` (the one Claude call) + `score_opportunity` (pure, tested) + `rank_all` orchestration |
+| `rank.py` | `analyze_extension` (the one Claude call) + `score_opportunity` (pure, tested) + `select_for_analysis` (incremental selector, pure) + `rank_all` orchestration |
 | `monetize.py` | Monetization research: `research_monetization` (one **web-search** Claude call → `MonetizationProfile`) + `monetize_all`; writes the `monetization` table the dashboard shows |
 | `deepdive.py` | **Deep-dive pool**: `research_deep_dive` (one web-search call → `DeepDiveReport`: reviews + competitors + verdict) + `deep_dive_all`; processes only the extensions queued from the dashboard, writes the `deep_dives` table |
-| `run.py` | CLI (`python -m analysis.run`; `--monetize` and `--deep-dive` add those passes) |
+| `run.py` | CLI (`python -m analysis.run`; `--monetize` adds pricing research; the deep-dive pool runs by default; `--force` forces a full re-run) |
+
+### Incremental runs + the dashboard override toggle
+
+Runs are **incremental by default**: `rank_all` only analyzes **newly added
+extensions** (candidates with no `opportunities` row yet) and `monetize_all` only
+researches those without a `monetization` row, so re-running right after a run
+costs **no tokens** for extensions already done. The selection is a pure,
+unit-tested helper — `select_for_analysis(candidates, done_ids, force=…)`.
+
+A **toggle saved in Supabase** controls the default: `app_settings.
+ranking_force_rerun` (migration **991**), flipped from the dashboard's **"Ranking
+mode"** control (server action → service-role write). `rank_all`/`monetize_all`
+read it at run time (`db.get_ranking_force_rerun()`); when **on**, they re-run the
+**whole top-N**, overwriting existing rows. The CLI `--force` flag forces a full
+re-run regardless of the toggle (under `--no-db` there's no toggle, so it defaults
+to a full pass). The deep-dive pool is always queue-driven (inherently
+incremental) and is processed by default whenever the DB is available
+(`--skip-deep-dive` opts out).
 
 ### Monetization (is it making money?)
 
@@ -49,7 +67,7 @@ click **"🔬 Add to deep-dive pool"**; that queues a row in `deep_dives`
 
 ```bash
 python -m analysis.deepdive               # process everything queued
-python -m analysis.run --deep-dive        # rank, then also process the pool
+python -m analysis.run                     # rank (incremental) + process the pool
 ```
 
 Each queued extension gets one web-search-backed Claude call → `DeepDiveReport`
@@ -57,8 +75,8 @@ Each queued extension gets one web-search-backed Claude call → `DeepDiveReport
 weaknesses, the opportunity, and a build/maybe/avoid verdict), written back to
 its `deep_dives` row and shown on the detail page — the competitors render as an
 Obsidian-style **force-directed graph** (drag nodes; click one to open its page)
-plus a detail list. The "Run Ranking" desktop button runs this pass too
-(`--deep-dive`).
+plus a detail list. The "Run Ranking" desktop button runs this pass too (the
+deep-dive pool is processed by default).
 
 ### Extension detail digest (`/reviews/<ext_id>`)
 

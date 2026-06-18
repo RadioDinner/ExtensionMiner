@@ -9,6 +9,7 @@ from analysis.rank import (
     recency_factor,
     recency_weight,
     score_opportunity,
+    select_for_analysis,
     to_opportunity_row,
     trend_signal,
 )
@@ -216,6 +217,29 @@ def test_decline_bonus_raises_score_and_lands_in_row():
     assert row["decline_score"] == 0.8
     assert row["recent_rating"] == 2.1 and row["baseline_rating"] == 3.4
     assert row["complaint_trend"] == 0.5
+
+
+def test_select_for_analysis_incremental_skips_already_done():
+    candidates = [{"id": 1}, {"id": 2}, {"id": 3}]
+    done = {1, 3}
+    # Incremental: only the newly added one (id 2) is sent to Claude.
+    todo = select_for_analysis(candidates, done, force=False)
+    assert [e["id"] for e in todo] == [2]
+
+
+def test_select_for_analysis_force_runs_everything():
+    candidates = [{"id": 1}, {"id": 2}, {"id": 3}]
+    done = {1, 2, 3}
+    # Override ON: the whole candidate list, even though all are already done.
+    todo = select_for_analysis(candidates, done, force=True)
+    assert [e["id"] for e in todo] == [1, 2, 3]
+
+
+def test_select_for_analysis_handles_empty_done():
+    candidates = [{"id": 1}, {"id": 2}]
+    # First run ever (nothing scored) -> everything is "new".
+    assert select_for_analysis(candidates, set(), force=False) == candidates
+    assert select_for_analysis(candidates, None, force=False) == candidates
 
 
 def test_build_user_prompt_includes_reviews():
