@@ -173,7 +173,7 @@ export default async function Page() {
             <p className="sub">Where the catalog sits. Gold bars are the 2.5–3.5★ zone.</p>
             <div className="chart"><RatingHistogram points={d.points} /></div>
           </div>
-          <ScatterCard points={d.points} />
+          <ScatterCard points={d.points} deepDiveStatus={d.deepDiveStatus} />
         </div>
         <div className="legend">
           <span><span className="dot gold" /> Opportunity zone (2.5–3.5★)</span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { deepDiveMeta } from "../lib/deepDive";
 
 // Theme colors mirror globals.css (CSS vars don't resolve in SVG attributes).
 const ACCENT = "#5b8cff";
@@ -63,9 +64,10 @@ function buildClusters(pts, x, y, cell) {
 // One SVG scatter (used at two sizes). Self-contained: it owns the popover that
 // opens when you click a circle holding more than one extension; a single-
 // extension circle navigates straight to that extension's page.
-function Scatter({ points, width, height, big }) {
+function Scatter({ points, width, height, big, deepDiveStatus }) {
   const router = useRouter();
   const [selected, setSelected] = useState(null); // a cluster, or null
+  const ddStatus = deepDiveStatus || {};
 
   const pts = useMemo(
     () =>
@@ -187,31 +189,39 @@ function Scatter({ points, width, height, big }) {
       </svg>
 
       {selected && (
-        <>
-          <div className="scatter-backdrop" onClick={() => setSelected(null)} />
-          <div
-            className="scatter-pop"
-            style={{ left: `${(selected.cx / width) * 100}%`, top: `${(selected.cy / height) * 100}%` }}
-          >
-            <div className="scatter-pop-head">
-              <strong>{selected.items.length} extensions here</strong>
-              <button className="btn-link" onClick={() => setSelected(null)}>close</button>
-            </div>
-            <ul className="scatter-pop-list">
-              {selected.items.slice(0, 12).map((p) => (
-                <li key={p.ext_id}>
-                  <a href={reviewHref(p.ext_id)}>{p.name || p.ext_id}</a>
-                  <span className="scatter-pop-meta">
-                    {Number(p.rating).toFixed(1)}★ · {fmtCompact(p.install_count)}
-                  </span>
-                </li>
-              ))}
-              {selected.items.length > 12 && (
-                <li className="scatter-pop-more">+{selected.items.length - 12} more</li>
-              )}
-            </ul>
+        <div
+          className="scatter-detail"
+          style={{ "--pop-origin": `${(selected.cx / width) * 100}% ${(selected.cy / height) * 100}%` }}
+        >
+          <div className="scatter-detail-head">
+            <strong>
+              {selected.items.length} extensions
+              <span className="scatter-detail-sub">
+                {" "}· near {Number(selected.rep.rating).toFixed(1)}★ · {fmtCompact(selected.rep.install_count)} installs
+              </span>
+            </strong>
+            <button className="btn-expand" onClick={() => setSelected(null)} title="Back to the chart">✕ Back to chart</button>
           </div>
-        </>
+          <div className="scatter-detail-grid">
+            {selected.items.map((p) => {
+              const inZone = Number(p.rating) >= ZONE_MIN && Number(p.rating) <= ZONE_MAX;
+              const m = deepDiveMeta(ddStatus[p.ext_id]);
+              return (
+                <a key={p.ext_id} className={`mini-card${inZone ? " zone" : ""}`} href={reviewHref(p.ext_id)}>
+                  <div className="mini-top">
+                    <span className="mini-name">{p.name || p.ext_id}</span>
+                    <span className={`dd-status ${m.cls}`} title={m.title}>{m.icon}</span>
+                  </div>
+                  <div className="mini-meta">
+                    <span className="mini-rating">{Number(p.rating).toFixed(1)}★</span>
+                    <span>{fmtCompact(p.install_count)} installs</span>
+                    {p.rating_count ? <span>{fmtCompact(p.rating_count)} ratings</span> : null}
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -220,7 +230,7 @@ function Scatter({ points, width, height, big }) {
 // The card: a normal-size scatter inline, with an Expand button that opens a
 // large, more-detailed view in a modal (click points there too). Replaces the
 // old server-rendered OpportunityScatter so it can be interactive.
-export default function ScatterCard({ points }) {
+export default function ScatterCard({ points, deepDiveStatus }) {
   const [expanded, setExpanded] = useState(false);
 
   // Close the modal on Escape.
@@ -242,7 +252,7 @@ export default function ScatterCard({ points }) {
         </div>
         <button className="btn-expand" onClick={() => setExpanded(true)} title="Expand for a larger, more detailed view">⤢ Expand</button>
       </div>
-      <div className="chart"><Scatter points={points} width={480} height={300} big={false} /></div>
+      <div className="chart"><Scatter points={points} width={480} height={300} big={false} deepDiveStatus={deepDiveStatus} /></div>
 
       {expanded && (
         <div className="scatter-modal-backdrop" onClick={() => setExpanded(false)}>
@@ -251,7 +261,7 @@ export default function ScatterCard({ points }) {
               <h3>Rating vs. installs — expanded</h3>
               <button className="btn-expand" onClick={() => setExpanded(false)} title="Close (Esc)">✕ Close</button>
             </div>
-            <Scatter points={points} width={760} height={520} big={true} />
+            <Scatter points={points} width={760} height={520} big={true} deepDiveStatus={deepDiveStatus} />
           </div>
         </div>
       )}

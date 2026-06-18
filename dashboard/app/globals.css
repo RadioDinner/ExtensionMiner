@@ -86,19 +86,42 @@ section .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
 .btn-expand:hover { color: var(--text); border-color: var(--accent); }
 .scatter-wrap { position: relative; }
 .scatter-pt:hover circle { stroke: #fff; stroke-width: 1; }
-/* transparent layer that closes the popover on an outside click */
-.scatter-backdrop { position: absolute; inset: 0; z-index: 1; }
-.scatter-pop {
-  position: absolute; z-index: 2; transform: translate(-50%, 10px);
-  min-width: 200px; max-width: 280px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  padding: 10px 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, .45);
+
+/* Clicking a stacked point "pops" the chart open into a detailed grid of just
+   those extensions — grows from the clicked spot, then settles. */
+@keyframes scatter-pop-in {
+  from { opacity: 0; transform: scale(0.72); }
+  60%  { opacity: 1; transform: scale(1.015); }
+  to   { opacity: 1; transform: scale(1); }
 }
-.scatter-pop-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
-.scatter-pop-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; }
-.scatter-pop-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 3px 0; }
-.scatter-pop-meta { color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.scatter-pop-more { color: var(--muted); font-size: 12px; }
+.scatter-detail {
+  position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter: blur(2px);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, var(--line)); border-radius: 12px;
+  padding: 12px 14px; overflow: hidden;
+  transform-origin: var(--pop-origin, 50% 50%);
+  animation: scatter-pop-in .19s cubic-bezier(.2, .8, .3, 1.1);
+}
+.scatter-detail-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.scatter-detail-head strong { font-size: 14px; }
+.scatter-detail-sub { color: var(--muted); font-weight: 400; }
+.scatter-detail-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px; overflow: auto; padding-right: 2px;
+}
+.mini-card {
+  display: block; background: var(--panel-2); border: 1px solid var(--line);
+  border-left: 3px solid var(--accent); border-radius: 10px; padding: 9px 11px;
+  text-decoration: none; transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+.mini-card.zone { border-left-color: var(--gold); }
+.mini-card:hover { transform: translateY(-2px); background: var(--panel); border-color: var(--accent); text-decoration: none; }
+.mini-card.zone:hover { border-color: var(--gold); }
+.mini-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mini-name { color: var(--text); font-weight: 600; font-size: 13px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.mini-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mini-rating { color: var(--gold); font-weight: 700; }
 /* expanded modal */
 .scatter-modal-backdrop {
   position: fixed; inset: 0; z-index: 50; padding: 24px;

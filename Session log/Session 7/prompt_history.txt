@@ -29,3 +29,5 @@ Once your done with these feature list additions, I want to start working on cha
 11. next feature
 
 12. all migrations are run
+
+13. I want the "Ratings vs installs" graph to be more visually fluid and beautiful when clicked. Like, when there are multiple extensions that land on the same one, rather than opening a drop down, pop the grid into a more detailed grid of those extensions. Make sense? Good
