@@ -158,6 +158,14 @@ a:hover { text-decoration: underline; }
 .pill { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
 /* Marks extensions that have a completed deep dive. */
 .dd-mark { margin-left: 6px; font-size: 12px; cursor: help; vertical-align: 1px; }
+/* Deep-dive status column (4 icons: done / queued / error / none). */
+.dd-col { text-align: center; width: 1%; white-space: nowrap; }
+th.dd-col { text-align: center; }
+.dd-status { font-size: 14px; cursor: help; }
+.dd-status.dd-none { opacity: .3; font-size: 12px; }
+.legend-dd { color: var(--muted); font-size: 12px; }
+.legend-dd .dd-status { margin: 0 2px 0 8px; }
+.legend-dd .dd-status:first-of-type { margin-left: 4px; }
 
 /* Decline / complaint-trend signal */
 .trend-down { color: #f87171; font-weight: 700; font-variant-numeric: tabular-nums; }

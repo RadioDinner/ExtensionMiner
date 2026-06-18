@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { deepDiveMeta } from "../lib/deepDive";
 
 // Complaint types come from the ranking schema (opportunities.complaint_type).
 const COMPLAINT_TYPES = ["all", "bug", "missing_feature", "pricing", "abandonment", "other"];
@@ -51,7 +52,7 @@ function recencyCell(w) {
 
 // Interactive "Scored opportunities" card: filter by complaint type + paid/unpaid,
 // sort by score. All client-side over the rows the server already fetched.
-export default function OpportunitiesCard({ rows, monetization, deepDived }) {
+export default function OpportunitiesCard({ rows, monetization, deepDiveStatus }) {
   const [type, setType] = useState("all");
   const [pricing, setPricing] = useState("all");
   const [sort, setSort] = useState("score-desc");
@@ -62,7 +63,7 @@ export default function OpportunitiesCard({ rows, monetization, deepDived }) {
   }
 
   const money = monetization || {};
-  const dd = new Set(deepDived || []);
+  const dd = deepDiveStatus || {};
   const filtered = rows
     .filter((r) => {
       if (type !== "all" && r.complaint_type !== type) return false;
@@ -126,6 +127,7 @@ export default function OpportunitiesCard({ rows, monetization, deepDived }) {
               <th className="num" title="Recency of the complaints behind the score">Recency</th>
               <th className="num" title="Is the extension getting worse? (recent reviews vs. baseline)">Trend</th>
               <th>Pricing</th>
+              <th className="dd-col" title="Deep-dive status">Deep dive</th>
             </tr>
           </thead>
           <tbody>
@@ -134,16 +136,14 @@ export default function OpportunitiesCard({ rows, monetization, deepDived }) {
               return (
                 <tr key={i}>
                   <td className="num">{r.score == null ? "—" : Number(r.score).toFixed(1)}</td>
-                  <td>
-                    {reviewLinkFor(r.extensions?.ext_id, r.extensions?.name)}
-                    {dd.has(r.extensions?.ext_id) ? <span className="dd-mark" title="Deep-dive researched">🔬</span> : null}
-                  </td>
+                  <td>{reviewLinkFor(r.extensions?.ext_id, r.extensions?.name)}</td>
                   <td>{r.top_complaint || "—"}</td>
                   <td><span className="pill">{r.complaint_type || "—"}</span></td>
                   <td>{r.fixable || "—"}</td>
                   <td className="num">{recencyCell(r.recency_weight)}</td>
                   <td className="num">{trendCell(r)}</td>
                   <td>{m && m.pricing_model ? <span className="pill" title={m.monetization_summary || ""}>{m.pricing_model}</span> : "—"}</td>
+                  <td className="dd-col">{(() => { const meta = deepDiveMeta(dd[r.extensions?.ext_id]); return <span className={`dd-status ${meta.cls}`} title={meta.title}>{meta.icon}</span>; })()}</td>
                 </tr>
               );
             })}

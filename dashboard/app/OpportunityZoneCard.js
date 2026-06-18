@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { dismissFromZone, restoreToZone } from "./actions";
+import { deepDiveMeta, DEEP_DIVE_RANK } from "../lib/deepDive";
 
 // Preset reasons for dismissing an extension from the zone (user-defined set).
 const REASONS = ["Too large", "Too complex", "Uninterested", "Publisher owned"];
@@ -49,12 +50,7 @@ function moneyStatus(m) {
 // Every column: how to read its value (for sorting) and render its cell. One
 // source of truth drives both the header and the body.
 const COLUMNS = [
-  { key: "name", label: "Extension", num: false, get: (r) => (r.name || r.ext_id || "").toLowerCase(), cell: (r, _money, dd) => (
-      <>
-        {reviewLink(r)}
-        {dd && dd.has(r.ext_id) ? <span className="dd-mark" title="Deep-dive researched">🔬</span> : null}
-      </>
-    ) },
+  { key: "name", label: "Extension", num: false, get: (r) => (r.name || r.ext_id || "").toLowerCase(), cell: (r) => reviewLink(r) },
   { key: "category", label: "Category", num: false, get: (r) => r.store_category, cell: (r) => <span className="pill">{r.store_category || "—"}</span> },
   { key: "rating", label: "Rating", num: true, get: (r) => r.rating, cell: (r) => stars(r.rating) },
   { key: "ratings", label: "Ratings", num: true, get: (r) => r.rating_count, cell: (r) => fmt(r.rating_count) },
@@ -62,6 +58,10 @@ const COLUMNS = [
   { key: "installs", label: "Installs", num: true, get: (r) => r.install_count, cell: (r) => fmt(r.install_count) },
   { key: "pricing", label: "Pricing", num: false, get: (r, money) => money[r.ext_id]?.pricing_model, cell: (r, money) => pricingCell(money[r.ext_id]) },
   { key: "revenue", label: "Est. /mo", num: true, get: (r, money) => money[r.ext_id]?.estimated_monthly_revenue_usd, cell: (r, money) => (money[r.ext_id] ? fmtUSD(money[r.ext_id].estimated_monthly_revenue_usd) : "—") },
+  { key: "deepdive", label: "Deep dive", num: true, get: (r, _money, dds) => DEEP_DIVE_RANK[(dds && dds[r.ext_id]) || "none"], cell: (r, _money, dds) => {
+      const m = deepDiveMeta(dds && dds[r.ext_id]);
+      return <span className={`dd-status ${m.cls}`} title={m.title}>{m.icon}</span>;
+    } },
 ];
 
 const INSTALL_PRESETS = [
@@ -156,7 +156,7 @@ function DismissedSection({ dismissed }) {
 // Interactive "Opportunity zone" table: click any column header to sort (click
 // again to flip direction), plus filters. All client-side over the rows the
 // server already fetched — no new query.
-export default function OpportunityZoneCard({ rows, monetization, deepDived, dismissed }) {
+export default function OpportunityZoneCard({ rows, monetization, deepDiveStatus, dismissed }) {
   const [sortKey, setSortKey] = useState("installs"); // matches the old default
   const [dir, setDir] = useState("desc");
   const [minInstalls, setMinInstalls] = useState(0);
@@ -178,7 +178,7 @@ export default function OpportunityZoneCard({ rows, monetization, deepDived, dis
   }
 
   const money = monetization || {};
-  const dd = new Set(deepDived || []);
+  const dd = deepDiveStatus || {};
   const categories = Array.from(new Set(safeRows.map((r) => r.store_category).filter(Boolean))).sort();
 
   function onSort(col) {
@@ -207,8 +207,8 @@ export default function OpportunityZoneCard({ rows, monetization, deepDived, dis
 
   const col = COLUMNS.find((c) => c.key === sortKey) || COLUMNS[0];
   const sorted = [...filtered].sort((a, b) => {
-    const va = col.get(a, money);
-    const vb = col.get(b, money);
+    const va = col.get(a, money, dd);
+    const vb = col.get(b, money, dd);
     if (va == null && vb == null) return 0;
     if (va == null) return 1; // nulls always last, regardless of direction
     if (vb == null) return -1;

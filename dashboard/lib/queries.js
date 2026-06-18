@@ -10,7 +10,7 @@ const EMPTY = {
   opportunities: [],
   helpfulReviews: [],
   monetization: {},
-  deepDived: [],
+  deepDiveStatus: {},
   points: [],
   rankingForceRerun: false,
   dismissedZone: [],
@@ -98,8 +98,7 @@ export async function getDashboardData() {
         .limit(2000),
       supabase
         .from("deep_dives")
-        .select("extensions(ext_id)")
-        .eq("status", "done")
+        .select("status,extensions(ext_id)")
         .limit(2000),
       supabase
         .from("app_settings")
@@ -130,8 +129,12 @@ export async function getDashboardData() {
       if (extId) monetization[extId] = m;
     }
 
-    // ext_ids that have a completed deep dive — to flag them in the lists.
-    const deepDived = (deepDives.data || []).map((d) => d.extensions?.ext_id).filter(Boolean);
+    // ext_id -> deep-dive status ('queued' | 'done' | 'error'); absent = 'none'.
+    const deepDiveStatus = {};
+    for (const d of deepDives.data || []) {
+      const extId = d.extensions?.ext_id;
+      if (extId) deepDiveStatus[extId] = d.status;
+    }
 
     // The ranking-layer override toggle (default OFF when 991 isn't applied).
     const rankingForceRerun = Boolean(settings.data?.[0]?.value);
@@ -167,7 +170,7 @@ export async function getDashboardData() {
       opportunities: opps.data || [],
       helpfulReviews: helpful.data || [],
       monetization,
-      deepDived,
+      deepDiveStatus,
       points: points.data || [],
       rankingForceRerun,
       dismissedZone,

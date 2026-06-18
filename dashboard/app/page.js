@@ -1,4 +1,5 @@
 import { getDashboardData } from "../lib/queries";
+import { deepDiveMeta } from "../lib/deepDive";
 import { RatingHistogram } from "./charts";
 import ScatterCard from "./OpportunityScatter";
 import OpportunitiesCard from "./OpportunitiesCard";
@@ -53,11 +54,10 @@ function reviewLinkFor(extId, label) {
 function reviewLink(row) {
   return reviewLinkFor(row.ext_id, row.name || row.ext_id);
 }
-// 🔬 next to extensions that have a completed deep dive (set of ext_ids).
-function deepDiveMark(extId, ddSet) {
-  return ddSet && ddSet.has(extId) ? (
-    <span className="dd-mark" title="Deep-dive researched">🔬</span>
-  ) : null;
+// One deep-dive status icon (done 🔬 / queued ⏳ / error ⚠️ / none ○).
+function deepDiveCell(status) {
+  const m = deepDiveMeta(status);
+  return <span className={`dd-status ${m.cls}`} title={m.title}>{m.icon}</span>;
 }
 
 // Community-upvoted reviews (surfaced under the store's "Helpful" sort) — the
@@ -70,9 +70,9 @@ function HelpfulReviews({ rows }) {
   return <ReviewList rows={rows} variant="helpful" defaultSort="rating-asc" />;
 }
 
-function ExtTable({ rows, showCategory, linkReviews, showMoney, money, deepDived }) {
+function ExtTable({ rows, showCategory, linkReviews, showMoney, money, deepDiveStatus }) {
   if (!rows || rows.length === 0) return <p className="empty">No data yet.</p>;
-  const dd = new Set(deepDived || []);
+  const dds = deepDiveStatus || {};
   return (
     <table>
       <thead>
@@ -85,6 +85,7 @@ function ExtTable({ rows, showCategory, linkReviews, showMoney, money, deepDived
           <th className="num">Installs</th>
           {showMoney ? <th title="Monetization model (researched by the ranking layer)">Pricing</th> : null}
           {showMoney ? <th className="num" title="Estimated monthly revenue (rough; hover for range + confidence)">Est. /mo</th> : null}
+          <th className="dd-col" title="Deep-dive status">Deep dive</th>
         </tr>
       </thead>
       <tbody>
@@ -92,7 +93,7 @@ function ExtTable({ rows, showCategory, linkReviews, showMoney, money, deepDived
           const m = money ? money[r.ext_id] : null;
           return (
             <tr key={r.ext_id}>
-              <td>{linkReviews ? reviewLink(r) : extLink(r)}{deepDiveMark(r.ext_id, dd)}</td>
+              <td>{linkReviews ? reviewLink(r) : extLink(r)}</td>
               {showCategory ? <td><span className="pill">{r.store_category || "—"}</span></td> : null}
               <td className="num">{stars(r.rating)}</td>
               <td className="num">{fmt(r.rating_count)}</td>
@@ -100,6 +101,7 @@ function ExtTable({ rows, showCategory, linkReviews, showMoney, money, deepDived
               <td className="num">{fmt(r.install_count)}</td>
               {showMoney ? <td>{pricingCell(m)}</td> : null}
               {showMoney ? <td className="num">{m ? fmtUSD(m.estimated_monthly_revenue_usd) : "—"}</td> : null}
+              <td className="dd-col">{deepDiveCell(dds[r.ext_id])}</td>
             </tr>
           );
         })}
@@ -176,20 +178,27 @@ export default async function Page() {
         <div className="legend">
           <span><span className="dot gold" /> Opportunity zone (2.5–3.5★)</span>
           <span><span className="dot accent" /> Everything else</span>
+          <span className="legend-dd">
+            Deep dive:{" "}
+            <span className="dd-status dd-done">🔬</span> done
+            {" "}<span className="dd-status dd-queued">⏳</span> queued
+            {" "}<span className="dd-status dd-error">⚠️</span> error
+            {" "}<span className="dd-status dd-none">○</span> none
+          </span>
           <span className="legend-note">Dot size ∝ number of ratings · click a dot to open it</span>
         </div>
       </section>
 
       <section className="zone">
         <h2>★ Opportunity zone (2.5–3.5★)</h2>
-        <p className="sub">Real demand, unhappy users — the targets to overtake. Click any column to sort, or filter below. Click a name to read its saved reviews. Hit <strong>✕</strong> to remove one that isn&apos;t a realistic target (pick a reason; the zone backfills with the next candidate). Pricing/revenue is researched by the ranking layer. <span className="dd-mark">🔬</span> marks extensions you&apos;ve deep-dive researched.</p>
-        <OpportunityZoneCard rows={d.opportunityZone} monetization={d.monetization} deepDived={d.deepDived} dismissed={d.dismissedZone} />
+        <p className="sub">Real demand, unhappy users — the targets to overtake. Click any column to sort, or filter below. Click a name to read its saved reviews. Hit <strong>✕</strong> to remove one that isn&apos;t a realistic target (pick a reason; the zone backfills with the next candidate). Pricing/revenue is researched by the ranking layer. The <strong>Deep dive</strong> column shows each extension&apos;s research status (see the legend above).</p>
+        <OpportunityZoneCard rows={d.opportunityZone} monetization={d.monetization} deepDiveStatus={d.deepDiveStatus} dismissed={d.dismissedZone} />
       </section>
 
       <section>
         <h2>Scored opportunities</h2>
         <p className="sub">Ranked by the Claude review-mining layer (Phase 3). Filter by complaint type or pricing; click a name to read its saved reviews.</p>
-        <OpportunitiesCard rows={d.opportunities} monetization={d.monetization} deepDived={d.deepDived} />
+        <OpportunitiesCard rows={d.opportunities} monetization={d.monetization} deepDiveStatus={d.deepDiveStatus} />
       </section>
 
       {d.helpfulReviews && d.helpfulReviews.length > 0 && (
@@ -202,12 +211,12 @@ export default async function Page() {
 
       <section>
         <h2>Lowest rated (high installs first)</h2>
-        <ExtTable rows={d.lowest} deepDived={d.deepDived} />
+        <ExtTable rows={d.lowest} deepDiveStatus={d.deepDiveStatus} />
       </section>
 
       <section>
         <h2>Highest rated</h2>
-        <ExtTable rows={d.highest} deepDived={d.deepDived} />
+        <ExtTable rows={d.highest} deepDiveStatus={d.deepDiveStatus} />
       </section>
     </main>
   );
