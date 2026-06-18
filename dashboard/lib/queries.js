@@ -35,7 +35,7 @@ const HELPFUL_LIMIT = 20;
 const POINT_COLS = "ext_id,name,rating,rating_count,install_count,store_category";
 const POINT_LIMIT = 1500;
 
-const EXT_COLS = "ext_id,name,store_category,rating,rating_count,install_count,listing_url";
+const EXT_COLS = "ext_id,name,developer,store_category,rating,rating_count,install_count,listing_url";
 // Same columns, plus the count of reviews/ratings WE'VE saved for each extension.
 // `reviews(count)` is a PostgREST embedded aggregate — it rides along in the one
 // query (no migration, no N+1) and comes back as `reviews: [{ count: N }]`.

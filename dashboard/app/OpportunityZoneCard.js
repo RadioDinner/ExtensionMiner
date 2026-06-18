@@ -5,7 +5,7 @@ import { dismissFromZone, restoreToZone } from "./actions";
 import { deepDiveMeta, DEEP_DIVE_RANK } from "../lib/deepDive";
 
 // Preset reasons for dismissing an extension from the zone (user-defined set).
-const REASONS = ["Too large", "Too complex", "Uninterested", "Publisher owned"];
+const REASONS = ["Too large", "Too complex", "Oversaturated", "Uninterested", "Non-English", "Publisher owned"];
 
 // --- small formatters (kept local, like the other page components) ----------
 function fmt(n) {
@@ -66,6 +66,7 @@ function moneyStatus(m) {
 // source of truth drives both the header and the body.
 const COLUMNS = [
   { key: "name", label: "Extension", num: false, get: (r) => (r.name || r.ext_id || "").toLowerCase(), cell: (r) => reviewLink(r) },
+  { key: "publisher", label: "Publisher", num: false, get: (r) => (r.developer || "").toLowerCase(), cell: (r) => <span title={r.developer || ""}>{r.developer || "—"}</span> },
   { key: "category", label: "Category", num: false, get: (r) => r.store_category, cell: (r) => <span className="pill">{r.store_category || "—"}</span> },
   { key: "rating", label: "Rating", num: true, get: (r) => r.rating, cell: (r) => stars(r.rating) },
   { key: "ratings", label: "Ratings", num: true, get: (r) => r.rating_count, cell: (r) => fmt(r.rating_count) },
