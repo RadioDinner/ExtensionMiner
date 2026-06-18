@@ -185,3 +185,28 @@ KEY CONTEXT / GOTCHAS
 * Egress: Chrome Web Store = 403 in the web env (scraper runs locally). Anthropic
   API + PyPI + npm reachable here (tests/build/Layer 0/1 ranking run fine).
 * DOCS: docs/GUIDE.md is canonical; /help is the in-app version — keep both current.
+
+================================================================================
+ADDENDUM — prompt 3 (session resumed)
+================================================================================
+3.  "i ran the migrations but I can't find the reload schema option. Is restarting
+    the project enough? I did that. Go ahead and wire up diagnostics"
+    -> ANSWERED: yes, restarting the Supabase project IS enough — it restarts
+       PostgREST, which reloads the schema cache. (The "Reload schema" button was
+       removed from newer Supabase dashboards; restart, or NOTIFY pgrst,'reload
+       schema' in the SQL editor, both work.)
+    -> BUILT (commit c7ecbe0): two new /diagnostics panels.
+       • "Layer 0 — review legitimacy": review_analysis counts (analyzed / done /
+         low-legitimacy <60% demoted / errored) + the EXACT zone embed test
+         (review_analysis -> extensions(ext_id)) the home page uses, so a missing
+         988 or stale cache surfaces here instead of a blank Legit column.
+       • "Deep-dive studies — Layer 2 & 3": deep_dive_studies queued/done per layer;
+         a read error tells the user to apply migration 989.
+       Both probe OUTSIDE the core-table verdict (a missing migration never flips the
+       main check to FAIL). docs/GUIDE.md §7 diagnostics description updated.
+    -> `next build` clean; committed to main. User confirmed migrations 988 + 989
+       are applied and the project was restarted (schema cache refreshed).
+
+UPDATED STATE: migrations 988 + 989 APPLIED by the user; project restarted. The two
+diagnostics panels are the quick way to confirm Layer 0 rows appear after the next
+ranking run and that Layer 2/3 studies are readable. NEXT NEW migration = 987.

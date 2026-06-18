@@ -11,3 +11,6 @@ Actually, I want to add a "pre layer 1" level to the deep dive. Every extension 
 Add the following to the feature list, I want a "Publisher" column on the opportunity zone section of the dashboard.
 
 Add an additional feature to the feature list, I want the scraper to prefer, or have the ability to be set to prefer, the extensions currently in the opportunity zone. I want the scraper to look at the 25 extensions in there currently and then go get every single review for each one on the list before moving on to doing what the scraper does currently.
+
+3.
+i ran the migrations but  Ican t find the reload schema option. Is restrating the project enough? I did that. Go ahead and wire up diagnostics
