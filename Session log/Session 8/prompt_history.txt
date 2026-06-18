@@ -28,3 +28,6 @@ I just ran the ranker and it looks like this [pasted ranker log: full re-run ove
 
 7.
 Continue from where you left off.
+
+8.
+Write the handoff, merge it to main and wrap the session

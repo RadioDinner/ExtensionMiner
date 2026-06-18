@@ -266,3 +266,55 @@ Opportunity Zone" in /scraper-settings (or run the scraper with --prefer-zone), 
 the scraper LOCALLY (store is 403 in the web env) to deep-load reviews for the zone
 targets, THEN re-run the ranker — it'll have review text to score, and Layer 0 will
 populate the zone "Legit" column. /diagnostics confirms the reviews count + Layer 0.
+
+================================================================================
+FINAL WRAP (end of Session 8) — authoritative snapshot
+================================================================================
+This supersedes any stale "next step" lines higher up in this log.
+
+WORKFLOW: committed DIRECTLY to main all session (user instruction, prompt 1).
+  Everything is on main and pushed. main HEAD at wrap = the commit of this log.
+  Commits this session (oldest→newest):
+    473abce  layered deep-dive system (Layer 0 + Layer 2/3)
+    c7ecbe0  /diagnostics Layer 0 + Layer 2/3 panels
+    1619a03  Opportunity Zone: Publisher column + dismiss reasons
+    (+ session-log / prompt-history commits interleaved)
+    d296d85  scraper "prefer the Opportunity Zone" mode
+    ec6cf81  session log: prompts 6-7 + prefer-zone addendum
+
+MIGRATIONS: lowest is 988. NEXT NEW = 987.
+  988_review_analysis.sql + 989_deep_dive_studies.sql are APPLIED (user ran them at
+  prompt 3 and restarted the Supabase project, which reloads the PostgREST schema
+  cache — restart is sufficient; no separate "Reload schema" button needed).
+
+TESTS / BUILD: pytest 118 passing; dashboard `next build` clean (routes: /,
+  /reviews/[extId], /diagnostics, /scraper-settings, /help). Web-env caveat: a fresh
+  container has no deps — pip install pytest/pydantic/python-dotenv/bs4/lxml/
+  python-dateutil and `npm install` in dashboard/ (adds unpdf) to reproduce.
+
+BACKLOG: docs/FEATURE_LIST.md is EMPTY — both captured items shipped this session
+  (Publisher column; scraper prefer-zone).
+
+SHIPPED THIS SESSION (recap): layered deep dive (L0 auto review-legitimacy + zone
+  demotion; L1 existing; L2 competitor study + L3 financial study, skill-driven via
+  copy-prompt → run deep-research skill → upload PDF, sequentially gated);
+  /diagnostics panels for L0 + L2/3; Opportunity Zone Publisher column + dismiss
+  reasons (Oversaturated, Non-English); scraper "prefer the Opportunity Zone" mode.
+
+OPEN ITEMS / FOR NEXT SESSION:
+1. THE UNBLOCK for "ranker scored 0": run the scraper LOCALLY with "Prefer the
+   Opportunity Zone" ON (or --prefer-zone) to deep-load review TEXT for the zone
+   targets, THEN re-run the ranker (it needs saved review text; store rating is not
+   enough) → Layer 0 fills the zone "Legit" column. /diagnostics confirms counts.
+2. OFFERED, NOT YET DONE (awaiting user yes): make the RANKER itself prefer
+   extensions that HAVE saved reviews, instead of blind top-25-by-install
+   (fetch_extensions_for_analysis in common/db.py). Would stop a ranking run from
+   wasting itself on 0-review extensions even without prefer-zone.
+3. KEEP IN SYNC: dashboard/lib/scraperSettings.js (DEFAULT + SCRAPER_FIELDS) MUST
+   mirror scraper/run.py DEFAULT_SCRAPER_SETTINGS (+ CrawlOptions + options_from_saved).
+   Same for the layer prompt/parser sentinels (layerPrompts.js ↔ layerReport.js).
+4. Optional polish (raised, not requested): store the uploaded L2/L3 PDF in Supabase
+   Storage (today only extracted text is kept); add L0/L2/L3 counts to nothing-else;
+   let the zone HARD-exclude very-low-legitimacy extensions instead of only demoting.
+
+STATE: green, backlog empty, all work on main. Ready for the next session.
