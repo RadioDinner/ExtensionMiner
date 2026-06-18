@@ -1,3 +1,7 @@
 1. Let's start session 7, get the handoff and kick off this next set of changes
 
 2. commit to main for this session, merge everything you have to main and I'm going to delete the insprining whatever branch
+
+3. A feature to the feature list. On the dashboard, the "rating vs installs" card, I want to be able to click the circles and have it load into the extension that the data circle represents, or the group of extensions that are represented in the data.
+
+Add a second feature, I want the opportunity zone to be more than 25 extensions. I want it to be able to display all the ones in the zone adn then a filter to limit it to a certain amount, like 25.
