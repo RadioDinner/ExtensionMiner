@@ -182,8 +182,8 @@ export default async function Page() {
 
       <section className="zone">
         <h2>★ Opportunity zone (2.5–3.5★)</h2>
-        <p className="sub">Real demand, unhappy users — the targets to overtake. Click any column to sort, or filter below. Click a name to read its saved reviews. Pricing/revenue is researched by the ranking layer. <span className="dd-mark">🔬</span> marks extensions you've deep-dive researched.</p>
-        <OpportunityZoneCard rows={d.opportunityZone} monetization={d.monetization} deepDived={d.deepDived} />
+        <p className="sub">Real demand, unhappy users — the targets to overtake. Click any column to sort, or filter below. Click a name to read its saved reviews. Hit <strong>✕</strong> to remove one that isn&apos;t a realistic target (pick a reason; the zone backfills with the next candidate). Pricing/revenue is researched by the ranking layer. <span className="dd-mark">🔬</span> marks extensions you&apos;ve deep-dive researched.</p>
+        <OpportunityZoneCard rows={d.opportunityZone} monetization={d.monetization} deepDived={d.deepDived} dismissed={d.dismissedZone} />
       </section>
 
       <section>

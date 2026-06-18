@@ -11,41 +11,7 @@
 
 ---
 
-### 1. 🆕 Curate the opportunity zone: dismiss with a reason + auto-backfill to 25
-_(Supersedes the earlier "show more than 25" idea — the user pivoted: instead of
-a longer list, keep a curated **top 25** and let the user prune it.)_
-
-Keep the **Opportunity zone** at a working list of **25**, but let the user
-**remove** an extension that isn't a realistic target and have the zone
-**backfill** with the next-best candidate so the list stays full at 25.
-- **Per-row "Remove from zone" control** on every opportunity-zone row. Clicking
-  it asks for a **reason** from a small preset list:
-  **"Too large"**, **"Too complex"**, **"Uninterested"**, **"Publisher owned"**
-  (e.g. Chrome Remote Desktop — 35M installs, published by Google itself; not a
-  realistic target right now).
-- **Auto-backfill:** when one is removed, pull in the next-highest-ranked
-  extension not already in (or dismissed from) the zone, so the displayed list
-  stays at 25.
-- **Restore / "bring back to the pool":** a way to view dismissed extensions
-  (with their reason) and **un-dismiss** them, returning them to consideration.
-- _Hints (user's words):_ "a button on each row of the extensions in the
-  opportunity zone where I can click 'Remove from zone' and add a cause … options
-  for removal reason 'Too large','Too complex','Uninterested' and 'Publisher
-  owned'. Then … the option to also bring them back to the pool, but whenever one
-  is eliminated from the 25, I want more added to keep a list of 25."
-- _Impl notes (capture-only, for when it's built):_
-  - New persistence: a `zone_exclusions` table (ext_id/extension_id + reason +
-    dismissed_at), service-role only like the rest. **Next migration = 990**
-    (991 is now used by `app_settings`).
-  - Writes go through Next.js **server actions** (service-role, server-side
-    only) — same pattern as the deep-dive queue (`app/actions.js`).
-  - The home zone query (`getDashboardData`) excludes dismissed ext_ids and
-    fetches **>25** candidates so it can backfill up to 25 after exclusions.
-  - `OpportunityZoneCard.js` gets the per-row Remove control + a reason picker,
-    plus a "Dismissed" view (list with reason + Restore). Keep existing
-    sort/filter behavior.
-
-### 2. 🆕 Deep-dive status column in the extension list (4 icons)
+### 1. 🆕 Deep-dive status column in the extension list (4 icons)
 In the **list of extensions**, add a **"Deep dive" status column** with **4
 distinct icons**, one per state:
 1. **Queued** — in the deep-dive pool, not yet researched.

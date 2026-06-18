@@ -13,7 +13,13 @@ const EMPTY = {
   deepDived: [],
   points: [],
   rankingForceRerun: false,
+  dismissedZone: [],
 };
+
+// How many zone candidates to pull so the curated top-25 can backfill past any
+// the user has dismissed.
+const ZONE_FETCH = 200;
+const ZONE_SHOW = 25;
 
 // Monetization columns we surface in the tables (keyed by ext_id below).
 const MONETIZATION_COLS =
@@ -44,14 +50,14 @@ export async function getDashboardData() {
   if (!supabase) return EMPTY;
 
   try {
-    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money, deepDives, settings] = await Promise.all([
+    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money, deepDives, settings, excl] = await Promise.all([
       supabase
         .from("extensions")
         .select(EXT_SELECT)
         .gte("rating", ZONE_MIN)
         .lte("rating", ZONE_MAX)
         .order("install_count", { ascending: false, nullsFirst: false })
-        .limit(25),
+        .limit(ZONE_FETCH),
       supabase
         .from("extensions")
         .select(EXT_SELECT)
@@ -100,14 +106,19 @@ export async function getDashboardData() {
         .select("value")
         .eq("key", "ranking_force_rerun")
         .limit(1),
+      supabase
+        .from("zone_exclusions")
+        .select("reason,dismissed_at,extensions(ext_id,name,store_category,rating,install_count,listing_url)")
+        .order("dismissed_at", { ascending: false })
+        .limit(2000),
     ]);
 
     // Surface the first real error (e.g. schema not applied yet) without crashing.
-    // `helpful`, `money`, `deepDives` and `settings` are intentionally excluded:
-    // they read columns/tables (reviews.helpful_ranked, monetization, deep_dives,
-    // app_settings) that only exist once migrations 996 / 995 / 993 / 991 are
-    // applied, so a missing one degrades to an empty section / default instead of
-    // erroring the whole page.
+    // `helpful`, `money`, `deepDives`, `settings` and `excl` are intentionally
+    // excluded: they read columns/tables (reviews.helpful_ranked, monetization,
+    // deep_dives, app_settings, zone_exclusions) that only exist once migrations
+    // 996 / 995 / 993 / 991 / 990 are applied, so a missing one degrades to an
+    // empty section / default instead of erroring the whole page.
     const firstError = [zone, lowest, highest, opps, points, extCount, revCount]
       .map((r) => r.error)
       .find(Boolean);
@@ -125,11 +136,32 @@ export async function getDashboardData() {
     // The ranking-layer override toggle (default OFF when 991 isn't applied).
     const rankingForceRerun = Boolean(settings.data?.[0]?.value);
 
+    // Extensions the user dismissed from the zone (resilient to 990 absent).
+    const dismissedZone = (excl.data || [])
+      .filter((e) => e.extensions)
+      .map((e) => ({
+        ext_id: e.extensions.ext_id,
+        name: e.extensions.name,
+        store_category: e.extensions.store_category,
+        rating: e.extensions.rating,
+        install_count: e.extensions.install_count,
+        listing_url: e.extensions.listing_url,
+        reason: e.reason,
+        dismissed_at: e.dismissed_at,
+      }));
+    const dismissedSet = new Set(dismissedZone.map((d) => d.ext_id));
+
+    // Curated zone: drop dismissed extensions, then keep the working top-N — so
+    // dismissing one backfills with the next candidate.
+    const opportunityZone = (zone.data || [])
+      .filter((r) => !dismissedSet.has(r.ext_id))
+      .slice(0, ZONE_SHOW);
+
     return {
       configured: true,
       error: firstError ? firstError.message : null,
       counts: { extensions: extCount.count || 0, reviews: revCount.count || 0 },
-      opportunityZone: zone.data || [],
+      opportunityZone,
       lowest: lowest.data || [],
       highest: highest.data || [],
       opportunities: opps.data || [],
@@ -138,6 +170,7 @@ export async function getDashboardData() {
       deepDived,
       points: points.data || [],
       rankingForceRerun,
+      dismissedZone,
     };
   } catch (err) {
     return { ...EMPTY, configured: true, error: String(err && err.message ? err.message : err) };

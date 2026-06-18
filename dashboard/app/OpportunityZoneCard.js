@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { dismissFromZone, restoreToZone } from "./actions";
+
+// Preset reasons for dismissing an extension from the zone (user-defined set).
+const REASONS = ["Too large", "Too complex", "Uninterested", "Publisher owned"];
 
 // --- small formatters (kept local, like the other page components) ----------
 function fmt(n) {
@@ -67,10 +71,92 @@ const INSTALL_PRESETS = [
   { v: 1_000_000, label: "1M+ installs" },
 ];
 
+// Per-row "Remove from zone" control: a ✕ that opens a small reason menu. Picking
+// a reason dismisses the extension (server action); the zone backfills on reload.
+function RemoveControl({ extId }) {
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState(null);
+
+  function pick(reason) {
+    setError(null);
+    start(async () => {
+      const res = await dismissFromZone(extId, reason);
+      if (!res || !res.ok) setError((res && res.error) || "Couldn't remove.");
+      else setOpen(false);
+    });
+  }
+
+  return (
+    <span className="zone-remove">
+      <button
+        className="btn-remove"
+        disabled={pending}
+        onClick={() => setOpen((o) => !o)}
+        title="Remove from the opportunity zone"
+      >
+        {pending ? "…" : "✕"}
+      </button>
+      {open && (
+        <>
+          <div className="zone-remove-backdrop" onClick={() => setOpen(false)} />
+          <div className="zone-remove-menu">
+            <div className="zone-remove-title">Remove — reason?</div>
+            {REASONS.map((r) => (
+              <button key={r} className="zone-reason" disabled={pending} onClick={() => pick(r)}>{r}</button>
+            ))}
+            {error ? <div className="deepdive-error">{error}</div> : null}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+// One dismissed extension, with its reason + a Restore button.
+function DismissedRow({ d }) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState(null);
+  function restore() {
+    setError(null);
+    start(async () => {
+      const res = await restoreToZone(d.ext_id);
+      if (!res || !res.ok) setError((res && res.error) || "Couldn't restore.");
+    });
+  }
+  return (
+    <li>
+      <a href={`/reviews/${encodeURIComponent(d.ext_id)}`}>{d.name || d.ext_id}</a>
+      {d.reason ? <span className="pill">{d.reason}</span> : null}
+      <span className="dismissed-meta">{stars(d.rating)} · {fmt(d.install_count)} installs</span>
+      <button className="btn-link" disabled={pending} onClick={restore}>{pending ? "…" : "restore"}</button>
+      {error ? <span className="deepdive-error">{error}</span> : null}
+    </li>
+  );
+}
+
+// Collapsible list of dismissed extensions (with reasons) + restore.
+function DismissedSection({ dismissed }) {
+  const [show, setShow] = useState(false);
+  if (!dismissed || dismissed.length === 0) return null;
+  return (
+    <div className="zone-dismissed">
+      <button className="btn-link" onClick={() => setShow((s) => !s)}>
+        {show ? "Hide" : "Show"} dismissed from zone ({dismissed.length})
+      </button>
+      {show && (
+        <ul className="dismissed-list">
+          {dismissed.map((d) => <DismissedRow key={d.ext_id} d={d} />)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // Interactive "Opportunity zone" table: click any column header to sort (click
 // again to flip direction), plus filters. All client-side over the rows the
 // server already fetched — no new query.
-export default function OpportunityZoneCard({ rows, monetization, deepDived }) {
+export default function OpportunityZoneCard({ rows, monetization, deepDived, dismissed }) {
   const [sortKey, setSortKey] = useState("installs"); // matches the old default
   const [dir, setDir] = useState("desc");
   const [minInstalls, setMinInstalls] = useState(0);
@@ -79,11 +165,21 @@ export default function OpportunityZoneCard({ rows, monetization, deepDived }) {
   const [savedOnly, setSavedOnly] = useState(false);
   const [category, setCategory] = useState("all");
 
-  if (!rows || rows.length === 0) return <p className="empty">No data yet.</p>;
+  const safeRows = rows || [];
+  // Show nothing only when there's truly nothing — but still surface the
+  // dismissed list (so the user can restore) even if every row is dismissed.
+  if (safeRows.length === 0) {
+    return (
+      <>
+        <p className="empty">No data yet.</p>
+        <DismissedSection dismissed={dismissed} />
+      </>
+    );
+  }
 
   const money = monetization || {};
   const dd = new Set(deepDived || []);
-  const categories = Array.from(new Set(rows.map((r) => r.store_category).filter(Boolean))).sort();
+  const categories = Array.from(new Set(safeRows.map((r) => r.store_category).filter(Boolean))).sort();
 
   function onSort(col) {
     if (col.key === sortKey) {
@@ -94,7 +190,7 @@ export default function OpportunityZoneCard({ rows, monetization, deepDived }) {
     }
   }
 
-  const filtered = rows.filter((r) => {
+  const filtered = safeRows.filter((r) => {
     if (minInstalls && !(Number(r.install_count) >= minInstalls)) return false;
     if (band === "lower" && !(r.rating != null && r.rating < 3.0)) return false;
     if (band === "upper" && !(r.rating != null && r.rating >= 3.0)) return false;
@@ -161,7 +257,7 @@ export default function OpportunityZoneCard({ rows, monetization, deepDived }) {
           <input type="checkbox" checked={savedOnly} onChange={(e) => setSavedOnly(e.target.checked)} />
           {" "}Has saved reviews
         </label>
-        <span className="filter-count">{sorted.length} of {rows.length}</span>
+        <span className="filter-count">{sorted.length} of {safeRows.length}</span>
       </div>
 
       {sorted.length === 0 ? (
@@ -181,6 +277,7 @@ export default function OpportunityZoneCard({ rows, monetization, deepDived }) {
                   {sortKey === c.key ? <span className="sort-ind">{dir === "asc" ? " ▲" : " ▼"}</span> : null}
                 </th>
               ))}
+              <th title="Remove from the zone"></th>
             </tr>
           </thead>
           <tbody>
@@ -189,11 +286,14 @@ export default function OpportunityZoneCard({ rows, monetization, deepDived }) {
                 {COLUMNS.map((c) => (
                   <td key={c.key} className={c.num ? "num" : undefined}>{c.cell(r, money, dd)}</td>
                 ))}
+                <td className="zone-actions"><RemoveControl extId={r.ext_id} /></td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
+
+      <DismissedSection dismissed={dismissed} />
     </>
   );
 }

@@ -70,6 +70,41 @@ export async function saveScraperSettings(input) {
   }
 }
 
+// Dismiss an extension from the opportunity zone with a reason. The zone backfills
+// with the next candidate so the working list stays at 25. Server-side only.
+export async function dismissFromZone(extId, reason) {
+  const supabase = getServerClient();
+  if (!supabase) return { ok: false, error: "Supabase isn't configured." };
+  try {
+    const id = await extPk(supabase, extId);
+    if (!id) return { ok: false, error: "Extension not found." };
+    const { error } = await supabase
+      .from("zone_exclusions")
+      .upsert({ extension_id: id, reason: reason || null }, { onConflict: "extension_id" });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+}
+
+// Bring a dismissed extension back into the opportunity zone.
+export async function restoreToZone(extId) {
+  const supabase = getServerClient();
+  if (!supabase) return { ok: false, error: "Supabase isn't configured." };
+  try {
+    const id = await extPk(supabase, extId);
+    if (!id) return { ok: false, error: "Extension not found." };
+    const { error } = await supabase.from("zone_exclusions").delete().eq("extension_id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+}
+
 // Remove an extension from the deep-dive pool entirely.
 export async function removeDeepDive(extId) {
   const supabase = getServerClient();
