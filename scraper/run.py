@@ -38,6 +38,31 @@ from .crawl import CrawlOptions, crawl
 
 log = logging.getLogger("scraper")
 
+# The crawl-shape settings the dashboard's "Scraper settings" tab controls, with
+# their defaults. With --use-saved-settings, these are loaded from
+# app_settings.scraper_settings (merged over these defaults) instead of from CLI
+# flags. Keep in sync with dashboard/app/scraper-settings/.
+DEFAULT_SCRAPER_SETTINGS = {
+    "categories": [],            # [] -> TARGET_CATEGORIES from env
+    "all_categories": False,
+    "max_extensions": 25,
+    "category_scrolls": 40,
+    "discovery_patience": 3,
+    "review_scrolls": 6,
+    "multi_sort": True,
+    "load_more_max": 40,
+    "follow_related": False,
+    "max_total": 0,
+    "concurrency": 1,
+    "refresh": False,
+    "skip_existing": False,
+    "refresh_after_days": None,
+    "rate_limit_seconds": None,  # None -> Settings/env default
+    "reviews_zone_only": False,
+    "zone_min": 2.5,
+    "zone_max": 3.5,
+}
+
 # Exit codes the launcher / Task Scheduler can read (0 = success).
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -108,6 +133,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--refresh-after-days", type=int, metavar="N", default=None,
                    help="refresh mode: re-scrape extensions whose last_scraped is older "
                         "than N days, skip fresher ones (implies cache bypass)")
+    p.add_argument("--use-saved-settings", action="store_true",
+                   help="load the crawl settings from the dashboard's 'Scraper settings' tab "
+                        "(app_settings.scraper_settings) instead of the CLI crawl flags. The "
+                        "run-environment flags (--no-db / --no-headless / --no-robots / "
+                        "--log-*) still apply. Used by the Run Scraper button so the dashboard "
+                        "drives the crawl.")
     p.add_argument("--no-robots", action="store_true",
                    help="skip the robots.txt check (use responsibly)")
     p.add_argument("--log-level", default="INFO",
@@ -144,8 +175,69 @@ def configure_logging(level_name: str, log_dir: str | None) -> str | None:
     return log_path
 
 
+def load_saved_scraper_settings() -> dict:
+    """The dashboard-saved scraper settings, merged over the defaults.
+
+    Resilient: if Supabase isn't reachable or migration 991 isn't applied, the
+    read fails and we fall back to DEFAULT_SCRAPER_SETTINGS so the run still works.
+    """
+    saved = dict(DEFAULT_SCRAPER_SETTINGS)
+    try:
+        from common import db  # lazy: only needed for --use-saved-settings
+
+        stored = db.get_setting(db.SCRAPER_SETTINGS_KEY, {}) or {}
+        if isinstance(stored, dict):
+            saved.update({k: v for k, v in stored.items() if k in DEFAULT_SCRAPER_SETTINGS})
+    except Exception as exc:  # never let a settings read sink the run
+        log.warning("could not load saved scraper settings (%s); using defaults", exc)
+    return saved
+
+
+def options_from_saved(args: argparse.Namespace) -> CrawlOptions:
+    """Build CrawlOptions from the dashboard's saved settings (crawl-shape) plus
+    the CLI's run-environment flags (--no-db / --no-headless / --no-robots)."""
+    saved = load_saved_scraper_settings()
+    cats = saved.get("categories") or []
+    if isinstance(cats, str):  # tolerate a CSV string from the form
+        cats = [c.strip() for c in cats.split(",") if c.strip()]
+    rad = saved.get("refresh_after_days")
+    rls = saved.get("rate_limit_seconds")
+    log.info(
+        "using saved scraper settings: categories=%s all=%s max/cat=%s concurrency=%s "
+        "zone_only=%s",
+        cats or "(env TARGET_CATEGORIES)", saved["all_categories"], saved["max_extensions"],
+        saved["concurrency"], saved["reviews_zone_only"],
+    )
+    return CrawlOptions(
+        categories=list(cats),
+        all_categories=bool(saved["all_categories"]),
+        max_extensions=int(saved["max_extensions"]),
+        category_scrolls=int(saved["category_scrolls"]),
+        discovery_patience=int(saved["discovery_patience"]),
+        review_scrolls=int(saved["review_scrolls"]),
+        multi_sort=bool(saved["multi_sort"]),
+        load_more_max=int(saved["load_more_max"]),
+        follow_related=bool(saved["follow_related"]),
+        max_total=int(saved["max_total"]),
+        concurrency=max(1, int(saved["concurrency"])),
+        write_db=not args.no_db,
+        headless=not args.no_headless,
+        refresh=bool(saved["refresh"]),
+        respect_robots=not args.no_robots,
+        skip_existing=bool(saved["skip_existing"]),
+        refresh_after_days=None if rad in (None, "", 0) else int(rad),
+        rate_limit_seconds=None if rls in (None, "") else float(rls),
+        reviews_zone_only=bool(saved["reviews_zone_only"]),
+        zone_min=float(saved["zone_min"]),
+        zone_max=float(saved["zone_max"]),
+    )
+
+
 def resolve_options(args: argparse.Namespace) -> CrawlOptions:
     """Turn parsed args (+ any preset) into CrawlOptions."""
+    if getattr(args, "use_saved_settings", False):
+        return options_from_saved(args)
+
     max_extensions = args.max_extensions
     refresh = args.refresh
     all_categories = args.all_categories

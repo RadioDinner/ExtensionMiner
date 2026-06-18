@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getServerClient } from "../lib/supabase";
+import { coerceScraperSettings } from "../lib/scraperSettings";
 
 // Resolve a Chrome Web Store ext_id to its internal extensions.id (PK).
 async function extPk(supabase, extId) {
@@ -45,6 +46,25 @@ export async function setRankingForceRerun(value) {
     if (error) return { ok: false, error: error.message };
     revalidatePath("/");
     return { ok: true, value: Boolean(value) };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+}
+
+// Save the "Scraper settings" tab. Persisted in Supabase (app_settings.
+// scraper_settings) so the Python scraper reads it with --use-saved-settings.
+// Coerced server-side so only clean, typed values are stored.
+export async function saveScraperSettings(input) {
+  const supabase = getServerClient();
+  if (!supabase) return { ok: false, error: "Supabase isn't configured." };
+  try {
+    const value = coerceScraperSettings(input);
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert({ key: "scraper_settings", value }, { onConflict: "key" });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/scraper-settings");
+    return { ok: true, value };
   } catch (err) {
     return { ok: false, error: String(err && err.message ? err.message : err) };
   }

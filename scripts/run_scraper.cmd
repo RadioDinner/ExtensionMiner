@@ -31,13 +31,17 @@ if not exist "%REPO%\scraper\run.py"   goto :norepo
 
 REM ===========================================================================
 REM  EDITABLE KNOBS
-REM  RUN_ARGS     - what to run. Default = the "daily" preset (full crawl +
-REM                 related graph + multi-sort reviews + successor linking).
+REM  RUN_ARGS     - what to run. Default = --use-saved-settings: the crawl is
+REM                 driven by the dashboard's "Scraper settings" tab (categories,
+REM                 caps, concurrency, the opportunity-zone review gate, etc.).
+REM                 Set it there, then click this. Alternatives:
+REM                   --preset daily   full-store crawl (ignores the dashboard)
+REM                   (add your own CLI flags for a one-off manual run)
 REM  AUTO_UPDATE  - 1 = git pull the latest code before running; 0 = don't.
 REM  UPDATE_BRANCH- which branch to track (main is the canonical, always-current
 REM                 one).
 REM ===========================================================================
-set "RUN_ARGS=--preset daily --log-dir logs"
+set "RUN_ARGS=--use-saved-settings --log-dir logs"
 set "AUTO_UPDATE=1"
 set "UPDATE_BRANCH=main"
 

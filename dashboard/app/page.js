@@ -116,6 +116,11 @@ export default async function Page() {
         <span className="kicker">Chrome Web Store · opportunity miner</span>
         <h1>ExtensionMiner</h1>
         <p>Extensions worth building a competitor against — the ~3★ opportunity zone.</p>
+        <p className="topnav">
+          <a href="/scraper-settings">Scraper settings →</a>
+          {" · "}
+          <a href="/diagnostics">Diagnostics →</a>
+        </p>
       </header>
 
       {!d.configured && (
@@ -148,10 +153,6 @@ export default async function Page() {
           the scraper writes to. Fix the value in your host and redeploy.{" "}
           <strong><a href="/diagnostics">→ Run diagnostics</a></strong> to see which.
         </div>
-      )}
-
-      {(!d.configured || d.error || d.counts.extensions === 0) ? null : (
-        <p className="diag-link"><a href="/diagnostics">Connection diagnostics →</a></p>
       )}
 
       <div className="stats">

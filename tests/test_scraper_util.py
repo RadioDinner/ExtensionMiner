@@ -268,6 +268,120 @@ def test_concurrency_flag_wires_through():
     ).concurrency == 12
 
 
+def test_should_fetch_reviews_zone_gate():
+    from scraper.crawl import should_fetch_reviews
+
+    # Gate off: always fetch, regardless of rating.
+    assert should_fetch_reviews(None, zone_only=False, zone_min=2.5, zone_max=3.5) is True
+    assert should_fetch_reviews(4.9, zone_only=False, zone_min=2.5, zone_max=3.5) is True
+    # Gate on: only in-zone (inclusive bounds).
+    for r in (2.5, 3.0, 3.5):
+        assert should_fetch_reviews(r, zone_only=True, zone_min=2.5, zone_max=3.5) is True
+    for r in (1.0, 4.8):
+        assert should_fetch_reviews(r, zone_only=True, zone_min=2.5, zone_max=3.5) is False
+    # Unknown rating is treated as out-of-zone when the gate is on.
+    assert should_fetch_reviews(None, zone_only=True, zone_min=2.5, zone_max=3.5) is False
+
+
+def test_zone_gate_defaults_off():
+    o = CrawlOptions()
+    assert o.reviews_zone_only is False
+    assert o.zone_min == 2.5 and o.zone_max == 3.5
+    assert o.rate_limit_seconds is None
+
+
+def test_scrape_extension_zone_gate_skips_reviews(monkeypatch):
+    import scraper.crawl as crawlmod
+    from scraper.models import Extension
+
+    fetched = []
+
+    class _Cache:
+        def has(self, *a, **k):
+            return False
+
+        def get(self, *a, **k):
+            return None
+
+    class _Browser:
+        refresh = True
+        cache = _Cache()
+
+        def fetch(self, url, **kw):
+            fetched.append(url)
+            return "<html></html>", ""
+
+        def fetch_review_sorts(self, *a, **k):
+            fetched.append("REVIEW_SORTS")
+            return []
+
+    # Out-of-zone rating -> the reviews sub-page is never fetched.
+    monkeypatch.setattr(
+        crawlmod.parse, "parse_detail",
+        lambda html, ext_id, page_text=None: Extension(ext_id=ext_id, name="X", rating=4.8),
+    )
+    ext, reviews, _ = crawlmod.scrape_extension(
+        _Browser(), "a" * 32, category="productivity/tools", reviews_zone_only=True
+    )
+    assert reviews == []
+    assert ext.rating == 4.8  # metadata still scraped
+    assert not any("reviews" in u or u == "REVIEW_SORTS" for u in fetched)
+
+    # In-zone rating -> reviews ARE fetched.
+    fetched.clear()
+    monkeypatch.setattr(
+        crawlmod.parse, "parse_detail",
+        lambda html, ext_id, page_text=None: Extension(ext_id=ext_id, name="X", rating=3.0),
+    )
+    crawlmod.scrape_extension(
+        _Browser(), "a" * 32, category="productivity/tools", reviews_zone_only=True
+    )
+    assert "REVIEW_SORTS" in fetched
+
+
+def test_use_saved_settings_flag_parses():
+    assert build_parser().parse_args([]).use_saved_settings is False
+    assert build_parser().parse_args(["--use-saved-settings"]).use_saved_settings is True
+
+
+def test_options_from_saved_maps_settings(monkeypatch):
+    import scraper.run as runmod
+    import common.db as dbmod
+
+    saved = {
+        "max_extensions": 7, "concurrency": 3, "reviews_zone_only": True,
+        "zone_min": 2.0, "zone_max": 4.0, "categories": "a/b, c/d",
+        "rate_limit_seconds": 1.5, "refresh_after_days": 10, "all_categories": True,
+    }
+    monkeypatch.setattr(dbmod, "get_setting", lambda key, default=None: saved)
+    args = runmod.build_parser().parse_args(["--use-saved-settings"])
+    opts = runmod.resolve_options(args)
+    assert opts.max_extensions == 7
+    assert opts.concurrency == 3
+    assert opts.reviews_zone_only is True
+    assert opts.zone_min == 2.0 and opts.zone_max == 4.0
+    assert opts.categories == ["a/b", "c/d"]
+    assert opts.rate_limit_seconds == 1.5
+    assert opts.refresh_after_days == 10
+    assert opts.all_categories is True
+
+
+def test_options_from_saved_falls_back_to_defaults(monkeypatch):
+    # A failing settings read must not crash the run — it falls back to defaults.
+    import scraper.run as runmod
+    import common.db as dbmod
+
+    def _boom(*a, **k):
+        raise RuntimeError("no DB")
+
+    monkeypatch.setattr(dbmod, "get_setting", _boom)
+    args = runmod.build_parser().parse_args(["--use-saved-settings"])
+    opts = runmod.resolve_options(args)
+    assert opts.max_extensions == 25          # the default
+    assert opts.reviews_zone_only is False
+    assert opts.concurrency == 1
+
+
 def test_review_sorts_are_recent_and_helpful_only():
     # We pull only the two sorts that carry signal (no highest/lowest passes).
     from scraper import selectors

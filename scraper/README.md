@@ -40,14 +40,31 @@ python -m scraper.run --preset daily --log-dir logs
 ```
 
 Useful flags: `--preset daily` (full refresh crawl of the **whole** taxonomy +
-related graph), `--all-categories` (discover & crawl every category from the
-store nav), `--follow-related` (graph-crawl past category pages via each
-extension's related links), `--concurrency N` (parallel browser workers; see
-below), `--max-total N` (cap total discovered), `--no-db` (dry run),
-`--no-headless` (watch it), `--refresh` (ignore cache), `--skip-existing`,
-`--refresh-after-days N`, `--log-dir DIR`, `--no-robots`, `--log-level DEBUG`,
-`--category-scrolls` (max passes to exhaust a category) / `--discovery-patience`
-(stop after N empty passes) / `--review-scrolls`.
+related graph), `--use-saved-settings` (drive the crawl from the dashboard — see
+below), `--all-categories` (discover & crawl every category from the store nav),
+`--follow-related` (graph-crawl past category pages via each extension's related
+links), `--concurrency N` (parallel browser workers; see below), `--max-total N`
+(cap total discovered), `--no-db` (dry run), `--no-headless` (watch it),
+`--refresh` (ignore cache), `--skip-existing`, `--refresh-after-days N`,
+`--log-dir DIR`, `--no-robots`, `--log-level DEBUG`, `--category-scrolls` (max
+passes to exhaust a category) / `--discovery-patience` (stop after N empty
+passes) / `--review-scrolls`.
+
+> **Dashboard-driven runs (`--use-saved-settings`).** Instead of CLI flags, the
+> crawl can read its settings from the dashboard's **Scraper settings** tab
+> (`/scraper-settings`), stored in `app_settings.scraper_settings` (migration
+> **991**). Set the categories, caps, concurrency, politeness, and the
+> **opportunity-zone review gate** there, then run
+> `python -m scraper.run --use-saved-settings` (this is what the **Run Scraper**
+> button now does). Run-environment flags (`--no-db`, `--no-headless`,
+> `--no-robots`, `--log-*`) still apply on top.
+>
+> **Opportunity-zone review gate** (the big speedup). With *“Only save reviews
+> for in-zone extensions”* on, the scraper fetches each extension's cheap detail
+> page, and only pays the **expensive review fetch** when the overall rating is
+> inside the zone (default 2.5–3.5★). Out-of-zone extensions still get their
+> metadata + rating snapshot saved, so they're tracked and can re-qualify later —
+> you just skip the bulk of review fetches. Set it in the Scraper settings tab.
 
 > Concurrency: `--concurrency N` runs N browser workers that drain the discovery
 > frontier in parallel (default **1**; **4** under `--preset daily`). Each worker

@@ -44,6 +44,30 @@ class CrawlOptions:
     respect_robots: bool = True
     skip_existing: bool = False       # skip ext_ids already stored in the DB
     refresh_after_days: Optional[int] = None  # re-scrape rows older than N days; skip fresher
+    rate_limit_seconds: Optional[float] = None  # override Settings.rate_limit_seconds when set
+    # Opportunity-zone review gate: only spend the (expensive) review fetch on
+    # extensions whose overall rating sits in the zone. Out-of-zone extensions
+    # still get their metadata + rating snapshot saved — just no reviews.
+    reviews_zone_only: bool = False
+    zone_min: float = 2.5
+    zone_max: float = 3.5
+
+
+def should_fetch_reviews(
+    rating: Optional[float], *, zone_only: bool, zone_min: float, zone_max: float
+) -> bool:
+    """Decide whether to scrape an extension's reviews (pure; unit-tested).
+
+    When the zone gate is off, always fetch. When it's on, fetch only if the
+    overall rating is known and inside [zone_min, zone_max]; an unknown (None)
+    rating is treated as out-of-zone (we can't confirm it's a target, so don't
+    pay the review cost).
+    """
+    if not zone_only:
+        return True
+    if rating is None:
+        return False
+    return zone_min <= float(rating) <= zone_max
 
 
 def build_browser(s: Settings, opts: CrawlOptions) -> CWSBrowser:
@@ -56,9 +80,10 @@ def build_browser(s: Settings, opts: CrawlOptions) -> CWSBrowser:
     # A refresh run must re-fetch (not serve stale cached HTML) for the pages it
     # decides to re-scrape, so bypass the cache when a freshness window is set.
     refresh = opts.refresh or opts.refresh_after_days is not None
+    rate_seconds = opts.rate_limit_seconds if opts.rate_limit_seconds is not None else s.rate_limit_seconds
     return CWSBrowser(
         cache=RawCache(s.cache_dir),
-        rate_limiter=RateLimiter(s.rate_limit_seconds),
+        rate_limiter=RateLimiter(rate_seconds),
         user_agent=s.user_agent,
         headless=opts.headless,
         robots_allowed=robots_allowed,
@@ -164,11 +189,18 @@ def scrape_extension(
     review_scrolls: int = 6,
     multi_sort: bool = True,
     load_more_max: int = 40,
+    reviews_zone_only: bool = False,
+    zone_min: float = 2.5,
+    zone_max: float = 3.5,
 ) -> Tuple[Extension, List[Review], List[str]]:
     """Scrape one extension. Returns (extension, reviews, related_ext_ids).
 
     ``related_ext_ids`` are other extension ids linked from the detail page (the
     "related"/"more from" sections) — the fuel for graph discovery.
+
+    When ``reviews_zone_only`` is set, the (expensive) review sub-page is only
+    fetched for extensions whose overall rating is in [zone_min, zone_max];
+    out-of-zone extensions return no reviews (metadata is still scraped).
     """
     # Detail page: metadata + description. Reviews are NOT here.
     html, text = browser.fetch(
@@ -185,6 +217,18 @@ def scrape_extension(
     else:
         ext.store_category = categories.category_from_detail(parse.extract_category_slugs(html))
     related = [i for i in parse.extract_extension_ids(html) if i != ext_id]
+
+    # Opportunity-zone gate: skip the costly review fetch for out-of-zone (or
+    # unrated) extensions. We still return the extension + related so its metadata
+    # and rating snapshot are saved and it can re-qualify on a later crawl.
+    if not should_fetch_reviews(
+        ext.rating, zone_only=reviews_zone_only, zone_min=zone_min, zone_max=zone_max
+    ):
+        log.debug(
+            "  %s rating=%s outside zone [%s, %s] — skipping reviews",
+            ext_id, ext.rating, zone_min, zone_max,
+        )
+        return ext, [], related
 
     # Reviews live on a dedicated sub-page; the store caps each sort at ~10, so we
     # re-sort (Recent + Helpful) and merge to gather more. A non-refresh run
@@ -284,7 +328,8 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
 
     # One rate limiter shared by every worker so the aggregate navigation rate
     # stays polite no matter how high --concurrency goes (see build_worker_browser).
-    shared_rl = RateLimiter(s.rate_limit_seconds)
+    rate_seconds = opts.rate_limit_seconds if opts.rate_limit_seconds is not None else s.rate_limit_seconds
+    shared_rl = RateLimiter(rate_seconds)
 
     # The frontier is a thread-safe queue. With --follow-related, workers push
     # newly discovered ids back onto it as they run, so completion is detected via
@@ -351,6 +396,8 @@ def crawl(settings: Optional[Settings] = None, opts: Optional[CrawlOptions] = No
                 browser, ext_id, category=category,
                 review_scrolls=opts.review_scrolls, multi_sort=opts.multi_sort,
                 load_more_max=opts.load_more_max,
+                reviews_zone_only=opts.reviews_zone_only,
+                zone_min=opts.zone_min, zone_max=opts.zone_max,
             )
             written = persist(ext, reviews, write_db=opts.write_db)
         except RobotsDisallowed:

@@ -145,6 +145,7 @@ def insert_rating_snapshot(row: dict[str, Any]) -> dict[str, Any]:
 # --- App settings (small shared key/value config) ---------------------------
 
 RANKING_FORCE_RERUN_KEY = "ranking_force_rerun"
+SCRAPER_SETTINGS_KEY = "scraper_settings"
 
 
 def get_setting(key: str, default: Any = None) -> Any:
