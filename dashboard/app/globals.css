@@ -76,6 +76,39 @@ section .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
 .legend-note { margin-left: auto; font-style: italic; }
 @media (max-width: 720px) { .legend-note { margin-left: 0; } }
 
+/* Interactive "Rating vs installs" scatter card */
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.btn-expand {
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  color: var(--muted); background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 4px 10px;
+}
+.btn-expand:hover { color: var(--text); border-color: var(--accent); }
+.scatter-wrap { position: relative; }
+.scatter-pt:hover circle { stroke: #fff; stroke-width: 1; }
+/* transparent layer that closes the popover on an outside click */
+.scatter-backdrop { position: absolute; inset: 0; z-index: 1; }
+.scatter-pop {
+  position: absolute; z-index: 2; transform: translate(-50%, 10px);
+  min-width: 200px; max-width: 280px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, .45);
+}
+.scatter-pop-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+.scatter-pop-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow: auto; }
+.scatter-pop-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 3px 0; }
+.scatter-pop-meta { color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.scatter-pop-more { color: var(--muted); font-size: 12px; }
+/* expanded modal */
+.scatter-modal-backdrop {
+  position: fixed; inset: 0; z-index: 50; padding: 24px;
+  background: rgba(0, 0, 0, .6); display: flex; align-items: center; justify-content: center;
+}
+.scatter-modal {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px 14px; width: min(1000px, 96vw); max-height: 92vh; overflow: auto;
+}
+
 table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 10px; overflow: hidden; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }

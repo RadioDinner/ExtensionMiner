@@ -1,5 +1,6 @@
 import { getDashboardData } from "../lib/queries";
-import { RatingHistogram, OpportunityScatter } from "./charts";
+import { RatingHistogram } from "./charts";
+import ScatterCard from "./OpportunityScatter";
 import OpportunitiesCard from "./OpportunitiesCard";
 import OpportunityZoneCard from "./OpportunityZoneCard";
 import RankingModeToggle from "./RankingModeToggle";
@@ -170,16 +171,12 @@ export default async function Page() {
             <p className="sub">Where the catalog sits. Gold bars are the 2.5–3.5★ zone.</p>
             <div className="chart"><RatingHistogram points={d.points} /></div>
           </div>
-          <div className="card">
-            <h3>Rating vs. installs</h3>
-            <p className="sub">Demand (installs, log) against satisfaction (rating). Gold dots in the shaded band are the targets.</p>
-            <div className="chart"><OpportunityScatter points={d.points} /></div>
-          </div>
+          <ScatterCard points={d.points} />
         </div>
         <div className="legend">
           <span><span className="dot gold" /> Opportunity zone (2.5–3.5★)</span>
           <span><span className="dot accent" /> Everything else</span>
-          <span className="legend-note">Dot size ∝ number of ratings · hover for details</span>
+          <span className="legend-note">Dot size ∝ number of ratings · click a dot to open it</span>
         </div>
       </section>
 

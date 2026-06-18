@@ -21,3 +21,5 @@ Also add this to the feature list, in the list of extensions, I want a deep dive
 Also, edit the feature list about the "Ratings vs installs" graph. I want that to be expandable to fill a larger space. Then I can open it to see more detail or make it smaller to make it take up less space
 
 Once your done with these feature list additions, I want to start working on changes to the scraper. I am realizing there are WAY too many extensions to scrape the whole store, at least at his time. Is it possible to add a "Scraper settings" tab to the dashboard? Then in this tab, I could set the run settings for the scraper? I want the scraper to only save extensions reviews if the overall review rating is in the opportunity zone.
+
+9. next feature
