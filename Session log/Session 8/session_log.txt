@@ -228,3 +228,41 @@ ADDENDUM — prompt 4
 
 BACKLOG NOW (docs/FEATURE_LIST.md): 1 item left —
    #1 Scraper "prefer the Opportunity Zone" mode (capture-only, NOT built).
+
+================================================================================
+ADDENDUM 2 — prompts 4–7
+================================================================================
+4.  Opportunity Zone tweaks: added dismiss reasons "Oversaturated" (next to Too
+    complex / Uninterested) and "Non-English"; BUILT the "Publisher" (developer)
+    column (was capture-only backlog #1) — sortable, after the Extension name; added
+    `developer` to the zone select; removed the item from docs/FEATURE_LIST.md.
+    (commit 1619a03)
+5.  User ran the ranker → "0 scored": the ranker analyzes the top-25 BY INSTALL, and
+    all 25 had 0 SAVED review texts (< --min-reviews=5). Distinct from store rating/
+    rating_count. Same gap starves Layer 0 + deep dives; monetization still ran (web
+    search, no reviews needed). Diagnosed; offered fixes.
+6.  User chose: BUILD the scraper "prefer the Opportunity Zone" mode (backlog #2).
+7.  "Continue" -> BUILT it (commit d296d85):
+    - common/db.py: select_zone_targets (PURE, unit-tested) = dashboard's curated
+      zone (drop dismissed; rank install_count * Layer-0 legitimacy; cap).
+      fetch_zone_targets wires it to Supabase (resilient to 990/988 absent).
+    - scraper/crawl.py: CrawlOptions.prefer_zone + zone_first_limit; scrape_zone_first()
+      runs SERIALLY before the category crawl, own REFRESHING browser, review paging
+      cranked (ZONE_EXHAUSTIVE_REVIEW_SCROLLS=40 / LOAD_MORE_MAX=1000), never
+      gates/skips reviews, marks ids seen so the normal crawl won't redo them.
+      stats.zone_extensions.
+    - scraper/run.py: --prefer-zone / --zone-first-limit + saved-settings wiring +
+      DEFAULT_SCRAPER_SETTINGS (prefer_zone, zone_first_limit).
+    - dashboard/lib/scraperSettings.js: prefer_zone + zone_first_limit fields (form +
+      coercion auto-render). KEPT IN SYNC with Python defaults.
+    - tests/test_zone_targets.py (5 new) → pytest now 118 passing. next build clean.
+    - docs/GUIDE.md scraper section updated; backlog EMPTIED.
+
+CURRENT STATE: backlog EMPTY again. Migrations 988+989 applied by the user (project
+restarted = schema cache refreshed). NEXT NEW migration = 987. All on main.
+
+NEXT STEP FOR THE USER (the actual unblock for "0 scored"): turn ON "Prefer the
+Opportunity Zone" in /scraper-settings (or run the scraper with --prefer-zone), run
+the scraper LOCALLY (store is 403 in the web env) to deep-load reviews for the zone
+targets, THEN re-run the ranker — it'll have review text to score, and Layer 0 will
+populate the zone "Legit" column. /diagnostics confirms the reviews count + Layer 0.
