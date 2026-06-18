@@ -106,6 +106,8 @@ your Supabase project. Current set:
 | 992 | opportunities decline/trend columns |
 | 991 | app_settings (ranking toggle + scraper settings) |
 | 990 | zone_exclusions (dismiss-from-zone) |
+| 989 | deep_dive_studies (Layer 2 + 3 skill-driven research uploads) |
+| 988 | review_analysis (Layer 0 review-legitimacy pre-screen) |
 
 > **After applying migrations, if a dashboard section looks blank**, reload the
 > PostgREST schema cache: Supabase → Project Settings → API → **Reload schema**
@@ -178,9 +180,21 @@ passes:
    overview). One structured Claude call per extension.
 2. **Monetization** (`--monetize`) → `monetization` (pricing model, est. monthly
    revenue range, confidence). One **web-search** Claude call per extension.
-3. **Deep-dive pool** (on by default when the DB is reachable) → processes the
-   extensions you **queued** from the dashboard: a deep read of the reviews +
-   **competitor research** + a build/maybe/avoid verdict, written to `deep_dives`.
+3. **Layer 0 review-legitimacy** (on by default when the DB is reachable) → for
+   every Opportunity-Zone extension, reads the reviews (weighted to **recent +
+   helpful**) and judges **why** the rating is what it is. A low rating is only an
+   *opportunity* if it comes from real, fixable product problems — if it's
+   review-bombing (e.g. kids angry at a school filter) or a competitor attack,
+   Layer 0 marks it **low-legitimacy** and the dashboard **demotes it in the
+   zone**. Written to `review_analysis`. Skip with `--skip-layer0`.
+4. **Deep-dive pool** (Layer 1, on by default when the DB is reachable) →
+   processes the extensions you **queued** from the dashboard: a deep read of the
+   reviews + **competitor research** + a build/maybe/avoid verdict, to `deep_dives`.
+
+> **Deep-dive layers (0–3).** The deep dive is layered and the manual layers are
+> **sequential**: **Layer 0** (auto review-legitimacy, above) → **Layer 1** (the
+> pool, above) → **Layer 2** (deep competitor study) → **Layer 3** (financial
+> study). Layers 2 and 3 are **skill-driven** — see §7.
 
 ### Incremental by default + the override toggle
 Re-running is **cheap**: the ranking and monetization passes only analyze
@@ -226,13 +240,27 @@ the pricing web-search; `--skip-deep-dive` to skip the pool this run.
 - **Lowest / Highest rated** — quick reference tables.
 
 ### Extension detail (`/reviews/<ext_id>`)
+- **🧠 Deep-dive layers** — the layered research stack for this extension:
+  - **🧪 Layer 0 — Review legitimacy** (automatic): why the rating is good/bad, a
+    legitimacy %, the dominant cause (product issues / review-bombing / competitor
+    attack / off-topic), and a note on the recent-vs-older trajectory.
+  - **🔬 Layer 1 — Quick competitive read**: the **Add to deep-dive pool** button
+    (queue/re-queue/remove); researched by the ranking layer (§6).
+  - **🔭 Layer 2 — Deep competitor study** *(skill-driven; needs Layer 1)*: click
+    **Generate research prompt**, **Copy** it into a Claude session with the
+    **deep-research skill**, run it, **export the PDF**, then **upload** it back
+    (or paste the text). The dashboard parses the narrative **and** the structured
+    competitors/opportunities out of the report.
+  - **💰 Layer 3 — Financial study** *(skill-driven; needs Layer 2)*: same flow,
+    focused on how the extension makes money and how competitors are attacking it
+    (free-alternative land-grabs, pricing openings).
+- **Layer 2 / 3 reports** (once uploaded) — executive summary + verdict, the
+  target's strengths/weaknesses, the **competitors** as a force-directed **graph**
+  + rich cards, the **opportunities** breakdown, financials (Layer 3), sources,
+  and the full narrative report (collapsible).
 - **Opportunity digest** — a plain "what it does" overview, the **clustered user
   problems** (each complaint + how many distinct reviewers raised it + verbatim
   "I'd pay if…" quotes), and the full **monetization breakdown**.
-- **Deep dive** (once researched) — a deep review read, the **competitors** as an
-  Obsidian-style force-directed **graph** (drag nodes; click one to open it) plus
-  a list, the opportunity, a verdict badge, and sources.
-- **🔬 Add to deep-dive pool** button — queue/re-queue/remove this extension.
 - **Saved reviews** — every review we stored, sortable by date/rating.
 
 ### Scraper settings (`/scraper-settings`) — §5.
@@ -278,6 +306,9 @@ something looks wrong.
 | Dashboard shows 0 rows | Wrong key (use the **service_role/secret** key, not anon/publishable), or `SUPABASE_URL` points at a different project. See `/diagnostics`. |
 | A section is blank after applying a migration | **Stale PostgREST schema cache** — reload it (Supabase → API → Reload schema). |
 | 🔬 / deep-dive section missing | No completed deep dive yet (queue one + run the pool), or stale cache. `/diagnostics` → Deep-dive pool panel tells you which. |
+| Layer 2/3 "locked" | The layers are sequential — finish Layer 1 before Layer 2, Layer 2 before Layer 3. |
+| Layer 2/3 upload: "no structured data block" | The deep-research output didn't end with the JSON block — re-run with the **generated prompt** (it asks for the block), or paste the report text including that block. |
+| PDF upload fails to parse | Use the **"…or paste the report text instead"** box (the report's JSON block is what matters). |
 | Scraper: HTTP 403 / can't reach store | The store is egress-blocked in the cloud env — run the scraper **locally**. |
 | Scraper: "No module named playwright" | `pip install -r requirements.txt && python -m playwright install chromium` (the launcher does this). |
 | Ranking: "ANTHROPIC_API_KEY isn't set" | Add it to `.env`. |
@@ -298,8 +329,13 @@ something looks wrong.
   decline_score/recent_rating/baseline_rating/complaint_trend, brief, details).
 - **monetization** — pricing model, paid tier, price range, est. users + monthly
   revenue range, confidence, sources.
-- **deep_dives** — the hand-picked research pool (status queued/done/error,
+- **review_analysis** — Layer 0 (status, **legitimacy** 0–1, primary_cause,
+  verdict, summary, categories breakdown, sentiment_note). Drives zone demotion.
+- **deep_dives** — Layer 1, the hand-picked research pool (status queued/done/error,
   what_it_is, review_summary, competitors, opportunity, recommendation, sources).
+- **deep_dive_studies** — Layers 2 & 3 (one row per extension+`layer`): the
+  generated `prompt`, the uploaded `report_md`, summary, recommendation,
+  competitors, opportunities, financials (L3), sources, parse_warning.
 - **app_settings** — key/value (`ranking_force_rerun`, `scraper_settings`).
 - **zone_exclusions** — extensions dismissed from the zone (+ reason).
 - **categories** — store categories / derived clusters.

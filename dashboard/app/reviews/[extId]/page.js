@@ -1,7 +1,11 @@
 import { getExtensionReviews } from "../../../lib/queries";
 import DeepDiveButton from "./DeepDiveButton";
+import StudyLayer from "./StudyLayer";
+import StudyReport from "./StudyReport";
 import ReviewList from "../../ReviewList";
 import CompetitorGraph from "../../CompetitorGraph";
+import { buildStudyPrompt } from "../../../lib/layerPrompts";
+import { LAYER_META } from "../../../lib/layers";
 
 // Render at request time so the build never needs Supabase credentials.
 export const dynamic = "force-dynamic";
@@ -63,6 +67,20 @@ export default async function ReviewsPage({ params }) {
   const ddStatus = dd && dd.status;
   const competitors = dd && Array.isArray(dd.competitors) ? dd.competitors : [];
 
+  // Layered deep-dive: Layer 0 (auto review legitimacy), Layer 1 (dd above),
+  // Layers 2/3 (skill-driven studies, gated in order).
+  const layer0 = d.layer0 && d.layer0.status === "done" ? d.layer0 : null;
+  const studies = d.studies || {};
+  const study2 = studies[2] || null;
+  const study3 = studies[3] || null;
+  const l1Done = ddStatus === "done";
+  const l2Done = Boolean(study2 && study2.status === "done");
+  const l3Done = Boolean(study3 && study3.status === "done");
+  const extName = ext ? ext.name || ext.ext_id : "This extension";
+  const l2Prompt = ext ? buildStudyPrompt(ext, 2) : "";
+  const l3Prompt = ext ? buildStudyPrompt(ext, 3) : "";
+  const l0Legit = layer0 && layer0.legitimacy != null ? Number(layer0.legitimacy) : null;
+
   return (
     <main className="wrap">
       <p className="back"><a href="/">← Back to dashboard</a></p>
@@ -83,11 +101,6 @@ export default async function ReviewsPage({ params }) {
         {href ? (
           <p className="store-link">
             <a href={href} target="_blank" rel="noreferrer">View on Chrome Web Store ↗</a>
-          </p>
-        ) : null}
-        {d.configured && ext ? (
-          <p className="deepdive-bar">
-            <DeepDiveButton extId={ext.ext_id} status={ddStatus} />
           </p>
         ) : null}
       </header>
@@ -118,8 +131,84 @@ export default async function ReviewsPage({ params }) {
       {d.configured && dd && dd.status === "error" && (
         <div className="banner">
           <strong>Deep dive failed:</strong> {dd.error || "unknown error"}. Use{" "}
-          <strong>“Re-run deep dive”</strong> above to try again.
+          <strong>“Re-run deep dive”</strong> in Layer 1 below to try again.
         </div>
+      )}
+
+      {d.configured && !d.notFound && !d.error && ext && (
+        <section className="layers-panel">
+          <h2>🧠 Deep-dive layers</h2>
+          <p className="sub">
+            A layered research stack — Layer 0 is automatic; Layers 1 → 3 go deeper and run in order.
+          </p>
+
+          {/* Layer 0 — automatic review-legitimacy pre-screen */}
+          <div className="study-layer layer0">
+            <div className="study-layer-head">
+              <span className="study-icon">{LAYER_META[0].icon}</span>
+              <span className="study-name"><strong>{LAYER_META[0].short}</strong> · {LAYER_META[0].name}</span>
+              {layer0 ? (
+                <span className={`study-status ${l0Legit != null && l0Legit < 0.6 ? "is-error" : "is-done"}`}>
+                  legitimacy {Math.round((l0Legit == null ? 1 : l0Legit) * 100)}%
+                </span>
+              ) : (
+                <span className="study-status is-none">○ runs automatically for zone extensions</span>
+              )}
+            </div>
+            <p className="study-blurb muted">{LAYER_META[0].blurb}</p>
+            {layer0 ? (
+              <div className="layer0-body">
+                {layer0.primary_cause ? <span className="pill">{String(layer0.primary_cause).replace(/_/g, " ")}</span> : null}
+                {layer0.verdict ? <p className="digest-text"><strong>{layer0.verdict}</strong></p> : null}
+                {layer0.summary ? <p className="digest-text">{layer0.summary}</p> : null}
+                {layer0.sentiment_note ? <p className="comp-line"><span className="l">Trajectory:</span> {layer0.sentiment_note}</p> : null}
+                {l0Legit != null && l0Legit < 0.6 ? (
+                  <p className="study-notice">
+                    ⚠ Low legitimacy — demoted in the Opportunity Zone (its low rating looks like noise, not a fixable product gap).
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {/* Layer 1 — quick competitive read (headless pipeline) */}
+          <div className="study-layer">
+            <div className="study-layer-head">
+              <span className="study-icon">{LAYER_META[1].icon}</span>
+              <span className="study-name"><strong>{LAYER_META[1].short}</strong> · {LAYER_META[1].name}</span>
+              <span className={`study-status ${l1Done ? "is-done" : ddStatus === "queued" ? "is-queued" : ddStatus === "error" ? "is-error" : "is-none"}`}>
+                {l1Done ? "✅ done" : ddStatus === "queued" ? "⏳ queued" : ddStatus === "error" ? "⚠️ failed" : "○ not started"}
+              </span>
+            </div>
+            <p className="study-blurb muted">{LAYER_META[1].blurb}</p>
+            <DeepDiveButton extId={ext.ext_id} status={ddStatus} />
+          </div>
+
+          {/* Layer 2 — deep competitor study (skill-driven, needs Layer 1) */}
+          <StudyLayer
+            extId={ext.ext_id} layer={2} meta={LAYER_META[2]}
+            status={study2 ? study2.status : "none"} prompt={l2Prompt}
+            locked={!l1Done} lockMsg="Run Layer 1 first — the deep-dive layers are sequential."
+            uploadedAt={study2 ? study2.uploaded_at : null}
+            sourceFilename={study2 ? study2.source_filename : null}
+          />
+
+          {/* Layer 3 — financial study (skill-driven, needs Layer 2) */}
+          <StudyLayer
+            extId={ext.ext_id} layer={3} meta={LAYER_META[3]}
+            status={study3 ? study3.status : "none"} prompt={l3Prompt}
+            locked={!l2Done} lockMsg="Finish Layer 2 first — the deep-dive layers are sequential."
+            uploadedAt={study3 ? study3.uploaded_at : null}
+            sourceFilename={study3 ? study3.source_filename : null}
+          />
+        </section>
+      )}
+
+      {d.configured && !d.notFound && !d.error && l2Done && (
+        <StudyReport meta={LAYER_META[2]} study={study2} extName={extName} />
+      )}
+      {d.configured && !d.notFound && !d.error && l3Done && (
+        <StudyReport meta={LAYER_META[3]} study={study3} extName={extName} />
       )}
 
       {d.configured && !d.notFound && !d.error && dd && dd.status === "done" && (

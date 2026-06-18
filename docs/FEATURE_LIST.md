@@ -11,5 +11,15 @@
 
 ---
 
-_Nothing in the backlog right now — every captured feature has shipped. Add the
-next one with "add this to the feature list."_
+### 1. 🆕 Publisher column on the Opportunity Zone
+Add a **"Publisher"** (developer) column to the Opportunity Zone section of the
+dashboard so each zone row shows who makes the extension at a glance. The
+`developer` field is already on the `extensions` table; surface it in the zone
+table (and consider it for the other extension lists too).
+
+### 2. 🆕 Scraper "prefer the Opportunity Zone" mode
+Give the scraper the ability (a settable mode) to **prioritise the 25 extensions
+currently in the Opportunity Zone**: before doing its normal crawl, it should
+look at the current zone list and go fetch **every single review** for each of
+those 25 extensions, exhaustively, then move on to its usual behaviour. Useful
+for deep-loading review data on the exact targets we care about most.

@@ -22,8 +22,9 @@ opportunities  (score, top complaint, WTP evidence, brief)  → Supabase
 | `prompt.py` | System + per-extension user prompt |
 | `rank.py` | `analyze_extension` (the one Claude call) + `score_opportunity` (pure, tested) + `select_for_analysis` (incremental selector, pure) + `rank_all` orchestration |
 | `monetize.py` | Monetization research: `research_monetization` (one **web-search** Claude call → `MonetizationProfile`) + `monetize_all`; writes the `monetization` table the dashboard shows |
-| `deepdive.py` | **Deep-dive pool**: `research_deep_dive` (one web-search call → `DeepDiveReport`: reviews + competitors + verdict) + `deep_dive_all`; processes only the extensions queued from the dashboard, writes the `deep_dives` table |
-| `run.py` | CLI (`python -m analysis.run`; `--monetize` adds pricing research; the deep-dive pool runs by default; `--force` forces a full re-run) |
+| `layer0.py` | **Layer 0** review-legitimacy pre-screen: `classify_reviews` (one review-only Claude call → `Layer0Report`) + `legitimacy_from_categories` (pure, tested) + `layer0_all`; runs over the Opportunity Zone and writes `review_analysis`. Low legitimacy demotes an extension in the zone (review-bombing ≠ opportunity). |
+| `deepdive.py` | **Layer 1** deep-dive pool: `research_deep_dive` (one web-search call → `DeepDiveReport`: reviews + competitors + verdict) + `deep_dive_all`; processes only the extensions queued from the dashboard, writes the `deep_dives` table. (Layers 2 & 3 are **skill-driven** — generated in the dashboard, run with the deep-research skill, uploaded back as a PDF → `deep_dive_studies`.) |
+| `run.py` | CLI (`python -m analysis.run`; `--monetize` adds pricing research; Layer 0 + the deep-dive pool run by default; `--force` forces a full re-run; `--skip-layer0` / `--skip-deep-dive` opt out) |
 
 ### Incremental runs + the dashboard override toggle
 

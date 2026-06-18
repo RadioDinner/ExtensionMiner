@@ -40,6 +40,21 @@ function reviewLink(row) {
   if (!row.ext_id) return row.name || "—";
   return <a href={`/reviews/${encodeURIComponent(row.ext_id)}`}>{row.name || row.ext_id}</a>;
 }
+// Layer 0 review-legitimacy badge: how much the rating reflects real, fixable
+// problems vs. noise (review-bombing). Low legitimacy = this rating is suspect,
+// and the extension is already demoted in the zone ranking.
+function legitCell(r) {
+  if (r.legitimacy == null) {
+    return <span className="muted" title="Layer 0 hasn't screened this extension yet">—</span>;
+  }
+  const pct = Math.round(Number(r.legitimacy) * 100);
+  const low = Number(r.legitimacy) < 0.6;
+  const title =
+    [r.review_cause ? `Cause: ${String(r.review_cause).replace(/_/g, " ")}` : null, r.review_verdict]
+      .filter(Boolean)
+      .join(" — ") || `Review legitimacy ${pct}%`;
+  return <span className={`pill ${low ? "legit-low" : "legit-ok"}`} title={title}>{low ? "⚠ " : ""}{pct}%</span>;
+}
 // Does the user pay? Derived from the monetization profile (may be absent).
 function moneyStatus(m) {
   if (!m || !m.pricing_model || m.pricing_model === "unknown") return "unknown";
@@ -58,6 +73,7 @@ const COLUMNS = [
   { key: "installs", label: "Installs", num: true, get: (r) => r.install_count, cell: (r) => fmt(r.install_count) },
   { key: "pricing", label: "Pricing", num: false, get: (r, money) => money[r.ext_id]?.pricing_model, cell: (r, money) => pricingCell(money[r.ext_id]) },
   { key: "revenue", label: "Est. /mo", num: true, get: (r, money) => money[r.ext_id]?.estimated_monthly_revenue_usd, cell: (r, money) => (money[r.ext_id] ? fmtUSD(money[r.ext_id].estimated_monthly_revenue_usd) : "—") },
+  { key: "legit", label: "Legit", num: true, get: (r) => (r.legitimacy == null ? null : Number(r.legitimacy)), cell: (r) => legitCell(r) },
   { key: "deepdive", label: "Deep dive", num: true, get: (r, _money, dds) => DEEP_DIVE_RANK[(dds && dds[r.ext_id]) || "none"], cell: (r, _money, dds) => {
       const m = deepDiveMeta(dds && dds[r.ext_id]);
       return <span className={`dd-status ${m.cls}`} title={m.title}>{m.icon}</span>;

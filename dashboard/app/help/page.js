@@ -89,10 +89,21 @@ export default function Help() {
             cost no tokens. Flip to <strong>🔁 Full re-run</strong> to re-score everything once, then
             flip back. The setting is saved in Supabase and read by the ranking layer.
           </Card>
-          <Card title="Deep dive (🔬)">
-            On an extension's page, <strong>🔬 Add to deep-dive pool</strong>, then run the ranking
-            layer. When done you get a deep review read, a <strong>competitor graph</strong>, and a
-            build/maybe/avoid verdict. The <strong>Deep dive</strong> column shows each row's status:
+          <Card title="Deep-dive layers (0–3)">
+            The deep dive is <strong>layered</strong>, and the manual layers run <strong>in order</strong>:
+            <br /><strong>🧪 Layer 0 — Review legitimacy</strong> (automatic): for every zone extension,
+            reads the reviews (recent + helpful weighted) to judge <em>why</em> the rating is what it is.
+            Low legitimacy (review-bombing, off-topic, competitor attacks) <strong>demotes</strong> it in
+            the zone — there's no fixable product gap to win.
+            <br /><strong>🔬 Layer 1 — Quick read</strong>: <strong>Add to deep-dive pool</strong>, then run
+            the ranking layer → a deep review read, a <strong>competitor graph</strong>, and a
+            build/maybe/avoid verdict.
+            <br /><strong>🔭 Layer 2 — Competitor study</strong> &amp; <strong>💰 Layer 3 — Financial study</strong>
+            (need the prior layer): <strong>Generate &amp; copy the research prompt</strong>, run it in a
+            Claude session with the <strong>deep-research skill</strong>, then <strong>upload the exported
+            PDF</strong> (or paste the text). You get the full report plus structured competitors,
+            opportunities, and (Layer 3) the money picture.
+            <br />The home-page <strong>Deep dive</strong> column shows Layer 1 status:
             <span className="dd-status dd-done"> 🔬</span> done
             <span className="dd-status dd-queued"> ⏳</span> queued
             <span className="dd-status dd-error"> ⚠️</span> error
@@ -134,8 +145,10 @@ export default function Help() {
           </Card>
           <Card title="Run Ranking">
             Click the Desktop <strong>Run ExtensionMiner Ranking</strong> button — it ranks, researches
-            monetization, and processes the deep-dive queue. By hand:
-            <code> python -m analysis.run --monetize</code>. Add <code>--force</code> for a full re-run.
+            monetization, runs the <strong>Layer 0</strong> review-legitimacy pre-screen, and processes the
+            Layer 1 deep-dive queue. By hand:
+            <code> python -m analysis.run --monetize</code>. Add <code>--force</code> for a full re-run;
+            <code> --skip-layer0</code> / <code>--skip-deep-dive</code> to skip a pass.
           </Card>
         </div>
         <p className="sub">Full run guides: <code>docs/RUNNING_THE_RANKER.md</code> and <code>scraper/README.md</code>.</p>

@@ -50,7 +50,7 @@ export async function getDashboardData() {
   if (!supabase) return EMPTY;
 
   try {
-    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money, deepDives, settings, excl] = await Promise.all([
+    const [zone, lowest, highest, opps, points, extCount, revCount, helpful, money, deepDives, settings, excl, legit] = await Promise.all([
       supabase
         .from("extensions")
         .select(EXT_SELECT)
@@ -110,14 +110,19 @@ export async function getDashboardData() {
         .select("reason,dismissed_at,extensions(ext_id,name,store_category,rating,install_count,listing_url)")
         .order("dismissed_at", { ascending: false })
         .limit(2000),
+      supabase
+        .from("review_analysis")
+        .select("legitimacy,primary_cause,verdict,extensions(ext_id)")
+        .limit(5000),
     ]);
 
     // Surface the first real error (e.g. schema not applied yet) without crashing.
-    // `helpful`, `money`, `deepDives`, `settings` and `excl` are intentionally
-    // excluded: they read columns/tables (reviews.helpful_ranked, monetization,
-    // deep_dives, app_settings, zone_exclusions) that only exist once migrations
-    // 996 / 995 / 993 / 991 / 990 are applied, so a missing one degrades to an
-    // empty section / default instead of erroring the whole page.
+    // `helpful`, `money`, `deepDives`, `settings`, `excl` and `legit` are
+    // intentionally excluded: they read columns/tables (reviews.helpful_ranked,
+    // monetization, deep_dives, app_settings, zone_exclusions, review_analysis)
+    // that only exist once migrations 996 / 995 / 993 / 991 / 990 / 988 are
+    // applied, so a missing one degrades to an empty section / default instead of
+    // erroring the whole page.
     const firstError = [zone, lowest, highest, opps, points, extCount, revCount]
       .map((r) => r.error)
       .find(Boolean);
@@ -154,10 +159,34 @@ export async function getDashboardData() {
       }));
     const dismissedSet = new Set(dismissedZone.map((d) => d.ext_id));
 
-    // Curated zone: drop dismissed extensions, then keep the working top-N — so
-    // dismissing one backfills with the next candidate.
+    // ext_id -> Layer 0 review-legitimacy (migration 988; absent = unscreened).
+    const reviewLegit = {};
+    for (const r of legit.data || []) {
+      const extId = r.extensions?.ext_id;
+      if (extId) reviewLegit[extId] = r;
+    }
+
+    // Curated zone: drop dismissed, attach Layer 0, then re-rank by installs
+    // DEMOTED by review legitimacy — so an extension that's only 3★ because it was
+    // review-bombed sinks below one with the same installs but real complaints.
+    // Unscreened extensions (no Layer 0 yet) keep a neutral multiplier of 1.
     const opportunityZone = (zone.data || [])
       .filter((r) => !dismissedSet.has(r.ext_id))
+      .map((r) => {
+        const la = reviewLegit[r.ext_id] || null;
+        const legitimacy = la && la.legitimacy != null ? Number(la.legitimacy) : null;
+        return {
+          ...r,
+          legitimacy,
+          review_cause: la ? la.primary_cause : null,
+          review_verdict: la ? la.verdict : null,
+        };
+      })
+      .sort((a, b) => {
+        const ka = (a.install_count || 0) * (a.legitimacy == null ? 1 : a.legitimacy);
+        const kb = (b.install_count || 0) * (b.legitimacy == null ? 1 : b.legitimacy);
+        return kb - ka;
+      })
       .slice(0, ZONE_SHOW);
 
     return {
@@ -204,6 +233,30 @@ const MON_DETAIL_COLS =
 // The deep-dive pool entry + its results (migration 993).
 const DEEP_DIVE_COLS =
   "status,what_it_is,review_summary,competitors,opportunity,recommendation,sources,error,analyzed_at,requested_at";
+// Layer 0 review-legitimacy analysis (migration 988).
+const L0_COLS =
+  "status,legitimacy,primary_cause,verdict,summary,categories,sentiment_note,reviews_analyzed,analyzed_at,error";
+// Layer 2/3 deep-dive studies (migration 989). One row per (extension, layer).
+const STUDY_COLS =
+  "layer,status,prompt,report_md,summary,recommendation,target_strengths,target_weaknesses," +
+  "competitors,opportunities,financials,sources,uploaded_at,source_filename,parse_warning,model,requested_at,error";
+
+// All study rows (layers 2 & 3) for one extension, keyed by layer. Resilient to
+// the table not existing yet (migration 989 not applied) — returns {}.
+async function maybeStudies(supabase, extensionId) {
+  try {
+    const { data, error } = await supabase
+      .from("deep_dive_studies")
+      .select(STUDY_COLS)
+      .eq("extension_id", extensionId);
+    if (error) return {};
+    const map = {};
+    for (const r of data || []) map[r.layer] = r;
+    return map;
+  } catch {
+    return {};
+  }
+}
 
 // One row by extension_id, tolerating a missing table/column (e.g. the
 // opportunities/monetization migration not applied yet) by returning null
@@ -257,7 +310,7 @@ export async function getExtensionReviews(extId) {
       return { configured: true, error: null, notFound: true, extension: null, reviews: [], opportunity: null, monetization: null };
     }
 
-    const [reviewsRes, opportunity, monetization, deepDive] = await Promise.all([
+    const [reviewsRes, opportunity, monetization, deepDive, layer0, studies] = await Promise.all([
       supabase
         .from("reviews")
         .select(REVIEW_COLS)
@@ -267,6 +320,8 @@ export async function getExtensionReviews(extId) {
       maybeRowByExtension(supabase, "opportunities", OPP_DETAIL_COLS, ext.id, OPP_CORE_COLS),
       maybeRowByExtension(supabase, "monetization", MON_DETAIL_COLS, ext.id),
       maybeRowByExtension(supabase, "deep_dives", DEEP_DIVE_COLS, ext.id),
+      maybeRowByExtension(supabase, "review_analysis", L0_COLS, ext.id),
+      maybeStudies(supabase, ext.id),
     ]);
 
     return {
@@ -278,6 +333,8 @@ export async function getExtensionReviews(extId) {
       opportunity,
       monetization,
       deepDive,
+      layer0,
+      studies,
     };
   } catch (err) {
     return {
@@ -289,6 +346,8 @@ export async function getExtensionReviews(extId) {
       opportunity: null,
       monetization: null,
       deepDive: null,
+      layer0: null,
+      studies: {},
     };
   }
 }

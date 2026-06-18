@@ -287,6 +287,67 @@ def upsert_monetization(row: dict[str, Any]) -> dict[str, Any]:
     return res.data[0] if res.data else {}
 
 
+# --- Layer 0 (review-legitimacy pre-screen of the Opportunity Zone) ----------
+
+# The opportunity sweet spot the dashboard surfaces (mirror of queries.js).
+ZONE_MIN_RATING, ZONE_MAX_RATING = 2.5, 3.5
+
+
+def fetch_zone_extensions(limit: int = 25, *, min_rating: float = ZONE_MIN_RATING,
+                          max_rating: float = ZONE_MAX_RATING) -> list[dict[str, Any]]:
+    """Opportunity-Zone extensions (mid-rated), most-installed first — Layer 0's input."""
+    res = (
+        get_client()
+        .table("extensions")
+        .select("id,ext_id,name,store_category,rating,rating_count,install_count,website")
+        .gte("rating", min_rating)
+        .lte("rating", max_rating)
+        .order("install_count", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return res.data or []
+
+
+def fetch_reviews_for_layer0(extension_id: int, limit: int = 120) -> list[dict[str, Any]]:
+    """Reviews for Layer 0 — includes the helpful flags so it can weight by them."""
+    res = (
+        get_client()
+        .table("reviews")
+        .select("stars,body,reviewed_at,helpful_count,helpful_ranked")
+        .eq("extension_id", extension_id)
+        .order("reviewed_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return res.data or []
+
+
+def fetch_review_analyzed_extension_ids() -> set[int]:
+    """extension_ids that already have a `review_analysis` row (Layer 0 done)."""
+    return _fetch_extension_ids("review_analysis")
+
+
+def upsert_review_analysis(row: dict[str, Any]) -> dict[str, Any]:
+    """Upsert one Layer 0 review-analysis result (one row per extension)."""
+    res = get_client().table("review_analysis").upsert(row, on_conflict="extension_id").execute()
+    return res.data[0] if res.data else {}
+
+
+def mark_review_analysis_error(extension_pk: int, message: str) -> int:
+    """Record a Layer 0 failure so it surfaces instead of silently retrying forever."""
+    res = (
+        get_client()
+        .table("review_analysis")
+        .upsert(
+            {"extension_id": extension_pk, "status": "error", "error": message[:2000]},
+            on_conflict="extension_id",
+        )
+        .execute()
+    )
+    return len(res.data or [])
+
+
 # --- Deep-dive pool (hand-picked extensions for comprehensive research) ------
 
 def queue_deep_dive(extension_pk: int) -> dict[str, Any]:

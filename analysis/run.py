@@ -49,6 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skip-deep-dive", action="store_true",
                    help="do NOT process the deep-dive queue this run (it is processed by default "
                         "whenever the DB is available; the queue is opt-in per extension).")
+    p.add_argument("--skip-layer0", action="store_true",
+                   help="do NOT run the Layer 0 review-legitimacy pre-screen this run (it runs by "
+                        "default over the Opportunity Zone whenever the DB is available).")
     p.add_argument("--force", action="store_true",
                    help="ignore the dashboard toggle and force a FULL re-run across the whole "
                         "top-N — re-analyze (and re-monetize) even extensions already scored. "
@@ -158,6 +161,26 @@ def main(argv=None) -> int:
             print(f"\nMonetization researched: {len(money)} extensions.")
         except Exception as exc:  # never let monetization sink an otherwise-good ranking run
             log.warning("monetization pass skipped (%s)", exc)
+
+    # Layer 0: the automatic review-legitimacy pre-screen of the Opportunity Zone.
+    # Runs by default whenever the DB is available; it down-weights zone extensions
+    # whose low rating is noise (review-bombing) rather than fixable product pain.
+    if args.no_db:
+        log.info("Layer 0 skipped under --no-db (it reads the zone + writes review_analysis)")
+    elif args.skip_layer0:
+        log.info("skipping the Layer 0 review-legitimacy pre-screen this run (--skip-layer0)")
+    else:
+        from .layer0 import layer0_all
+
+        log.info("running Layer 0 review-legitimacy pre-screen over the Opportunity Zone")
+        try:
+            l0 = layer0_all(
+                settings, limit=args.limit, min_reviews=args.min_reviews,
+                max_reviews=args.max_reviews, model=args.model, force=force,
+            )
+            print(f"\nLayer 0 analyzed: {len(l0)} zone extensions.")
+        except Exception as exc:  # never let Layer 0 sink an otherwise-good run
+            log.warning("Layer 0 pass skipped (%s)", exc)
 
     # Process the hand-picked deep-dive pool by default (it's inherently incremental
     # — only status='queued' rows are touched). Needs the DB to read the queue.
