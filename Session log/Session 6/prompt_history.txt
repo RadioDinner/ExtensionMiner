@@ -68,3 +68,6 @@ On the main dashboard, I want a way of seeing if it has ever been deep dive rese
 
 22.
 ship it
+
+23.
+write the handoff, commit it to main and wrap the session

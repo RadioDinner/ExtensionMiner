@@ -1,0 +1,209 @@
+SESSION 6 — HANDOFF LOG
+=======================
+Date: 2026-06-18 (UTC). WEB session (Claude-Code-on-the-web).
+
+BRANCH / WORKFLOW:
+  - Session started on the assigned branch claude/pensive-tesla-lih6no. At prompt
+    2 the user said "merge everything you have to main and delete the branches.
+    Commit directly to main for the remainder of this session." So from prompt 2
+    on, ALL work is committed straight to main. No feature branch.
+  - main HEAD at handoff = this log's commit.
+  - BRANCH CLEANUP: the old feature branches are fully merged into main but could
+    NOT be deleted from this web env — the git proxy returns HTTP 403 on delete-
+    pushes and there's no GitHub MCP delete-branch tool. The USER must delete
+    them from the GitHub Branches page (they're harmless; fully merged):
+      * claude/pensive-tesla-lih6no
+      * claude/intelligent-wozniak-gjt2g9
+    (Same limitation hit in Session 5.) Don't recreate them — commit to main.
+
+MIGRATIONS: count DOWN from 999. Lowest is now 992. NEXT NEW = 991.
+  ALL applied (user confirmed "all migrations applied" at prompt 18):
+    999, 998, 997, 996, 995, 994 (recency), 993 (deep-dive pool), 992 (decline).
+
+================================================================================
+WHAT THE USER ASKED (prompt by prompt)
+================================================================================
+1.  "Let's start a new session, are there open bugs/issues" -> reported: 0 GitHub
+    issues/PRs, no TODO/FIXME, Session 5 ended green (79 tests). Open = verify
+    items + feature backlog.
+2.  "merge everything to main and delete the branches. Commit directly to main..."
+    + ADD FEATURE: deep-dive research pool (capture-only). -> merged to main;
+    couldn't delete remote branches (403); captured feature.
+3.  ADD FEATURE: decline/complaint-trend detection (capture-only).
+4.  "whats the next feature" -> reported #1 (recency weighting).
+5.  "build it" -> built recency-weighted review scoring (feature #1).
+6.  "migration run next feature" -> 994 applied; reported next (richer detail page).
+7.  "next feature" -> reported richer detail page.
+8.  "build it" -> built richer extension detail page (digest).
+9.  ADD FEATURE: sortable/filterable Opportunity zone card (capture-only).
+10. "build the next one" -> built the deep-dive research pool (feature).
+11. "migration run next feature" -> 993 applied; reported next (decline detection).
+12. "build it" -> built decline/complaint-trend detection.
+    [mid-build] ADD FEATURE: sort displayed reviews by date/rating (capture-only).
+13. (the add-feature above, logged as prompt 13)
+14. ADD FEATURE: "Competitors" card — Obsidian-style graph (capture-only).
+15. "build the next feature" -> built sortable/filterable Opportunity zone card.
+16. "build the next one" -> built sortable review lists (everywhere).
+17. "build the next one, dont stop" -> built the Competitors graph. Backlog emptied.
+18. "all migrations applied" -> confirmed; explained run flow.
+19. "the summary card is missing from one of the extensions, why?"
+20. "actually it looks like it is missing from all the extensions" -> DIAGNOSED +
+    FIXED: see below (digest-robustness fix).
+21. "On the main dashboard ... add a star or something by the [deep-dive]
+    researched [ones]" -> built the 🔬 deep-dive markers.
+22. "ship it" -> confirmed shipped (already on main; Vercel auto-deploys).
+23. "write the handoff, commit it to main and wrap the session" -> this log.
+
+================================================================================
+WHAT WAS BUILT THIS SESSION (all on main)
+================================================================================
+FEATURES SHIPPED (each removed from docs/FEATURE_LIST.md on ship, per CLAUDE.md §6):
+
+1) RECENCY-WEIGHTED REVIEW SCORING (decay old reviews). migration 994.
+   - analysis/rank.py: pure recency_weight(date) curve (RECENCY_BUCKETS: <=3mo 1.0
+     -> >3yr 0.15 floor) + recency_factor(reviews) (avg decay over complaint <=3*
+     reviews; 1.0 when nothing dated). score_opportunity(...recency=) scales the
+     DEMAND term only. Persisted as opportunities.recency_weight; dashboard
+     "Recency" column on the Scored-opportunities card.
+
+2) RICHER EXTENSION DETAIL PAGE (opportunity digest). NO migration.
+   - schema: new REQUIRED ExtensionAnalysis.what_it_does (rides in opportunities.
+     details JSONB). prompt asks Claude for it. Old rows fall back to brief.
+   - dashboard /reviews/<ext_id>: "Opportunity digest" = what-it-does + clustered
+     user problems (reviewer counts + WTP quotes) + full monetization breakdown.
+     getExtensionReviews also pulls opportunity + monetization rows resiliently.
+
+3) DEEP-DIVE RESEARCH POOL (opt-in, token-frugal). migration 993 (deep_dives).
+   - analysis/deepdive.py: DeepDiveReport (what_it_is, review_summary, competitors
+     [{name,url,pricing,strengths,weaknesses}], opportunity, recommendation
+     build/maybe/avoid, sources) via ONE web-search Claude call. deep_dive_all()
+     processes only status='queued' rows; failures -> status='error'. CLI
+     `python -m analysis.deepdive`. run.py --deep-dive flag. run_ranker.cmd button
+     RUN_ARGS now "--monetize --deep-dive --log-dir logs" (one click = all 3).
+   - common/db.py: queue_deep_dive / remove_deep_dive / fetch_deep_dive_queue /
+     upsert_deep_dive / mark_deep_dive_error.
+   - dashboard: server actions (app/actions.js: queueDeepDive/removeDeepDive via
+     service-role, server-side only) + DeepDiveButton (Add to pool / Queued+remove
+     / Re-run) + a "Deep dive" results section (what-it-is, deep review read,
+     competitors, opportunity, verdict badge, sources). All resilient to 993 absent.
+
+4) DECLINE / COMPLAINT-TREND DETECTION. migration 992.
+   - analysis/rank.py: pure trend_signal(reviews) -> decline_score [0,1] from the
+     recent(~6mo)-vs-prior(~6-18mo) rating drop + rise in negative(<=2*) share;
+     needs >=3 dated reviews per window. Small score bonus (W_DECLINE). Stored as
+     opportunities.decline_score/recent_rating/baseline_rating/complaint_trend.
+   - dashboard: Scored-opportunities card gains a "Trend" column, "Declining
+     fastest" sort, "Declining only" filter; detail digest shows a Declining badge.
+
+5) SORTABLE + FILTERABLE OPPORTUNITY ZONE CARD. NO migration.
+   - NEW dashboard/app/OpportunityZoneCard.js (client): the ★ zone is now sortable
+     by any column (click header, click again to flip; nulls last) + filters (min
+     installs, rating band, pricing, category, has-saved-reviews). Split out from
+     the shared ExtTable so Lowest/Highest tables are untouched.
+
+6) SORTABLE REVIEW LISTS (everywhere reviews show). NO migration.
+   - NEW dashboard/app/ReviewList.js (client): Sort = Newest/Oldest/Highest/Lowest
+     (nulls last). Used by BOTH the per-extension saved-reviews list (variant
+     "saved", default date-desc) and the home community-upvoted list (variant
+     "helpful", default rating-asc). Removed the duplicated inline review markup +
+     unused StarRow/fmtDate from page.js and [extId]/page.js.
+
+7) COMPETITORS GRAPH (Obsidian-style). NO migration.
+   - NEW dashboard/app/CompetitorGraph.js (client): hand-rolled SVG force-directed
+     graph (extension center node + competitor nodes), draggable, click a
+     competitor to open its page (drag distinguished from click so a drag never
+     navigates), hover shows pricing/strengths/weaknesses. NO new dependency.
+     Lives in the Competitors card on the detail page; data = deep_dives.competitors
+     (so it only appears once a deep dive has COMPLETED with >=1 competitor).
+
+8) 🔬 DEEP-DIVE MARKERS on the home dashboard (prompt 21). NO migration.
+   - getDashboardData also fetches ext_ids with a COMPLETED deep dive (status=
+     'done'), excluded from error-gating (993 absent => no marks, not a page error).
+     A 🔬 (title "Deep-dive researched") renders next to the name in the Opportunity
+     zone, Scored opportunities, and Lowest/Highest tables + a legend note.
+
+BUG FIX (prompts 19-20): "summary card missing from ALL extensions".
+   - ROOT CAUSE: the detail page's opportunities fetch (maybeRowByExtension)
+     returned null on ANY error, and it selects the newer recency/decline columns.
+     If one of those wasn't queryable yet (migration not applied, or — most likely
+     here, right after applying migrations — PostgREST's schema cache still STALE),
+     the whole opportunity row dropped => the entire digest vanished for every
+     extension.
+   - FIX (dashboard/lib/queries.js): maybeRowByExtension takes a fallbackCols; the
+     opportunities fetch falls back to the migration-999 core columns
+     (OPP_CORE_COLS) so the summary always renders when a row exists (only the
+     Recency/Trend extras drop). Plus a clear "No Claude analysis yet — run the
+     ranking layer" hint on the detail page when an extension genuinely has no
+     opportunities/monetization/deep-dive data.
+   - IF STILL BLANK after deploy: reload PostgREST's schema (Supabase Settings ->
+     API -> "Reload schema", or NOTIFY pgrst,'reload schema'); and make sure the
+     RANKER HAS RUN (the digest is Claude-built, not from scraping).
+
+DOCS: analysis/README.md (recency, decline, deep-dive pool, detail digest, graph),
+  docs/RUNNING_THE_RANKER.md (3 tasks; --deep-dive; deepdive CLI), scraper docs
+  untouched. docs/FEATURE_LIST.md is now EMPTY (all captured features shipped).
+
+TESTS: 93 passing (added recency, what_it_does, decline/trend, and deep-dive
+  tests). Dashboard `next build` succeeds. NOTE: the web env has NO .venv; this
+  session pip-installed deps ad hoc (pydantic, pytest, python-dotenv, bs4, lxml,
+  python-dateutil, anthropic) to run pytest, and `npm install` in dashboard/ to
+  build. A fresh container must redo this.
+
+================================================================================
+CURRENT PROJECT STATE
+================================================================================
+* All 8 migrations applied (999..992). Backlog empty. main is the working branch.
+* The full pipeline is wired and ready; it just needs the user to run it on their
+  machine (Chrome Web Store is HTTP-403 in the web env, so the scraper runs local):
+    1. run_scraper.py --preset daily   -> extensions + reviews into Supabase.
+    2. "Run ExtensionMiner Ranking" button (= --monetize --deep-dive) ->
+       opportunities (incl. recency_weight + decline_score/trend), monetization,
+       and any QUEUED deep_dives.
+    3. Dashboard then shows: Recency + Trend columns, Declining filter/sort,
+       sortable/filterable zone, sortable review lists, the detail digest, 🔬
+       deep-dive markers, and (for queued+done extensions) the deep-dive results
+       + Competitors graph.
+* Deep dive is OPT-IN: open an extension -> "🔬 Add to deep-dive pool" -> run the
+  Ranking/deepdive pass -> graph + 🔬 marker appear once status='done'.
+
+================================================================================
+OPEN ITEMS / FOR NEXT SESSION
+================================================================================
+1. VERIFY END-TO-END on the user's machine / live data (not done in web env):
+   - Recency + Trend columns populate after a ranking run (migrations 994/992).
+   - Monetization web-search call (never verified live, only mocked).
+   - Deep-dive pool: queue an extension, run --deep-dive, confirm the deep-dive
+     section + Competitors graph + 🔬 marker render.
+   - If the summary digest is blank despite opportunities rows: reload PostgREST
+     schema cache (see bug-fix note above).
+2. BRANCH CLEANUP: user deletes claude/pensive-tesla-lih6no +
+   claude/intelligent-wozniak-gjt2g9 from GitHub (proxy blocks delete here).
+3. docs/FEATURE_LIST.md is empty — next "add to the feature list" starts fresh.
+4. Optional polish ideas raised but NOT requested: mark QUEUED deep dives with a
+   hollow icon (only 'done' is marked now); have the deep dive capture each
+   competitor's Chrome Web Store listing URL/ext_id so graph nodes link straight
+   to the store page (today competitor.url may be a homepage).
+
+================================================================================
+KEY CONTEXT / GOTCHAS
+================================================================================
+* WORKFLOW: commit DIRECTLY to main (user instruction, prompt 2). Push origin main.
+* Migrations count DOWN; lowest is 992; NEXT NEW = 991.
+* "Run Ranking" button = ALL Claude tasks (ranking + monetization + deep-dive pool).
+  "Run Scraper" button = scraping only. Both auto-update from main (git pull) first.
+* Deep-dive pool is OPT-IN per extension (token-frugal) — it does NOT run for every
+  extension. The Competitors graph + 🔬 marker only show after a deep dive COMPLETES.
+* Dashboard writes (deep-dive queue) go through Next.js SERVER ACTIONS using the
+  server-side service-role client — the key never reaches the browser.
+* Resilience pattern: optional tables/columns (monetization 995, helpful 996,
+  deep_dives 993, recency/decline 994/992) are fetched OUTSIDE the error-gating so
+  a missing migration degrades gracefully instead of erroring the page. The detail
+  page's opportunities fetch now also falls back to core columns (the prompt-19/20
+  fix) so a stale PostgREST schema cache can't blank the digest.
+* Egress: Chrome Web Store = HTTP 403 in the web env (scraper runs on user's
+  machine). Anthropic API + PyPI reachable here (tests/ranking/monetize run).
+* Claude API surface (grounded via the claude-api skill): model claude-opus-4-8,
+  messages.parse(output_format=PydanticModel) -> .parsed_output, adaptive thinking,
+  web_search_20260209 / web_fetch_20260209 SERVER tools (monetize + deepdive).
+* Supabase MCP is project-scoped in .mcp.json but needs local OAuth (/mcp) — not
+  available in this web session, so live DB verification is the user's to do.
