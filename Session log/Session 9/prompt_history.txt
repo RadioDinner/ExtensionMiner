@@ -48,3 +48,23 @@ fatal: unable to access 'https://github.com/RadioDinner/ExtensionMiner.git/': Fa
 PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>
 
 [mid-turn message while logging the PR notice]
+
+14. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch> netsh winhttp show proxy
+>> Test-NetConnection github.com -Port 443
+
+Current WinHTTP proxy settings:
+
+    Direct access (no proxy server).
+
+
+
+ComputerName     : github.com
+RemoteAddress    : 140.82.112.3
+RemotePort       : 443
+InterfaceAlias   : Ethernet
+SourceAddress    : 192.168.3.147
+TcpTestSucceeded : True
+
+
+
+PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>
