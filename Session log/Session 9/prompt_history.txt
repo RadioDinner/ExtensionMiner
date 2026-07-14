@@ -100,3 +100,8 @@ npm error code ENOENT
 npm error syscall open
 npm error path E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch\package.json
 [... npm ENOENT: no package.json in that directory - ran in wrong folder ...]
+
+20. keep working in main now that its merged. The extension says "Amazarch
+No Monarch session yet — open the Monarch web app while signed in.
+
+M0 skeleton — open the Monarch web app to connect. Amazon sync, matching, and the review queue arrive in later milestones (see SPEC.md)" when I have a webpage of https://app.monarch.com/dashboard
