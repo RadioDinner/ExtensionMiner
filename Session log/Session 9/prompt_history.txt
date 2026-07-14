@@ -75,3 +75,14 @@ fatal: unable to access 'https://github.com/RadioDinner/ExtensionMiner.git/': Fa
 PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>
 
 16. I merged it to main, give me the zip download to main
+
+17. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch> https://github.com/RadioDinner/ExtensionMiner/archive/refs/heads/main.zip
+https://github.com/RadioDinner/ExtensionMiner/archive/refs/heads/main.zip : The term
+'https://github.com/RadioDinner/ExtensionMiner/archive/refs/heads/main.zip' is not recognized as the name of a cmdlet,
+function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the
+path is correct and try again.
+At line:1 char:1
++ https://github.com/RadioDinner/ExtensionMiner/archive/refs/heads/main ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (https://github..../heads/main.zip:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
