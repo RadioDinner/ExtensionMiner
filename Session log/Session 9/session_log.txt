@@ -105,18 +105,50 @@ throughout (privacy section now cloud, milestones +M4.5 cloud/billing, risks
 +cloud-custody +paid-friction). New milestone order: M0..M4, M4.5, M5.
 
 ================================================================================
+LATE-SESSION UPDATE 2 (prompt 10): STRAT-0 RESOLVED (D17) + M0 BUILT
+================================================================================
+STRAT-0 decided by user (verbatim in prompt_history #10): start with (b) full
+independent matcher, with (a)'s gap-filler features (refunds/returns matching,
+Firefox, fix ALL official-extension complaints) as core parts of (b), and (d)
+multi-app expansion eventually. Recorded in SPEC.md as D17 + §1.5 updated +
+post-v1 milestone line (non-US Amazon/WF/digital/business, then YNAB + Lunch
+Money backends behind the same matcher core).
+
+M0 SKELETON BUILT under amazarch/ (per SPEC §6 M0) — VERIFIED in this env:
+npm run build (dist/chrome + dist/firefox), tsc --noEmit clean, vitest 12/12.
+  - package.json / tsconfig.json / build.mjs (esbuild, iife bundles; targets
+    chrome|firefox|both; copies manifest.<target>.json -> manifest.json).
+  - manifest.chrome.json (MV3 service worker) / manifest.firefox.json (MV3
+    event page, gecko id amazarch@radiodinner.dev, data_collection_permissions
+    FIRST DRAFT [authenticationInfo, financialAndPaymentInfo] — re-validate
+    category names against AMO before submission). Host permissions: both
+    Monarch app+api domains (monarchmoney.com AND monarch.com) + www.amazon.com.
+  - src/shared/monarch-session.ts: extractMonarchToken (persist:root double-
+    decode) + extractDeviceUuid — PURE, tested.
+  - src/shared/money.ts: integer-cents parse/format/sum — PURE, tested.
+  - src/content/monarch/index.ts: token bridge (polls localStorage up to 30s
+    for app hydration, sends session to background) + "Amazarch connected"
+    pill (M0 overlay proof).
+  - src/background/index.ts: holds session in storage.session ONLY (memory-
+    backed, never disk), answers get-status with REDACTED token preview.
+  - src/popup/*: shows detected-session status.
+  - README.md: build/load instructions (chrome://extensions load-unpacked;
+    Firefox about:debugging temporary), M5 store notes.
+  - NOT verifiable here (egress 403): live token capture on app.monarch.com —
+    needs a local browser; that's the first thing to check next session.
+
+================================================================================
 OPEN ITEMS FOR NEXT SESSION (in priority order)
 ================================================================================
-1. STRAT-0 STILL UNDECIDED — user asked "what is strat-0?" and it was explained
-   in chat (positioning vs Monarch's official free Retail Sync extension:
-   (a) paid gap-filler companion [recommended, coherent with D13/D15],
-   (b) full head-on matcher, (c) kill, (d) multi-app pivot). AWAIT their pick;
-   (a) vs (b) barely changes the build, mostly listing/positioning.
-2. Then: start M0 (manifests, build tooling, token-bridge proof) per SPEC §6.
-   NOTE: amazon.com and app.monarch.com are NOT reachable from the Claude-web
-   env (egress 403) — the matcher core + parsers are testable here via
-   fixtures; live end-to-end must run locally.
-3. AskUserQuestion tool was flaky all session (permission stream aborts) —
+1. USER: load dist/chrome (or firefox) locally against real Monarch and
+   confirm the token bridge + pill work (M0 exit criterion).
+2. M1 (read-only match preview): Amazon fetchers (order list + transactions
+   page parsers w/ fixtures), Monarch GraphQL reads (Web_GetTransactionsList),
+   matcher core (per-charge exact -> order-total -> combination -> refunds),
+   overlay preview of proposed matches. NO WRITES in M1.
+3. Consider extracting amazarch/ to its own repo before it grows (user said
+   "store it in the repo for now").
+4. AskUserQuestion tool was flaky all session (permission stream aborts) —
    the user got the questions but their answers never reached the agent.
    Prefer plain-text questions in chat for this user until that's resolved.
 

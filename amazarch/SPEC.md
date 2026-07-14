@@ -2,9 +2,9 @@
 
 > *Match Amazon orders to Monarch transactions.*
 >
-> **Status:** Spec agreed via grill session (Session 9, 2026-07-14). Not yet
-> built. All decisions D1–D16 are owner-answered; the one remaining call is
-> **STRAT-0** (positioning vs. Monarch's official extension, §1.5).
+> **Status:** Spec agreed via grill session (Session 9, 2026-07-14). All
+> decisions D1–D17 are owner-answered, including STRAT-0 (§1.5 / D17).
+> Build started at M0.
 >
 > **Name:** **Amazarch** (D16). Lives in this repo for now (`amazarch/`);
 > can be extracted to its own repo before store submission.
@@ -52,7 +52,12 @@ almost exactly onto this spec's requirements:
 | Sync-reliability complaints (top recurring review theme) | reliability as a feature |
 | Gift-card / split-tender mismatches | matcher handles via per-charge ledger |
 
-**STRAT-0 (owner must decide):**
+**STRAT-0 — RESOLVED by owner 2026-07-14 (recorded as D17 below).** Owner's
+words: start with **(b)** a full independent matcher, with **(a)**'s
+gap-filler features (refunds/returns matching, Firefox support, and fixing
+*all* recurring complaints against the official extension) built in as core
+differentiators, and **(d)** multi-app support added eventually. The options
+as they were offered:
 - **(a) Gap-filler / companion** *(research-recommended default)* — position as
   the tool for what the official extension can't do: full-history backfill,
   refunds/returns reconciliation, review-queue control, Firefox. Coexists with
@@ -69,15 +74,8 @@ almost exactly onto this spec's requirements:
   cross-app "Amazon itemizer" (YNAB + Lunch Money + Monarch) diversifies the
   Monarch-platform risk.
 
-The spec below remains written for the agreed scope (D1–D16), which is
-compatible with **(a)** and **(b)** — the build is nearly identical; only
-positioning and store listing differ.
-
-> **Note (2026-07-14):** the owner's D13 (paid at launch) + D15 (cloud sync)
-> answers make **(a) as a paid hosted companion** the coherent shape — it
-> mirrors the only proven paid model in this niche (YNAB's hosted SaaS
-> tools) while targeting the official extension's gaps. STRAT-0 itself is
-> still awaiting the owner's explicit pick.
+The spec below is written for the agreed scope (D1–D17): a full matcher
+whose headline features are precisely the official extension's gaps.
 
 ---
 
@@ -220,6 +218,26 @@ multiple amazon accounts signed in")
   no brand colors/logos, "not affiliated with Amazon or Monarch Money"
   disclaimer in listing + UI. Keep a fallback name in the back pocket if a
   complaint ever lands.
+
+### D17. Positioning (STRAT-0) — full matcher with the gap-fixes as headline features
+- **Amazarch is a complete, independent Amazon⇄Monarch matcher (option b)**
+  — it does not depend on or defer to the official extension — **and its
+  paid pitch is everything the official one can't do (option a)**:
+  - **Refunds & returns matching** (official: none; owner's original pain).
+  - **Full-history backfill** (official: ~3 months; its top complaint).
+  - **Firefox support** (official: Chrome-family only).
+  - **Reliability + control** (official: recurring sync-failure complaints,
+    occasional wrong splits with no review step) → Amazarch's review queue,
+    never-clobber rule (D10), journal/Undo, and visible sync status are the
+    fix, not an afterthought.
+  - Remaining official-extension complaints tracked on the roadmap where v1
+    scope excludes them (D3): non-US Amazon (e.g. Canada), Whole Foods /
+    Fresh, digital orders, business accounts — post-v1 wedge features.
+- **(d) Multi-app expansion is the eventual direction** (post-v1): the same
+  Amazon ingestion + matcher core re-targeted at YNAB (official API, proven
+  paid demand) and Lunch Money (official API, invites integrations) — keep
+  the Monarch write layer behind an interface so a second backend is a
+  module, not a rewrite.
 
 ---
 
@@ -520,6 +538,9 @@ operation names:
 - **M5 — Store submission:** privacy policy + data-transmission disclosures,
   permission justifications, assets, AMO source-code package, Chrome/AMO
   review (D12, D16 naming rules).
+- **Post-v1 (D17):** remaining official-extension complaints (non-US Amazon,
+  Whole Foods/Fresh, digital, business accounts), then multi-app expansion —
+  YNAB and Lunch Money backends behind the same matcher core.
 
 ## 7. Top risks
 
