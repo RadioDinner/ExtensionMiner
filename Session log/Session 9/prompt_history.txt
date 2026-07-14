@@ -86,3 +86,5 @@ At line:1 char:1
 + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : ObjectNotFound: (https://github..../heads/main.zip:String) [], CommandNotFoundException
     + FullyQualifiedErrorId : CommandNotFoundException
+
+18. give me the full command to download the zip from main
