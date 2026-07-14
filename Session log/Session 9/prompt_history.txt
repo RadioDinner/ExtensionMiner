@@ -36,3 +36,5 @@ SESSION 9 — PROMPT HISTORY (verbatim)
 9. What is strat-0? Also, I've answered the four defaults numerous times. 1) Paid at launch 2) Rules + optional Claude organizer 3) full cloud sync 4) name is Amazarch (Match Amazon orders to Monarch transactions)
 
 10. STRAT-0 . I want a paid gap-filler to exist for firefox users, and I want my app to fix the refund/return matching issue. I want to fix all the complaints with the offical Monarch version. Basically I want elements of options a, b and d. Lets start with (b) and I want the features that are lacking from the official version (a) to be a part of (b) and eventually, I want to include (d)
+
+11. I want to test in Firefox. How do I do that
