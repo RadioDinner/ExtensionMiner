@@ -4,7 +4,10 @@ Date: 2026-07-14 (UTC). WEB session (Claude-Code-on-the-web).
 
 BRANCH / WORKFLOW:
   - Session ASSIGNED branch: claude/monarch-amazon-matcher-gntufh. ALL work
-    committed and pushed there (NOT main). No PR opened (none requested).
+    committed and pushed there (NOT main).
+  - PR #5 (https://github.com/RadioDinner/ExtensionMiner/pull/5) was created
+    by the USER from the Claude Code UI for this branch — pushes to the branch
+    update it. Do not open another PR.
   - Commits: b40d77e (spec draft + decision record), 8bc037a (research
     integration), + final commit (R3 Monarch-API findings + this log).
 
