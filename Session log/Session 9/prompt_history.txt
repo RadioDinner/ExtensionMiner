@@ -88,3 +88,15 @@ At line:1 char:1
     + FullyQualifiedErrorId : CommandNotFoundException
 
 18. give me the full command to download the zip from main
+
+19. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch> Invoke-WebRequest -Uri "https://github.com/RadioDinner/ExtensionMiner/archive/refs/heads/main.zip" -OutFile "$env:TEMP\amazarch-main.zip"
+>> Expand-Archive -Path "$env:TEMP\amazarch-main.zip" -DestinationPath "E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch" -Force
+>> cd C:\dev\ExtensionMiner-main\amazarch
+cd : Cannot find path 'C:\dev\ExtensionMiner-main\amazarch' because it does not exist.
+[...]
+PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch> npm install
+>> npm run build:firefox
+npm error code ENOENT
+npm error syscall open
+npm error path E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch\package.json
+[... npm ENOENT: no package.json in that directory - ran in wrong folder ...]
