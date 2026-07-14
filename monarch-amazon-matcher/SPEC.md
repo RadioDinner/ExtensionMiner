@@ -28,6 +28,53 @@ anything ambiguous.
 
 ---
 
+## 1.5 ⚠️ STRATEGIC FINDING (from the research pass — decide before building)
+
+**Monarch already ships an official, free Chrome extension that does the core
+of this**: *"Monarch Money | Retail purchase sync"* (Chrome Web Store id
+`imfcckkmcklambpijbgcebggegggkgla`, ~90,000 users, ~4.27★/67 reviews, v1.0.22
+as of 2026-04-30). It syncs Amazon US (and, since Aug 2025, Target) orders,
+matches by date/amount/merchant, auto-splits, AI-categorizes per item, writes
+itemized notes, and tags transactions "Retail Sync". Monarch has announced
+more retailers + Amazon Canada as planned.
+
+**A straight "match Amazon to Monarch" product is therefore dead as a paid
+standalone.** But the official tool's *stated exclusions and complaints* map
+almost exactly onto this spec's requirements:
+
+| Official extension gap | This spec |
+|---|---|
+| **No refunds/returns handling** | D3 makes refunds first-class |
+| **~3-month history limit** (top complaint) | D7 backfills *everything* |
+| No Whole Foods / Fresh / Kindle / digital | out of v1 here too (D3) — future wedge |
+| No Amazon business accounts, no Amazon Canada | future wedge |
+| Chrome-family only — **no Firefox** | D12 ships Firefox |
+| Sync-reliability complaints (top recurring review theme) | reliability as a feature |
+| Gift-card / split-tender mismatches | matcher handles via per-charge ledger |
+
+**STRAT-0 (owner must decide):**
+- **(a) Gap-filler / companion** *(research-recommended default)* — position as
+  the tool for what the official extension can't do: full-history backfill,
+  refunds/returns reconciliation, review-queue control, Firefox. Coexists with
+  (or replaces) the official tool for power users.
+- **(b) Full independent matcher anyway** — everything in this spec, competing
+  head-on with free first-party. Justifiable mainly as personal tooling +
+  learning; weak as a store product.
+- **(c) Kill / just use the official extension** — it may already solve enough
+  of the original pain (orders), though **not refunds and not old history**,
+  which were the owner's explicitly stated pains.
+- **(d) Multi-app pivot** — the only *proven paid* demand in this niche is in
+  the YNAB ecosystem (Ace My Budget, Bridge Your Budget: hosted SaaS, ~$2–5/mo)
+  precisely because YNAB has an official API and no first-party feature. A
+  cross-app "Amazon itemizer" (YNAB + Lunch Money + Monarch) diversifies the
+  Monarch-platform risk.
+
+The spec below remains written for the agreed scope (D1–D12), which is
+compatible with **(a)** and **(b)** — the build is nearly identical; only
+positioning, naming, and store listing differ.
+
+---
+
 ## 2. Decision record (from the grill session)
 
 Every decision below was made explicitly by the product owner unless marked
@@ -80,6 +127,12 @@ Every decision below was made explicitly by the product owner unless marked
   whatever Monarch still has. Long first sync is accepted; it must be
   resumable/incremental (checkpointed) so an interrupted backfill continues
   rather than restarts.
+- **Research refinement (R1):** deep backfill should primarily use Amazon's
+  official Privacy Central **"Request My Data"** export (user requests it,
+  drops the ZIP on the extension, we parse `Retail.OrderHistory`) — ToS-clean,
+  complete, and avoids scraping years of pages. Live scraping covers the
+  recent window and ongoing incremental sync. This also beats the official
+  Monarch extension's ~3-month limit — a headline differentiator.
 
 ### D8. Split rules — only when categories differ
 - A multi-item charge whose items all map to one category stays a single
@@ -120,10 +173,10 @@ multiple amazon accounts signed in")
 
 | # | Question | Default taken | Alternatives offered |
 |---|----------|---------------|----------------------|
-| OPEN-1 | Audience/monetization | **Free public tool at launch**; architecture must not preclude a paid tier later (feature flags around backfill depth, splits, multi-account — the natural premium levers) | Freemium from day one; paid-only; private until proven |
+| OPEN-1 | Audience/monetization | **Free public tool at launch**; architecture must not preclude a paid tier later (feature flags around backfill depth, splits, multi-account — the natural premium levers). *Research (R2): no one has demonstrated paying for a local Monarch matcher; the only paid niche is hosted SaaS in the YNAB ecosystem — free is the realistic launch mode.* | Freemium from day one; paid-only; private until proven |
 | OPEN-2 | Categorization engine | **Rules + optional AI:** built-in keyword/department rules work offline for everyone; user may paste an Anthropic API key to have Claude classify odd items into *their* custom Monarch categories; uncategorizable → review queue | AI-first (every user needs a key); rules-only |
 | OPEN-3 | Data/privacy model | **Local-only:** all data (order cache, matches, settings) stays in browser extension storage. Network calls only to amazon.com, monarchmoney.com, and — if AI is enabled — the Anthropic API. This is the store privacy-policy story. | Local + opt-in encrypted sync; cloud-backed service |
-| OPEN-4 | Name | **Placeholder `monarch-amazon-matcher`** until pre-submission | "Butterfly Box" (Monarch butterfly + Amazon boxes), "Order Matcher for Monarch", "Reconcile" |
+| OPEN-4 | Name | **Placeholder `monarch-amazon-matcher`** until pre-submission. *Research (R4): must be a distinctive mark + "for" phrasing — e.g. "Butterfly Box for Monarch Money", "OrderSync for Monarch Money" — never leading with Monarch/Amazon, generic icon, "not affiliated" disclaimer.* | "Butterfly Box", "OrderSync", "Reconcile" (+ "for Monarch Money") |
 
 ---
 
@@ -149,6 +202,12 @@ multiple amazon accounts signed in")
    journaled locally with an **Undo** (restores the pre-write field values).
 
 ### Matching logic (v1)
+
+**Primary Amazon data source (per R1):** the Transactions page
+(`/cpe/yourpayments/transactions`) — per-charge rows (date, card last-4,
+order IDs, amount, refunds included) joined to order-detail/item data by
+order ID. Charges, not order totals, are what banks see, so this makes rule 1
+the common case instead of the lucky case.
 
 Candidate generation, in order of strength:
 1. **Exact charge match:** Amazon per-shipment charge amount + card last-4 (when
@@ -198,9 +257,18 @@ monarch-amazon-matcher/
   for promise APIs; per-browser manifests generated at build. Chrome service
   worker keeps long syncs alive via `chrome.alarms` + checkpointed work chunks
   (every unit of work is resumable, per D7).
-- **Amazon module:** background `fetch` with host permissions (cookies ride
-  along), 1 request every 2–4 s with jitter, exponential backoff, response
-  cache in IndexedDB so re-syncs never re-fetch old immutable order pages.
+- **Amazon module:** three ingestion paths — (1) **export parser** for the
+  Privacy Central ZIP (deep backfill, D7); (2) **order/detail fetcher**:
+  background `fetch` with host permissions (cookies ride along), AZAD's
+  politeness envelope (≤6 concurrent, 1–4 s pacing with jitter, exponential
+  backoff, hard page caps), IndexedDB response cache so re-syncs never
+  re-fetch immutable order pages, incremental sync stops at cache overlap;
+  (3) **transactions-page worker**: the page is JS-rendered, so it runs in an
+  offscreen document / extension tab context (AZAD-style iframe worker)
+  rather than raw fetch. Parsers are versioned, multi-strategy ("largest
+  plausible result wins"), with fixture tests per page type; logout/CAPTCHA
+  pages are detected and pause the run. Only specific Amazon domains in
+  `host_permissions`; other locales via `optional_host_permissions`.
 - **Monarch module:** content script on `app.monarchmoney.com` captures the
   session token the web app already holds; background GraphQL client performs
   reads (transaction queries) and writes (update merchant/notes/category,
@@ -220,11 +288,130 @@ Anthropic API. Privacy policy for the stores states exactly this.
 
 ## 5. Research findings (verified 2026-07-14)
 
-> Produced by a fan-out research pass with adversarial verification of key
-> claims. Confidence noted per claim; anything REFUTED during verification was
-> corrected before landing here.
+> Produced by a fan-out research pass (4 topics × independent web-research
+> agents) with adversarial verification of key claims. Anything refuted during
+> verification was corrected before landing here. Chrome Web Store, Reddit,
+> and monarch.com direct fetches were 403-blocked in the research environment;
+> those data points come from secondary trackers and are marked approximate.
 
-_(pending — filled in below by the research workflow)_
+### R1. Amazon order-history access (HIGH confidence overall)
+
+- **No consumer API exists.** Amazon killed the official Order History Reports
+  CSV on **2023-03-20**. The replacement, Privacy Central **"Request My Data"**
+  (Your Orders category), returns a ZIP of CSV/JSON (incl.
+  `Retail.OrderHistory`) within hours-to-days — ToS-clean, complete, but
+  asynchronous and manual. **Design consequence: use it as the "backfill
+  everything" (D7) path** — user requests the export, drops the ZIP on the
+  extension, we parse it. Live scraping is reserved for incremental sync.
+- **State of the art is `philipmulcahy/azad`** ("Amazon Order History
+  Reporter", Apache-2.0, actively maintained — commits within days of
+  2026-07-14, verified). It fetches, on the user's logged-in session: order
+  list (`/gp/css/order-history`, `/your-orders/orders`), order details,
+  invoice pages, legacy digital orders, and the **Transactions page**.
+- **The Transactions page (`/cpe/yourpayments/transactions`) is the
+  per-CHARGE ledger** — rows carry date, payment method/card last-4, order
+  ID(s), amount, vendor, **including refunds**. Amazon's own help pages direct
+  users there to match card statements. This solves the
+  order-total ≠ card-charge problem *by construction* and is the primary
+  financial surface for the matcher. It is also the **most hostile** surface:
+  JS-rendered, button/scroll pagination, rate-limited (429s), and Amazon has
+  already flattened its layout and obfuscated attribute names (AZAD needed a
+  third parsing strategy in v1.16.19).
+- **Anti-bot envelope (copy AZAD's):** ≤6 concurrent same-domain requests,
+  ~1 s pacing + hard page caps on transactions, cache everything scraped,
+  incremental sync stops at overlap with cache, scrape one year at a time.
+  Amazon's typical response to over-fetching is **selective session logout**
+  on some page types and 429s — the fetcher must detect logout/CAPTCHA pages
+  and pause gracefully, never retry-hammer (refines D5).
+- **Multi-account (D11):** Amazon "Switch Accounts" keeps multiple identities
+  in the browser but only ONE active session; cookies are scoped to the active
+  account and there is no documented way to fetch pages as an inactive
+  account. v1.x multi-account = detect active account, tag data by account,
+  prompt the user to switch (or use a second profile/container). Verify
+  cookie behavior empirically before building the UX (this fact is inferred,
+  MEDIUM confidence).
+- **Refund caveat:** refunds to gift-card balance never hit the card; order
+  pages give order-level (not item-level) refund amounts. Model gift-card
+  refunds explicitly as "no card credit expected".
+
+### R2. Prior art & competition (HIGH confidence; store metrics approximate)
+
+- **Monarch's official "Retail purchase sync" extension** — see §1.5. Facts
+  verified: ~90k users, 4.27★/67 reviews, v1.0.22 (2026-04-30); Target support
+  shipped **Aug 2025**; exclusions confirmed from Monarch's own help pages:
+  refunds, Kindle/digital, Whole Foods, Amazon Fresh, business accounts,
+  non-US Amazon; ~3-month initial-history limit and sync-reliability failures
+  are the recurring complaints.
+- **Third-party Monarch tools** (all free/OSS, all on the unofficial GraphQL
+  API): `alex-peck/monarch-amazon-sync` (Chrome ext, notes-only, 95★,
+  unmaintained since Oct 2024 — its 24 open issues are a free pain-point
+  list); `elsell/monarch-money-amazon-connector` (Python, notes-only, 32★);
+  `jprouty/monarchmoney-amazon-tagger` (port of the 224★ Mint splitter);
+  `eshaffer321/itemize` (Go CLI, AI-splits Amazon/Walmart/Costco, **actively
+  developed through July 2026** — the closest living blueprint).
+- **Adjacent ecosystems:** Copilot has first-party Amazon itemization
+  (matches on amount ± 2-day window — a sane default for our matcher too).
+  **YNAB is where paid demand is proven** (Ace My Budget, Bridge Your Budget —
+  hosted SaaS subscriptions) because YNAB has an official API and no
+  first-party feature. Lunch Money invites integrations via official API.
+- **Pricing norm:** first-party = free; OSS = free; the only observed paid
+  model is hosted "we run it for you" SaaS (~$2–5/mo, 14-day trials) where no
+  first-party tool exists. **Nobody has demonstrated willingness to pay for a
+  local Monarch matcher** (informs OPEN-1: free is the realistic launch mode).
+
+### R3. Monarch internal GraphQL API
+
+_(re-research in flight — this subsection is filled by the follow-up agent;
+the workflow's first pass returned malformed output for this topic)_
+
+- Cross-topic corroboration meanwhile: every third-party Monarch tool above
+  reads AND writes through the reverse-engineered GraphQL API (the
+  `hammem/monarchmoney` Python wrapper is the canonical client), including
+  transaction updates and splits — so the write path (D1/D6) is proven
+  feasible from userland. Monarch's Terms of Use **prohibit scraping and
+  programmatic/automated access** — the D6 risk the owner accepted, now with
+  the added twist that Monarch has a *competitive incentive* to block third
+  parties since it ships its own extension. A "Public API" component exists on
+  Monarch's status page and employees have signaled intent — watch for an
+  official API and design the GraphQL client as a swappable module.
+
+### R4. Store policy & MV3 constraints (HIGH confidence)
+
+- **Chrome Web Store:** the single-purpose framing must be one sentence
+  ("imports your own Amazon purchase details into your Monarch Money account
+  and categorizes them") and every permission/data-flow must map to it.
+  **Narrow host permissions** (specific Amazon domains + Monarch API host,
+  never `<all_urls>`) *minimize* review time (most clear <24 h; flagged
+  reviews ~1–2 weeks). Per-permission written justifications are required;
+  vague ones are a top rejection cause. Financial data = sensitive under
+  Limited Use; the optional Anthropic call must be disclosed as third-party
+  sharing. **New CWS policy enforcement starts 2026-08-01:** ALL data
+  collection must be prominently disclosed and post-install changes to data
+  handling proactively re-disclosed — plan the consent UI for this from day
+  one. MV3 remote-code ban is fine here (fetched JSON is data, not code).
+  Precedent: AZAD has lived in CWS for years doing the Amazon half.
+- **Firefox/AMO:** listed builds with bundlers require human-readable source +
+  reproducible build instructions + lockfiles; obfuscation banned. Since
+  **2025-11-03**, new extensions must declare data collection/transmission in
+  `manifest.json` (`browser_specific_settings.gecko.data_collection_permissions`)
+  using Firefox's consent UI. Firefox MV3 = event pages (not service
+  workers); host permissions are user-revocable at any time → runtime
+  `permissions.request` recovery flow is mandatory. Unlisted signing is
+  near-instant — use it for the beta channel before listing.
+- **MV3 service-worker lifetime (Chrome):** killed ~30 s idle / ~5 min hard
+  cap. Long syncs must be chunked + checkpointed and resumed via
+  `chrome.alarms`, or run in an offscreen document / visible extension tab
+  (AZAD scrapes from a page context). Cross-origin `fetch()` from the worker
+  WITH host permissions sends cookies and bypasses CORS — the intended
+  mechanism. `declarativeNetRequestWithHostAccess` only if Monarch's endpoint
+  needs Origin/Referer rewrites.
+- **Naming/trademark (OPEN-4):** the enforced convention is a distinctive
+  mark + "for" phrasing — e.g. **"OrderSync for Monarch Money"** — generic
+  icon, no brand logos/colors, "not affiliated with Monarch or Amazon" in the
+  listing. Leading with "Monarch" or "Amazon" invites a complaint-driven
+  takedown — and Monarch, running a competing official extension, has motive
+  and standing. (This kills the raw "Butterfly Box… Monarch"-led candidates'
+  riskier variants; adjust naming shortlist accordingly.)
 
 ---
 
@@ -245,6 +432,12 @@ _(pending — filled in below by the research workflow)_
 
 ## 7. Top risks
 
+0. **First-party competition (NEW, see §1.5):** Monarch's free official
+   extension owns the core use case and Monarch has motive + standing to
+   file store complaints against confusingly-named competitors and to break
+   the unofficial API. Mitigations: gap-filler positioning (STRAT-0a),
+   "for Monarch Money" naming, swappable GraphQL client, watch for the
+   official public API.
 1. **Monarch API drift** (unofficial): pin known-good operation shapes, fail
    soft to read-only overlay mode when mutations start erroring, ship updates
    fast. (Owner accepted, D6.)
