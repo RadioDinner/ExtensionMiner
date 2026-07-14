@@ -1,0 +1,103 @@
+SESSION 9 — HANDOFF LOG
+=======================
+Date: 2026-07-14 (UTC). WEB session (Claude-Code-on-the-web).
+
+BRANCH / WORKFLOW:
+  - Session ASSIGNED branch: claude/monarch-amazon-matcher-gntufh. ALL work
+    committed and pushed there (NOT main). No PR opened (none requested).
+  - Commits: b40d77e (spec draft + decision record), 8bc037a (research
+    integration), + final commit (R3 Monarch-API findings + this log).
+
+MIGRATIONS: none this session. Lowest is still 988 → NEXT NEW = 987.
+
+================================================================================
+WHAT THIS SESSION WAS
+================================================================================
+NEW PRODUCT KICKOFF, not miner work. The user wants a Firefox+Chrome browser
+extension that plugs into Monarch Money (personal finance app) and matches the
+user's Amazon transactions (orders, refunds, amounts) to Monarch transactions —
+replacing their manual two-window matching workflow. Stored in this repo for
+now under monarch-amazon-matcher/.
+
+The user asked for the "/grill-me" skill to elicit requirements. That skill
+does not exist in this environment (checked session skills + claude.ai skills),
+so the interview was run directly via AskUserQuestion in rounds.
+
+================================================================================
+WHAT WAS PRODUCED (single deliverable)
+================================================================================
+monarch-amazon-matcher/SPEC.md — full product spec containing:
+  - Decision record D1–D12 (all answered by the user, 3 grill rounds):
+    D1 writes = notes + merchant rename + auto-categorize + splits (ALL).
+    D2 autonomy = auto-apply exact matches + review queue for fuzzy.
+    D3 coverage = orders + split shipments + refunds/returns (NOT S&S/digital/
+       Whole Foods/Fresh in v1).
+    D4 UI = injected INTO the Monarch web app (badges + review-queue overlay).
+    D5 Amazon = silent background fetch on user's logged-in session.
+    D6 Monarch writes = unofficial internal GraphQL API (user accepted ToS/
+       breakage risk explicitly).
+    D7 backfill = EVERYTHING (entire Amazon history), checkpointed/resumable.
+    D8 splits only when a charge mixes categories.
+    D9 cadence = sync on opening Monarch + manual "Sync now".
+    D10 already-manually-edited transactions are NEVER auto-clobbered → review
+        queue with diff.
+    D11 multi-Amazon-account support desired (v1 single, v1.x multi).
+    D12 publish to BOTH stores (Chrome Web Store + AMO) — it's a product.
+  - OPEN decisions (grill round 4 NEVER reached the user — the AskUserQuestion
+    permission stream aborted 3x; defaults taken and flagged in the spec):
+    OPEN-1 audience/monetization → defaulted free-at-launch.
+    OPEN-2 categorizer → defaulted rules + optional user-keyed Claude AI.
+    OPEN-3 privacy → defaulted local-only storage.
+    OPEN-4 name → placeholder "monarch-amazon-matcher".
+  - STRAT-0 (NEW, from research — THE decision the user must make before any
+    code): Monarch ships an OFFICIAL free "Retail purchase sync" Chrome
+    extension (~90k users, 4.27★, v1.0.22) doing Amazon→Monarch matching with
+    AI splits/notes/categories. A straight clone is dead. BUT its stated gaps
+    = exactly this spec's differentiators: NO refunds handling, ~3-month
+    history limit, no Firefox, no Whole Foods/digital/business, reliability
+    complaints. Options in spec: (a) gap-filler/companion [research-recommended],
+    (b) full independent matcher, (c) kill, (d) multi-app pivot (YNAB is where
+    PAID demand is proven — Ace My Budget / Bridge Your Budget SaaS).
+  - Research findings §R1–R4 (fan-out research workflow, 17 agents, key claims
+    adversarially verified; monarch-api topic re-run as single agent after the
+    workflow pass returned malformed output for it):
+    R1 Amazon: /cpe/yourpayments/transactions is the per-CHARGE ledger (incl.
+       refunds + card last-4) → primary matcher source; Privacy Central
+       "Request My Data" ZIP = ToS-clean deep-backfill path; AZAD
+       (philipmulcahy/azad) is the reference implementation + politeness
+       envelope (≤6 concurrent, 1s pacing, caches, logout/429 detection).
+    R2 Prior art: third-party Monarch tools all free/OSS/mostly dead;
+       eshaffer321/itemize is the living blueprint; alex-peck/
+       monarch-amazon-sync's 24 open issues = free pain-point list.
+    R3 Monarch GraphQL: ALL needed ops verified by name —
+       Web_GetTransactionsList (read), Web_TransactionDrawerUpdateTransaction
+       (rename/category/notes), Common_SplitTransactionMutation (splits; must
+       sum exactly), Web_SetTransactionTags. Token from localStorage
+       persist:root → user.token + monarchDeviceUUID header. ⚠ API host
+       MIGRATED to api.monarch.com (Jan 2026) — keep endpoint configurable,
+       cover both *.monarchmoney.com and *.monarch.com. No known bans for
+       unofficial-API use; no official public API yet.
+    R4 Store policy: CWS Aug-1-2026 disclosure enforcement; AMO
+       data_collection_permissions manifest key mandatory since Nov 2025;
+       MV3 service-worker chunking via chrome.alarms or offscreen doc;
+       naming must be "<Distinctive> for Monarch Money" (trademark).
+  - Milestones M0–M5 (M1 is read-only match preview before any writes) and
+    risk register (risk 0 = first-party competition).
+
+================================================================================
+OPEN ITEMS FOR NEXT SESSION (in priority order)
+================================================================================
+1. USER MUST DECIDE STRAT-0 (a/b/c/d) — positioning vs the official Monarch
+   extension. Spec is written to be compatible with (a) and (b).
+2. USER SHOULD CONFIRM/OVERRIDE OPEN-1..4 defaults (audience, categorizer,
+   privacy, name).
+3. Then: start M0 (manifests, build tooling, token-bridge proof) per SPEC §6.
+   NOTE: amazon.com and app.monarch.com are NOT reachable from the Claude-web
+   env (egress 403) — the matcher core + parsers are testable here via
+   fixtures; live end-to-end must run locally.
+4. AskUserQuestion tool was flaky all session (permission stream aborts) —
+   if grilling again, keep rounds small and be ready to fall back to defaults.
+
+KEY CONTEXT: the ExtensionMiner miner/dashboard work (Sessions 1–8) was NOT
+touched this session. Miner state is unchanged from Session 8 handoff (apply
+migrations 989+988, etc. still pending on the user).

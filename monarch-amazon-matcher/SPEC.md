@@ -269,10 +269,15 @@ monarch-amazon-matcher/
   plausible result wins"), with fixture tests per page type; logout/CAPTCHA
   pages are detected and pause the run. Only specific Amazon domains in
   `host_permissions`; other locales via `optional_host_permissions`.
-- **Monarch module:** content script on `app.monarchmoney.com` captures the
-  session token the web app already holds; background GraphQL client performs
-  reads (transaction queries) and writes (update merchant/notes/category,
-  tags, splits). All mutations journaled for Undo.
+- **Monarch module:** content script on the Monarch app (cover both
+  `app.monarchmoney.com` and `app.monarch.com`) reads the session token from
+  localStorage (`persist:root` → `user.token`, plus `monarchDeviceUUID`);
+  GraphQL calls go to `https://api.monarch.com/graphql` (endpoint
+  configurable — it already migrated once, R3) preferably as same-origin
+  fetches from the content script. Reads via `Web_GetTransactionsList`;
+  writes via `Web_TransactionDrawerUpdateTransaction`,
+  `Common_SplitTransactionMutation`, `Web_SetTransactionTags` (see R3 table).
+  All mutations journaled for Undo.
 - **Matcher:** pure functions over normalized `Charge`/`Refund`/`Txn` records —
   fully unit-testable offline with fixtures (this part is buildable and
   testable in the Claude-Code web env even though amazon.com is egress-blocked
@@ -359,21 +364,51 @@ Anthropic API. Privacy policy for the stores states exactly this.
   first-party tool exists. **Nobody has demonstrated willingness to pay for a
   local Monarch matcher** (informs OPEN-1: free is the realistic launch mode).
 
-### R3. Monarch internal GraphQL API
+### R3. Monarch internal GraphQL API (HIGH confidence — verified against library/extension source)
 
-_(re-research in flight — this subsection is filled by the follow-up agent;
-the workflow's first pass returned malformed output for this topic)_
+**Every write in D1 is proven feasible from an extension context.** The
+canonical reference is `hammem/monarchmoney` (Python), with active successors
+(`keithah/monarchmoney-enhanced`, `keithah/monarchmoney-ts`). Verified
+operation names:
 
-- Cross-topic corroboration meanwhile: every third-party Monarch tool above
-  reads AND writes through the reverse-engineered GraphQL API (the
-  `hammem/monarchmoney` Python wrapper is the canonical client), including
-  transaction updates and splits — so the write path (D1/D6) is proven
-  feasible from userland. Monarch's Terms of Use **prohibit scraping and
-  programmatic/automated access** — the D6 risk the owner accepted, now with
-  the added twist that Monarch has a *competitive incentive* to block third
-  parties since it ships its own extension. A "Public API" component exists on
-  Monarch's status page and employees have signaled intent — watch for an
-  official API and design the GraphQL client as a swappable module.
+| Need | GraphQL operation |
+|---|---|
+| Read transactions (date range, merchant search, category/account/tag filters, `isSplit`, `hasNotes`, …) | `GetTransactionsList` / `Web_GetTransactionsList` (+ `GetTransactionDrawer` for detail) |
+| Rename merchant / set category / notes / hidden / needsReview | `Web_TransactionDrawerUpdateTransaction` (input: `id`, `name`, `category`, `amount`, `date`, `hideFromReports`, `needsReview`, `goalId`, `notes`) |
+| Read splits | `TransactionSplitQuery` |
+| **Create splits** | `Common_SplitTransactionMutation` — `splitData` = array of `{merchantName, amount, categoryId, notes?}`; **amounts must sum exactly to the original transaction total**; empty array un-splits |
+| Tags | `GetHouseholdTransactionTags` (list), `Common_CreateTransactionTag` (name+color), `Web_SetTransactionTags` (transactionId, tagIds[]) |
+| Create/delete transactions | `Common_CreateTransactionMutation` / `Common_DeleteTransactionMutation` |
+
+- **Auth from an extension:** the web app stores the token in localStorage —
+  `JSON.parse(JSON.parse(localStorage.getItem('persist:root')).user).token` —
+  and the device id under `monarchDeviceUUID`. Requests send
+  `Authorization: Token <token>`, `device-uuid`, `Client-Platform: web`.
+  This exact pattern ships today in `alex-peck/monarch-amazon-sync` and the
+  Monarch-Money-Tweaks extension (Chrome + Firefox, v5.12) — direct proof the
+  session-reuse approach works in production extensions.
+- **⚠ The API host migrated `api.monarchmoney.com` → `api.monarch.com`
+  (reported 2026-01-16)**, breaking hardcoded clients (525/auth errors).
+  Design consequence: endpoint and operation strings live in one
+  configurable module; never hardcode. (The web app also moved toward
+  `app.monarch.com` — content scripts and host permissions must cover both
+  `*.monarchmoney.com` and `*.monarch.com`.)
+- **Prefer same-origin fetch from the content script** on the Monarch app
+  page (cookies + CSRF attach automatically, sidesteps Cloudflare issues that
+  plague headless clients), with the background worker as fallback.
+- **Splits validation:** resolve `categoryId`/`tagIds` via `GetCategories` /
+  `GetHouseholdTransactionTags` first; split amounts must sum exactly
+  (integer-cents math, D-architecture) or the mutation is rejected.
+- **ToS/enforcement:** Monarch's Terms prohibit crawling/scraping/programmatic
+  access; **no enforcement precedent found** (community discussion unanswered,
+  no known bans). No official public API as of mid-2026; a `public-api`
+  status-page component exists and employees have signaled intent — keep the
+  GraphQL client swappable for an eventual official API.
+- **Implementation guidance:** mirror the live web app's payload shapes from
+  DevTools rather than trusting the Python lib byte-for-byte; handle 401 by
+  re-reading the token; keep writes user-initiated where possible to minimize
+  ToS surface, and disclose the ToS caveat to end users (also a store-review
+  plus, R4).
 
 ### R4. Store policy & MV3 constraints (HIGH confidence)
 
