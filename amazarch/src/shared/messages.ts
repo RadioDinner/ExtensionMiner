@@ -5,14 +5,18 @@ export interface MonarchSessionInfo {
   deviceUuid: string | null;
   origin: string; // which Monarch host the session was captured from
   capturedAt: number; // epoch ms
+  strategy: string; // which token-hunt strategy found it (diagnostics)
 }
 
 export type Message =
   | { type: "monarch-session-detected"; session: MonarchSessionInfo }
+  | { type: "content-script-loaded"; origin: string; loadedAt: number }
   | { type: "get-status" };
 
 export interface StatusResponse {
   monarch: (Omit<MonarchSessionInfo, "token"> & { tokenPreview: string }) | null;
+  /** Origins where the Monarch content script has reported in this browser session. */
+  contentScriptOrigins: string[];
 }
 
 /** Redact a token down to a short identifiable preview (never log/show full tokens). */
