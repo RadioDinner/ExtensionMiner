@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Amazarch",
+  "version": "0.0.1",
+  "description": "Match your Amazon orders, refunds, and split shipments to your Monarch Money transactions. Not affiliated with Amazon or Monarch Money.",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Amazarch"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://app.monarchmoney.com/*", "https://app.monarch.com/*"],
+      "js": ["monarch-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://app.monarchmoney.com/*",
+    "https://app.monarch.com/*",
+    "https://api.monarchmoney.com/*",
+    "https://api.monarch.com/*",
+    "https://www.amazon.com/*"
+  ],
+  "permissions": ["storage", "alarms"]
+}

@@ -1,0 +1,70 @@
+SESSION 9 — PROMPT HISTORY (verbatim)
+=====================================
+
+1. I want to write an extension for firefox and chrome that is a plugin for Monarch, the personal finance budget app. We'll store it in the repo for now but I want you to use the /grill-me skill to figure out how I want it to work. I basically would want to be able to sign into my amazon account and have it match the transactions in monarch. Currently, they all come in randomly and I need to open two browser windows and manually match refunds, orders and amounts to monardch
+
+2. [AskUserQuestion answers — grill round 1]
+   Match action = "Add items to notes, Rename the merchant, Auto-categorize, Split by item"
+   Autonomy = "Auto + review queue (Recommended)"
+   Coverage = "Orders + split shipments, Refunds & returns"
+   UI surface = "Inside Monarch's page (Recommended)"
+
+3. Continue from where you left off.
+
+4. [AskUserQuestion answers — grill round 2]
+   Amazon access = "Silent background fetch (Recommended)"
+   Monarch write = "Yes, use internal API (Recommended)"
+   Backfill = "Everything"
+   Split rules = "Only when categories differ (Recommended)"
+
+5. [AskUserQuestion answers — grill round 3]
+   Cadence = "On opening Monarch + manual (Recommended)"
+   Overwrite? = "Queue for review"
+   Accounts = "Ideally we could have multiple amazon accounts signed in" (custom answer)
+   Distribution = "Publish to both stores"
+
+6. Continue from where you left off.
+
+7. Continue from where you left off.
+
+8. Continue from where you left off.
+   [NOTE: grill round 4 (Audience / Categorizer / Privacy / Name) failed to reach the
+   user 3x ("permission stream closed"). Proceeding with flagged defaults per fallback
+   announced in chat: free-first audience, rules+optional-AI categorizer, local-only
+   privacy, placeholder name. All four marked OPEN in the spec for user override.]
+
+9. What is strat-0? Also, I've answered the four defaults numerous times. 1) Paid at launch 2) Rules + optional Claude organizer 3) full cloud sync 4) name is Amazarch (Match Amazon orders to Monarch transactions)
+
+10. STRAT-0 . I want a paid gap-filler to exist for firefox users, and I want my app to fix the refund/return matching issue. I want to fix all the complaints with the offical Monarch version. Basically I want elements of options a, b and d. Lets start with (b) and I want the features that are lacking from the official version (a) to be a part of (b) and eventually, I want to include (d)
+
+11. I want to test in Firefox. How do I do that
+
+12. A pull request was just created for this branch from the Claude Code UI: https://github.com/RadioDinner/ExtensionMiner/pull/5
+
+You don't need to create one. Reference this PR going forward — pushing more commits to this branch will update it.
+
+13. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch> git clone https://github.com/RadioDinner/ExtensionMiner.git      Cloning into 'ExtensionMiner'...
+fatal: unable to access 'https://github.com/RadioDinner/ExtensionMiner.git/': Failed to connect to github.com port 443 after 21108 ms: Could not connect to server
+PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>
+
+[mid-turn message while logging the PR notice]
+
+14. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch> netsh winhttp show proxy
+>> Test-NetConnection github.com -Port 443
+
+Current WinHTTP proxy settings:
+
+    Direct access (no proxy server).
+
+
+
+ComputerName     : github.com
+RemoteAddress    : 140.82.112.3
+RemotePort       : 443
+InterfaceAlias   : Ethernet
+SourceAddress    : 192.168.3.147
+TcpTestSucceeded : True
+
+
+
+PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>

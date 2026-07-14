@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font: 13px/1.5 system-ui, sans-serif;
+        margin: 0;
+        padding: 14px;
+        min-width: 260px;
+        color: #111827;
+      }
+      h1 { font-size: 14px; margin: 0 0 8px; }
+      .status { padding: 8px 10px; border-radius: 8px; background: #f3f4f6; }
+      .ok { background: #ecfdf5; color: #065f46; }
+      .muted { color: #6b7280; font-size: 12px; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Amazarch</h1>
+    <div id="monarch-status" class="status">Checking Monarch session…</div>
+    <p class="muted">
+      M0 skeleton — open the Monarch web app to connect. Amazon sync, matching,
+      and the review queue arrive in later milestones (see SPEC.md).
+    </p>
+    <script src="popup.js"></script>
+  </body>
+</html>
