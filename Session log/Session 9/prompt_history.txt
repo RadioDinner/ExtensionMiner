@@ -1,0 +1,34 @@
+SESSION 9 — PROMPT HISTORY (verbatim)
+=====================================
+
+1. I want to write an extension for firefox and chrome that is a plugin for Monarch, the personal finance budget app. We'll store it in the repo for now but I want you to use the /grill-me skill to figure out how I want it to work. I basically would want to be able to sign into my amazon account and have it match the transactions in monarch. Currently, they all come in randomly and I need to open two browser windows and manually match refunds, orders and amounts to monardch
+
+2. [AskUserQuestion answers — grill round 1]
+   Match action = "Add items to notes, Rename the merchant, Auto-categorize, Split by item"
+   Autonomy = "Auto + review queue (Recommended)"
+   Coverage = "Orders + split shipments, Refunds & returns"
+   UI surface = "Inside Monarch's page (Recommended)"
+
+3. Continue from where you left off.
+
+4. [AskUserQuestion answers — grill round 2]
+   Amazon access = "Silent background fetch (Recommended)"
+   Monarch write = "Yes, use internal API (Recommended)"
+   Backfill = "Everything"
+   Split rules = "Only when categories differ (Recommended)"
+
+5. [AskUserQuestion answers — grill round 3]
+   Cadence = "On opening Monarch + manual (Recommended)"
+   Overwrite? = "Queue for review"
+   Accounts = "Ideally we could have multiple amazon accounts signed in" (custom answer)
+   Distribution = "Publish to both stores"
+
+6. Continue from where you left off.
+
+7. Continue from where you left off.
+
+8. Continue from where you left off.
+   [NOTE: grill round 4 (Audience / Categorizer / Privacy / Name) failed to reach the
+   user 3x ("permission stream closed"). Proceeding with flagged defaults per fallback
+   announced in chat: free-first audience, rules+optional-AI categorizer, local-only
+   privacy, placeholder name. All four marked OPEN in the spec for user override.]
