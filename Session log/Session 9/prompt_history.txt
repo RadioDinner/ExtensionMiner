@@ -68,3 +68,8 @@ TcpTestSucceeded : True
 
 
 PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>
+
+15. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch> git clone https://github.com/RadioDinner/ExtensionMiner.git
+Cloning into 'ExtensionMiner'...
+fatal: unable to access 'https://github.com/RadioDinner/ExtensionMiner.git/': Failed to connect to github.com port 443 after 21112 ms: Could not connect to server
+PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>
