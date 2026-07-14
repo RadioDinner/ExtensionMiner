@@ -85,18 +85,40 @@ monarch-amazon-matcher/SPEC.md — full product spec containing:
     risk register (risk 0 = first-party competition).
 
 ================================================================================
+LATE-SESSION UPDATE (prompt 9): OPEN-1..4 RESOLVED BY USER IN CHAT
+================================================================================
+The user's earlier dialog answers never arrived (stream aborts); they answered
+in plain text instead. Now in the spec as D13–D16:
+  D13 (was OPEN-1): PAID AT LAUNCH. Licensing via our own backend; ~$2–5/mo
+      + trial is the researched norm; pitch must sell official-tool gaps.
+  D14 (was OPEN-2): rules + optional Claude ("Claude organizer" per user);
+      with a backend, server-proxied Claude under our key is an option —
+      decide proxy-vs-user-key at build time.
+  D15 (was OPEN-3): FULL CLOUD SYNC. Supabase (Auth+Postgres+RLS) + Vercel;
+      extension IndexedDB = working copy; backend carries licensing; heavy
+      disclosure obligations (CWS Aug-2026, AMO data_collection_permissions).
+  D16 (was OPEN-4): name = "Amazarch" (tagline: Match Amazon orders to
+      Monarch transactions). AMAZ- prefix trademark caution documented with
+      mitigations ("for Monarch Money" subtitle, disclaimers, fallback name).
+FOLDER RENAMED: monarch-amazon-matcher/ -> amazarch/ (git mv). Spec updated
+throughout (privacy section now cloud, milestones +M4.5 cloud/billing, risks
++cloud-custody +paid-friction). New milestone order: M0..M4, M4.5, M5.
+
+================================================================================
 OPEN ITEMS FOR NEXT SESSION (in priority order)
 ================================================================================
-1. USER MUST DECIDE STRAT-0 (a/b/c/d) — positioning vs the official Monarch
-   extension. Spec is written to be compatible with (a) and (b).
-2. USER SHOULD CONFIRM/OVERRIDE OPEN-1..4 defaults (audience, categorizer,
-   privacy, name).
-3. Then: start M0 (manifests, build tooling, token-bridge proof) per SPEC §6.
+1. STRAT-0 STILL UNDECIDED — user asked "what is strat-0?" and it was explained
+   in chat (positioning vs Monarch's official free Retail Sync extension:
+   (a) paid gap-filler companion [recommended, coherent with D13/D15],
+   (b) full head-on matcher, (c) kill, (d) multi-app pivot). AWAIT their pick;
+   (a) vs (b) barely changes the build, mostly listing/positioning.
+2. Then: start M0 (manifests, build tooling, token-bridge proof) per SPEC §6.
    NOTE: amazon.com and app.monarch.com are NOT reachable from the Claude-web
    env (egress 403) — the matcher core + parsers are testable here via
    fixtures; live end-to-end must run locally.
-4. AskUserQuestion tool was flaky all session (permission stream aborts) —
-   if grilling again, keep rounds small and be ready to fall back to defaults.
+3. AskUserQuestion tool was flaky all session (permission stream aborts) —
+   the user got the questions but their answers never reached the agent.
+   Prefer plain-text questions in chat for this user until that's resolved.
 
 KEY CONTEXT: the ExtensionMiner miner/dashboard work (Sessions 1–8) was NOT
 touched this session. Miner state is unchanged from Session 8 handoff (apply

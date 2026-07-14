@@ -32,3 +32,5 @@ SESSION 9 — PROMPT HISTORY (verbatim)
    user 3x ("permission stream closed"). Proceeding with flagged defaults per fallback
    announced in chat: free-first audience, rules+optional-AI categorizer, local-only
    privacy, placeholder name. All four marked OPEN in the spec for user override.]
+
+9. What is strat-0? Also, I've answered the four defaults numerous times. 1) Paid at launch 2) Rules + optional Claude organizer 3) full cloud sync 4) name is Amazarch (Match Amazon orders to Monarch transactions)

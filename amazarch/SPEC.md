@@ -1,13 +1,13 @@
-# Monarch ⇄ Amazon Transaction Matcher — Product Spec
+# Amazarch — Product Spec
 
-> **Status:** Spec agreed via grill session (Session 9, 2026-07-14). Not yet built.
-> Four decisions could not be collected interactively (the question stream kept
-> dropping) and are **defaulted + flagged `OPEN`** below — override any of them
-> and the spec updates, nothing downstream is blocked on them.
+> *Match Amazon orders to Monarch transactions.*
 >
-> **Working name:** `monarch-amazon-matcher` (placeholder — see OPEN-4).
-> Lives in this repo for now (`monarch-amazon-matcher/`); can be extracted to
-> its own repo before store submission.
+> **Status:** Spec agreed via grill session (Session 9, 2026-07-14). Not yet
+> built. All decisions D1–D16 are owner-answered; the one remaining call is
+> **STRAT-0** (positioning vs. Monarch's official extension, §1.5).
+>
+> **Name:** **Amazarch** (D16). Lives in this repo for now (`amazarch/`);
+> can be extracted to its own repo before store submission.
 
 ---
 
@@ -69,16 +69,24 @@ almost exactly onto this spec's requirements:
   cross-app "Amazon itemizer" (YNAB + Lunch Money + Monarch) diversifies the
   Monarch-platform risk.
 
-The spec below remains written for the agreed scope (D1–D12), which is
+The spec below remains written for the agreed scope (D1–D16), which is
 compatible with **(a)** and **(b)** — the build is nearly identical; only
-positioning, naming, and store listing differ.
+positioning and store listing differ.
+
+> **Note (2026-07-14):** the owner's D13 (paid at launch) + D15 (cloud sync)
+> answers make **(a) as a paid hosted companion** the coherent shape — it
+> mirrors the only proven paid model in this niche (YNAB's hosted SaaS
+> tools) while targeting the official extension's gaps. STRAT-0 itself is
+> still awaiting the owner's explicit pick.
 
 ---
 
 ## 2. Decision record (from the grill session)
 
-Every decision below was made explicitly by the product owner unless marked
-`OPEN` (defaulted).
+Every decision below (D1–D16) was made explicitly by the product owner.
+(D13–D16 were answered by the owner on 2026-07-14 after the interactive
+question dialogs repeatedly failed to deliver; earlier spec revisions carried
+them as defaulted "OPEN-1..4".)
 
 ### D1. What a match writes to Monarch — ALL of:
 - **Notes:** Amazon item name(s), order number, link to the order
@@ -169,14 +177,49 @@ multiple amazon accounts signed in")
 - Firefox note: permanent installs require Mozilla-signed builds anyway, so
   AMO submission is on the critical path regardless.
 
-### OPEN decisions (defaulted — override any of these)
+### D13–D16 (resolved by owner 2026-07-14; formerly the "OPEN" defaults)
 
-| # | Question | Default taken | Alternatives offered |
-|---|----------|---------------|----------------------|
-| OPEN-1 | Audience/monetization | **Free public tool at launch**; architecture must not preclude a paid tier later (feature flags around backfill depth, splits, multi-account — the natural premium levers). *Research (R2): no one has demonstrated paying for a local Monarch matcher; the only paid niche is hosted SaaS in the YNAB ecosystem — free is the realistic launch mode.* | Freemium from day one; paid-only; private until proven |
-| OPEN-2 | Categorization engine | **Rules + optional AI:** built-in keyword/department rules work offline for everyone; user may paste an Anthropic API key to have Claude classify odd items into *their* custom Monarch categories; uncategorizable → review queue | AI-first (every user needs a key); rules-only |
-| OPEN-3 | Data/privacy model | **Local-only:** all data (order cache, matches, settings) stays in browser extension storage. Network calls only to amazon.com, monarchmoney.com, and — if AI is enabled — the Anthropic API. This is the store privacy-policy story. | Local + opt-in encrypted sync; cloud-backed service |
-| OPEN-4 | Name | **Placeholder `monarch-amazon-matcher`** until pre-submission. *Research (R4): must be a distinctive mark + "for" phrasing — e.g. "Butterfly Box for Monarch Money", "OrderSync for Monarch Money" — never leading with Monarch/Amazon, generic icon, "not affiliated" disclaimer.* | "Butterfly Box", "OrderSync", "Reconcile" (+ "for Monarch Money") |
+### D13. Monetization — PAID at launch (was OPEN-1)
+- Paid product from day one. Note: Chrome Web Store's native payments are
+  long dead, so licensing/subscriptions run through **our own backend**
+  (which D15 requires anyway). Adjacent-niche pricing norm is ~$2–5/mo with a
+  14-day trial (YNAB's Ace My Budget / Bridge Your Budget pattern).
+- Research caution stands (R2): no one has yet paid for a *local* Monarch
+  matcher — the proven paid model is a **hosted service**, which is exactly
+  the shape D15 (cloud sync) gives us. The paid pitch must therefore sell
+  what the free official extension can't do: refunds, full-history backfill,
+  Firefox, reliability, review control.
+
+### D14. Categorizer — rules + optional Claude (was OPEN-2)
+- Built-in keyword/department rules as the base; Claude as the smart layer
+  for odd items against the user's *custom* Monarch categories;
+  uncategorizable → review queue.
+- With a backend in the picture (D15), the Claude calls can be **proxied
+  server-side under our API key** with the subscription covering inference
+  cost — better UX than user-pasted keys. Decide proxy-vs-user-key at build
+  time; either way it's disclosed data sharing (R4).
+
+### D15. Data model — FULL CLOUD SYNC (was OPEN-3)
+- Matched orders, item cache, match state, and settings sync through a
+  backend; the extension keeps a local IndexedDB working copy. Cross-device
+  sync, survives reinstalls, and carries the licensing/auth for D13.
+- Natural stack given existing infra: **Supabase** (Postgres + Auth + RLS)
+  and **Vercel** for the account/billing/API surface.
+- Consequences we now own: user accounts at first-run; we custody users'
+  financial data (encryption at rest, per-user RLS, deletion on request);
+  the privacy policy is substantive; CWS Limited-Use + Aug-2026 disclosure
+  rules and Firefox `data_collection_permissions` must declare transmission
+  of purchase/transaction data to our servers (R4).
+
+### D16. Name — "Amazarch" (was OPEN-4)
+- **Amazarch** — *Match Amazon orders to Monarch transactions.*
+- Trademark caution (R4): it's a portmanteau opening with "Amaz-", and Amazon
+  has historically opposed AMAZ-prefixed marks; Monarch also has standing as
+  a competitor. Mitigations: store subtitle uses the accepted phrasing
+  ("Amazarch — Amazon order matching **for Monarch Money**"), generic icon,
+  no brand colors/logos, "not affiliated with Amazon or Monarch Money"
+  disclaimer in listing + UI. Keep a fallback name in the back pocket if a
+  complaint ever lands.
 
 ---
 
@@ -234,8 +277,9 @@ unique candidates auto-apply; everything else queues (D2).
 ## 4. Architecture
 
 ```
-monarch-amazon-matcher/
+amazarch/
 ├── SPEC.md                  # this file
+├── backend/                 # Supabase schema + Vercel account/billing/sync API (D13/D15)
 ├── manifest.chrome.json     # MV3 (service worker)
 ├── manifest.firefox.json    # MV3 (event pages; gecko id for AMO signing)
 ├── src/
@@ -284,10 +328,17 @@ monarch-amazon-matcher/
   here).
 - **Money:** integer cents everywhere; never float.
 
-### Privacy (per OPEN-3 default)
-Local-only. No telemetry, no external servers. Data leaves the browser only
-toward amazon.com, monarchmoney.com, and (opt-in, user's own key) the
-Anthropic API. Privacy policy for the stores states exactly this.
+### Cloud layer & privacy (per D15)
+Cloud-synced: the extension's local IndexedDB is a working copy; match state,
+order/item cache, and settings sync to the backend (Supabase — Postgres +
+Auth + RLS; account/billing/API surface on Vercel). The backend also holds
+subscription state (D13) and, if the server-proxy path is chosen, fronts the
+Claude categorization calls (D14). Data leaves the browser toward: amazon.com
+(reads), monarch.com / monarchmoney.com (reads + writes), our backend (sync),
+and Anthropic (categorization). All of this is disclosed in the privacy
+policy, the CWS Privacy Practices tab, and Firefox
+`data_collection_permissions` (R4). Financial data is encrypted at rest,
+scoped per-user via RLS, and deletable on request.
 
 ---
 
@@ -362,7 +413,8 @@ Anthropic API. Privacy policy for the stores states exactly this.
 - **Pricing norm:** first-party = free; OSS = free; the only observed paid
   model is hosted "we run it for you" SaaS (~$2–5/mo, 14-day trials) where no
   first-party tool exists. **Nobody has demonstrated willingness to pay for a
-  local Monarch matcher** (informs OPEN-1: free is the realistic launch mode).
+  local Monarch matcher** — the paid precedent is hosted SaaS, which is the
+  shape D13+D15 adopt; the paid pitch must lean on the official tool's gaps.
 
 ### R3. Monarch internal GraphQL API (HIGH confidence — verified against library/extension source)
 
@@ -440,13 +492,13 @@ operation names:
   WITH host permissions sends cookies and bypasses CORS — the intended
   mechanism. `declarativeNetRequestWithHostAccess` only if Monarch's endpoint
   needs Origin/Referer rewrites.
-- **Naming/trademark (OPEN-4):** the enforced convention is a distinctive
-  mark + "for" phrasing — e.g. **"OrderSync for Monarch Money"** — generic
-  icon, no brand logos/colors, "not affiliated with Monarch or Amazon" in the
-  listing. Leading with "Monarch" or "Amazon" invites a complaint-driven
+- **Naming/trademark (applies to D16 "Amazarch"):** the enforced convention
+  is a distinctive mark + "for" phrasing in the listing subtitle — generic
+  icon, no brand logos/colors, "not affiliated with Monarch or Amazon"
+  disclaimer. Leading with "Monarch" or "Amazon" invites a complaint-driven
   takedown — and Monarch, running a competing official extension, has motive
-  and standing. (This kills the raw "Butterfly Box… Monarch"-led candidates'
-  riskier variants; adjust naming shortlist accordingly.)
+  and standing. "Amazarch" is distinctive but AMAZ-prefixed; see D16 for the
+  mitigations and fallback-name plan.
 
 ---
 
@@ -460,10 +512,14 @@ operation names:
   Undo, review queue UI, already-edited diff flow (D10).
 - **M3 — Splits + refunds:** split mutations (D1/D8), refund matching (D3),
   full backfill hardening (D7 checkpoints).
-- **M4 — Product polish:** categorizer rules pass + optional AI (OPEN-2),
+- **M4 — Product polish:** categorizer rules pass + optional AI (D14),
   multi-account (D11), options page, onboarding.
-- **M5 — Store submission:** privacy policy, permission justifications,
-  assets, AMO source-code package, Chrome/AMO review (D12).
+- **M4.5 — Cloud + billing:** Supabase accounts + sync protocol (D15),
+  subscription/licensing + trial flow (D13), server-proxy vs user-key
+  decision for Claude (D14).
+- **M5 — Store submission:** privacy policy + data-transmission disclosures,
+  permission justifications, assets, AMO source-code package, Chrome/AMO
+  review (D12, D16 naming rules).
 
 ## 7. Top risks
 
@@ -483,8 +539,16 @@ operation names:
    complexity the matcher exists for; the transactions/invoice data source
    choice (Research §R2) decides how hard this is.
 4. **Store review friction** for an unofficial-API finance extension (D12):
-   strongest mitigations are the local-only privacy story (OPEN-3) and
+   strongest mitigations are precise data-transmission disclosures (D15) and
    precise, minimal host permissions.
 5. **Writes to real financial data:** journal + Undo on every mutation;
    review queue defaults conservative; already-edited rows never clobbered
    (D10).
+6. **Cloud custody of users' financial data (D15):** we hold purchase/
+   transaction data server-side — breach or mishandling is an existential
+   product risk and a store-policy violation. Encryption at rest, per-user
+   RLS, minimal retention, deletion on request, and honest disclosures are
+   non-negotiable from M4.5 onward.
+7. **Paid-product friction (D13):** paid + unofficial-API + cloud custody
+   raises user trust bar and store scrutiny; the trial flow and a public
+   security/privacy page are part of the product, not marketing polish.
