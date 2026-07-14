@@ -73,3 +73,5 @@ PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>
 Cloning into 'ExtensionMiner'...
 fatal: unable to access 'https://github.com/RadioDinner/ExtensionMiner.git/': Failed to connect to github.com port 443 after 21112 ms: Could not connect to server
 PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch>
+
+16. I merged it to main, give me the zip download to main
