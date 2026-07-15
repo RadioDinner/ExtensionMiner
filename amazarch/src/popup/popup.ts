@@ -50,6 +50,16 @@ async function refresh(): Promise<void> {
     } else if (read) {
       setText("read", `Transaction read failed — ${read.note}`, false);
     }
+    const amazon = status.amazon;
+    if (amazon?.signedIn) {
+      setText("amazon", `Amazon: signed in — ${amazon.note}`, true);
+    } else if (amazon && amazon.ok) {
+      setText("amazon", "Amazon: not signed in — open amazon.com and sign in, then reload Monarch.", false);
+    } else if (amazon) {
+      setText("amazon", `Amazon: ${amazon.note}`, false);
+    } else {
+      setText("amazon", "Amazon: checking…");
+    }
     setText(
       "debug",
       status.monarch.authMethod === "bearer"

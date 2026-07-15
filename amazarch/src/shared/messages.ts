@@ -27,6 +27,14 @@ export interface ReadResult {
   note: string;
 }
 
+export interface AmazonStatus {
+  ranAt: number;
+  ok: boolean; // we reached a recognizable Amazon page
+  signedIn: boolean;
+  orderCardCount: number;
+  note: string;
+}
+
 export type Message =
   | {
       type: "monarch-connected";
@@ -41,6 +49,7 @@ export interface StatusResponse {
   monarch: (Omit<MonarchSessionInfo, "token"> & { tokenPreview: string }) | null;
   probe: ProbeResult | null;
   read: ReadResult | null;
+  amazon: AmazonStatus | null;
   /** Origins where the Monarch content script has reported in this browser session. */
   contentScriptOrigins: string[];
 }

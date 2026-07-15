@@ -131,3 +131,5 @@ built dist/firefox
 
 28. [after loading a panel build] "Now I see it, however, it seems like it is pulling the amazon data from Monarch, not from Amazon. Reason I say that is because there is a transaction there that is for $47.47. The date of the order in Amazon is 7-6-26 but the date that is listed in Monarch is 7-7-26."
    => Correct/by design: panel currently shows the MONARCH side (bank charges) only; Amazon-side fetch is the next build. The 7-6 vs 7-7 gap is exactly why matching uses amount + a date WINDOW (Amazon charges on ship; bank shows settlement). Earlier popup showed old wording => user had been on a stale build; added v0.0.2 version badge (popup + panel) + panel SPA-persistence guard to fix the reload confusion; relabeled panel "Amazon charges in Monarch".
+
+29. [after v0.0.2 loaded, panel visible] user notes panel pulls Amazon data from MONARCH not Amazon; $47.47 txn Amazon order date 7-6-26 vs Monarch 7-7-26. => confirmed by-design (Monarch side only so far); date gap = why matcher uses amount+date-window (charge-on-ship vs settlement). Started Amazon SIDE: v0.0.3 diagnostic-first Amazon reachability probe.

@@ -4,6 +4,7 @@
 // answers popup status queries.
 import browser from "webextension-polyfill";
 import type {
+  AmazonStatus,
   Message,
   MonarchSessionInfo,
   ProbeResult,
@@ -11,10 +12,12 @@ import type {
   StatusResponse,
 } from "../shared/messages";
 import { tokenPreview } from "../shared/messages";
+import { checkAmazon } from "./amazon";
 
 const SESSION_KEY = "monarchSession";
 const PROBE_KEY = "monarchProbe";
 const READ_KEY = "monarchRead";
+const AMAZON_KEY = "amazonStatus";
 const CS_ORIGINS_KEY = "contentScriptOrigins";
 
 // storage.session is memory-backed and cleared when the browser closes —
@@ -50,6 +53,11 @@ browser.runtime.onMessage.addListener(async (raw: unknown): Promise<StatusRespon
         `(${message.session.authMethod}) — ${message.probe.note}` +
         (message.read ? ` | read: ${message.read.note}` : ""),
     );
+    // Now that a Monarch session is active, probe the Amazon side too (D5/D9:
+    // sync when Monarch is opened). Silent background fetch of order history.
+    const amazon = await checkAmazon();
+    await set(AMAZON_KEY, amazon);
+    console.info(`[Amazarch] amazon: ok=${amazon.ok} signedIn=${amazon.signedIn} — ${amazon.note}`);
     return undefined;
   }
 
@@ -68,6 +76,7 @@ browser.runtime.onMessage.addListener(async (raw: unknown): Promise<StatusRespon
         : null,
       probe: await get<ProbeResult>(PROBE_KEY),
       read: await get<ReadResult>(READ_KEY),
+      amazon: await get<AmazonStatus>(AMAZON_KEY),
       contentScriptOrigins: (await get<string[]>(CS_ORIGINS_KEY)) ?? [],
     };
   }
