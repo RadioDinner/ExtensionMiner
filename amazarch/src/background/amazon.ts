@@ -3,7 +3,7 @@
 // session cookies (content scripts can't do this cross-origin in Chrome), then
 // parses it into structured orders. Diagnostic-first: report what we reached.
 import type { AmazonCheck, AmazonStatus } from "../shared/messages";
-import { countOrderCards, detectAmazonPage, pageTitle } from "../shared/amazon-parse";
+import { countOrderCards, detectAmazonPage, diagnoseOrderHtml, pageTitle } from "../shared/amazon-parse";
 import { parseAmazonOrders } from "../shared/amazon-order-parse";
 
 const ORDERS_URL = "https://www.amazon.com/gp/css/order-history";
@@ -30,9 +30,15 @@ export async function checkAmazon(): Promise<AmazonCheck> {
         ok: true,
         signedIn: true,
         orderCardCount: cards,
-        note: `${orders.length} orders parsed (${cards} cards on page 1)`,
+        note:
+          orders.length > 0
+            ? `${orders.length} orders parsed (${cards} cards on page 1)`
+            : `0 orders parsed from ${cards} cards — see the [Amazarch] console diagnostic on the Monarch tab`,
       };
-      return { status, orders };
+      // When cards are present but nothing parsed, return a redacted diagnostic
+      // (counts only) so the content script can log it on the Monarch tab.
+      const diagnostic = orders.length === 0 && cards > 0 ? diagnoseOrderHtml(html) : undefined;
+      return { status, orders, diagnostic };
     }
     return {
       status: {

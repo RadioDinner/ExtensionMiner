@@ -93,6 +93,12 @@ async function tryConnect(): Promise<boolean> {
   try {
     const check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
     console.info(`${LOG} amazon: ${check.status.note}`);
+    if (check.diagnostic) {
+      console.warn(
+        `${LOG} amazon order-parse diagnostic (counts only, paste this):`,
+        JSON.stringify(check.diagnostic, null, 2),
+      );
+    }
     if (read.ok) {
       renderPanel({
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,
