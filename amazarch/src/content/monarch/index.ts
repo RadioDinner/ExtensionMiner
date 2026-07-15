@@ -29,7 +29,40 @@ import type {
   MonarchSessionInfo,
 } from "../../shared/messages";
 import type { MonarchAuth } from "../../shared/monarch-gql";
-import { renderPanel } from "./overlay";
+import { renderPanel, setPanelStatus } from "./overlay";
+
+// Live status line with a running timer, updated in place during a sync.
+let statusTimer: ReturnType<typeof setInterval> | undefined;
+let statusStart = 0;
+let statusLabel = "";
+function statusTick(): void {
+  const secs = ((Date.now() - statusStart) / 1000).toFixed(1);
+  setPanelStatus(`${statusLabel}  ·  ${secs}s`);
+}
+function statusBegin(label: string): void {
+  statusLabel = label;
+  statusStart = Date.now();
+  statusTick();
+  if (statusTimer) clearInterval(statusTimer);
+  statusTimer = setInterval(statusTick, 200);
+}
+function statusSet(label: string): void {
+  statusLabel = label;
+  statusTick();
+}
+function statusStop(): void {
+  if (statusTimer) {
+    clearInterval(statusTimer);
+    statusTimer = undefined;
+  }
+}
+
+// Live progress pushed from the background while it reads the Amazon tab.
+browser.runtime.onMessage.addListener((raw: unknown): undefined => {
+  const m = raw as { type?: string; label?: string };
+  if (m?.type === "amazon-progress" && typeof m.label === "string") statusSet(m.label);
+  return undefined;
+});
 
 const LOG = "[Amazarch]";
 const MAX_ATTEMPTS = 20;
@@ -110,21 +143,33 @@ async function tryConnect(): Promise<boolean> {
   // Heavy work (read charges + open the Amazon tab + match) runs ONLY on demand,
   // so opening Monarch stays fast and the Amazon tab isn't opened every visit.
   const doSync = async (): Promise<void> => {
-    const read = await readAmazonTransactions(auth);
+    statusBegin("Sync queued…");
+    statusSet("Reading your Monarch transactions…");
+    const read = await readAmazonTransactions(auth, {}, (loaded) =>
+      statusSet(`Reading Monarch transactions — ${loaded} Amazon charges so far…`),
+    );
     console.info(`${LOG} transaction read: ok=${read.ok} — ${read.note}`);
     let matches: ReturnType<typeof matchOrdersToCharges> = [];
     let check: AmazonCheck | null = null;
     try {
+      statusSet("Opening Amazon…"); // background pushes per-page progress from here
       check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
       console.info(`${LOG} amazon: ${check.status.note}`);
-      if (read.ok) matches = matchOrdersToCharges(read.rows, check.orders);
+      if (read.ok) {
+        statusSet(`Matching ${check.orders.length} orders to ${read.rows.length} charges…`);
+        matches = matchOrdersToCharges(read.rows, check.orders);
+      }
     } catch (e) {
       console.warn(`${LOG} amazon fetch failed:`, e);
     }
+    statusStop();
+    const done = check?.status.signedIn === false
+      ? "Amazon needs sign-in — open amazon.com, sign in, then Sync again."
+      : `Done — ${read.rows.length} Amazon charges, ${check?.orders.length ?? 0} orders read.`;
     renderPanel({
       txns: read.rows, totalCount: read.totalCount, capped: read.capped,
       orders: check?.orders, amazonNote: check?.status.note, matches,
-      synced: true, onSync: doSync, onApply, onRename,
+      synced: true, status: done, onSync: doSync, onApply, onRename,
       diagnostic: check?.diagnostic, sample: check?.sample, report: check?.report,
     });
   };

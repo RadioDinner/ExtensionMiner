@@ -45,19 +45,23 @@ function orderKey(o: AmazonOrderLite): string {
   return o.orderId || `${o.date}|${o.totalCents}|${o.itemTitles[0] ?? ""}`;
 }
 
-export async function fetchAmazonViaTab(): Promise<AmazonCheck> {
+export async function fetchAmazonViaTab(
+  onProgress?: (label: string) => void,
+): Promise<AmazonCheck> {
   let tabId: number | undefined;
   const all = new Map<string, AmazonOrderLite>();
   let signedIn = true;
   let pagesRead = 0;
 
   try {
+    onProgress?.("Opening Amazon in a background tab…");
     const tab = await browser.tabs.create({ url: pageUrl(0), active: false });
     tabId = tab.id;
     if (tabId === undefined) return errCheck("could not open an Amazon tab");
 
     for (let page = 0; page < MAX_PAGES; page++) {
       if (page > 0) await browser.tabs.update(tabId, { url: pageUrl(page * PAGE_SIZE) });
+      onProgress?.(`Reading Amazon orders — page ${page + 1} (${all.size} so far, waiting for decryption…)`);
       const r = await waitForReport(tabId);
       signedIn = r.signedIn;
       if (!r.signedIn) break;

@@ -68,9 +68,15 @@ browser.runtime.onMessage.addListener(
     }
 
     // Read Amazon orders by opening the order-history page in a background tab
-    // and scraping the decrypted, rendered DOM (D5/D9; SPEC.md §R1).
+    // and scraping the decrypted, rendered DOM (D5/D9; SPEC.md §R1). Progress is
+    // pushed back to the requesting Monarch tab so the panel can show live status.
     if (message.type === "fetch-amazon") {
-      const check = await fetchAmazonViaTab();
+      const monarchTabId = sender.tab?.id;
+      const check = await fetchAmazonViaTab((label) => {
+        if (monarchTabId !== undefined) {
+          browser.tabs.sendMessage(monarchTabId, { type: "amazon-progress", label }).catch(() => {});
+        }
+      });
       await set(AMAZON_KEY, check.status);
       console.info(
         `[Amazarch] amazon: ok=${check.status.ok} signedIn=${check.status.signedIn} — ${check.status.note}`,

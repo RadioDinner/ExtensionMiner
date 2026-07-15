@@ -163,3 +163,8 @@ built dist/firefox
    - MERCHANT RENAME: buildMerchantName -> "Amazon — <shortItemSummary>" (strips sizes/counts/parentheticals, truncates at word boundary). setTransactionName via same mutation (refactored updateTransaction helper). Second per-match button "Rename merchant" with undo. Added `name` to read query + AmazonTxn (for rename undo). Heuristic summary now; crisp AI paraphrase later (D14).
    - ON-DEMAND SYNC (perf fix + answers "don't load Amazon page every time"): on Monarch load, NOTHING heavy runs — light panel + "Sync now" button. Read charges + open Amazon tab + match ONLY on click. Amazon tab no longer opens every visit.
    Pure parts tested (65 tests). NOTE: `name` added to read query — if Monarch's result type lacks `name`, read would break (watch for 0 charges); high confidence it's valid.
+
+43. "Its still pretty slow, even before sync. I want the extension box to give hyper frequent status updates after clicking Sync... 'sync queueing...' with a timer"
+   v0.4.0:
+   - PERF (pre-sync): panel now attaches to document.documentElement (<html>), OUTSIDE Monarch's React <body> tree, so React re-renders don't wipe/retrigger our redraw; re-assert guard slowed 2s->8s. Should stop the redraw churn.
+   - LIVE STATUS: panel has a status line (#amazarch-panel-status) with a running timer (ticks every 200ms). doSync drives it: "Sync queued…" -> "Reading Monarch transactions — N so far…" (per page) -> "Opening Amazon…" -> per-page "Reading Amazon orders — page K (X so far, waiting for decryption…)" pushed from the BACKGROUND via tabs.sendMessage(amazon-progress) -> "Matching…" -> final "Done — N charges, M orders". setPanelStatus updates in place (no full re-render) so the timer stays smooth.

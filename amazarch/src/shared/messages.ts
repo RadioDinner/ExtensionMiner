@@ -62,6 +62,7 @@ export type Message =
   | { type: "content-script-loaded"; origin: string; loadedAt: number }
   | { type: "fetch-amazon" }
   | { type: "amazon-orders"; orders: AmazonOrderLite[]; signedIn: boolean }
+  | { type: "amazon-progress"; label: string }
   | { type: "get-status" };
 
 export interface StatusResponse {

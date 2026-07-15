@@ -57,6 +57,7 @@ interface Options {
 export async function readAmazonTransactions(
   auth: MonarchAuth,
   opts: Options = {},
+  onProgress?: (loaded: number) => void,
 ): Promise<AmazonReadResult> {
   const maxRows = opts.maxRows ?? 500;
   const pageSize = opts.pageSize ?? 100;
@@ -92,6 +93,7 @@ export async function readAmazonTransactions(
       if (rows.length >= maxRows) { capped = true; break; }
       rows.push(row);
     }
+    onProgress?.(rows.length);
     if (page.pageLen < pageSize) break; // last page
     if (!useSearch && totalScanned >= unfilteredScanCap) { capped = true; break; }
     offset += pageSize;

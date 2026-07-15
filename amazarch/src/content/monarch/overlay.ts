@@ -23,7 +23,8 @@ export interface PanelView {
   amazonNote?: string;
   matches?: MatchResult[];
   synced?: boolean; // false = connected but no sync run yet (light state)
-  syncNote?: string; // status line shown in the light state
+  syncNote?: string; // body text shown in the light state
+  status?: string; // initial status-line text (updated live via setPanelStatus)
   onSync?: () => Promise<void>;
   onApply?: (chargeId: string, chargeNotes: string, order: AmazonOrderLite) => Promise<ApplyResult>;
   onRename?: (chargeId: string, currentName: string, order: AmazonOrderLite) => Promise<ApplyResult>;
@@ -47,15 +48,24 @@ export function renderPanel(view: PanelView): void {
   draw(view);
   if (!guardStarted) {
     guardStarted = true;
-    // Re-assert if Monarch's SPA removes our node on a route change.
+    // Fallback re-assert if the panel ever disappears. Attaching to <html>
+    // (below) keeps it out of Monarch's React <body> tree, so this rarely fires.
     setInterval(() => {
-      if (lastView && !document.getElementById(PANEL_ID) && document.body) draw(lastView);
-    }, 2000);
+      if (lastView && !document.getElementById(PANEL_ID) && document.documentElement) draw(lastView);
+    }, 8000);
   }
 }
 
+// Update just the status line in place (no full re-render) — keeps the timer
+// smooth and cheap during a sync.
+export function setPanelStatus(text: string): void {
+  const el = document.getElementById(`${PANEL_ID}-status`);
+  if (el) el.textContent = text;
+}
+
 function draw(view: PanelView): void {
-  if (!document.body) return;
+  const host = document.documentElement;
+  if (!host) return;
   document.getElementById(PANEL_ID)?.remove();
 
   const version = browser.runtime.getManifest().version;
@@ -103,6 +113,15 @@ function draw(view: PanelView): void {
   header.append(right);
   panel.append(header);
 
+  // Live status line (updated in place during a sync via setPanelStatus).
+  const status = el("div", {
+    padding: "6px 12px", "font-size": "11px", color: "#93c5fd",
+    "border-bottom": "1px solid #1f2937", "min-height": "16px",
+  });
+  status.id = `${PANEL_ID}-status`;
+  status.textContent = view.status ?? "";
+  panel.append(status);
+
   // Light state: connected but no sync run yet — do nothing heavy on page load.
   if (view.onSync && !view.synced) {
     const body0 = el("div", { padding: "12px" });
@@ -113,7 +132,7 @@ function draw(view: PanelView): void {
       }),
     );
     panel.append(body0);
-    document.body.appendChild(panel);
+    host.appendChild(panel);
     return;
   }
 
@@ -224,7 +243,7 @@ function draw(view: PanelView): void {
     padding: "8px 12px", background: "#1f2937", color: "#9ca3af", "font-size": "11px",
   }));
 
-  document.body.appendChild(panel);
+  host.appendChild(panel);
 }
 
 function el(tag: string, style: Record<string, string>): HTMLElement {
