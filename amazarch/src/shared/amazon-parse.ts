@@ -61,6 +61,51 @@ export function diagnoseOrderHtml(html: string): Record<string, number | string>
 }
 
 /**
+ * Redacted schema of the largest embedded JSON blob (from <script type=
+ * "application/json"> or data-a-state). Reports nested KEY NAMES and value
+ * TYPES only ("string"/"number"/array/object) — never a value. This reveals
+ * where the order data (date, total, order id, items) lives so we can parse the
+ * JSON instead of the pre-hydration HTML.
+ */
+export function extractOrderJsonSchema(html: string): string {
+  const blobs: string[] = [];
+  const scriptRe = /<script[^>]*type=["']application\/json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = scriptRe.exec(html)) !== null) if (m[1]) blobs.push(m[1]);
+  const stateRe = /data-a-state=["'](\{[^"']*\})["']/gi;
+  while ((m = stateRe.exec(html)) !== null) if (m[1]) blobs.push(m[1].replace(/&quot;/g, '"'));
+
+  let best: unknown = null;
+  let bestLen = 0;
+  for (const b of blobs) {
+    try {
+      const parsed = JSON.parse(b.trim());
+      if (b.length > bestLen) {
+        best = parsed;
+        bestLen = b.length;
+      }
+    } catch {
+      // not valid JSON — skip
+    }
+  }
+  if (best === null) return `(no parseable JSON blob found; ${blobs.length} candidates)`;
+  return `(schema of largest JSON blob, ${bestLen} bytes)\n` + JSON.stringify(schemaOf(best, 0), null, 1).slice(0, 6000);
+}
+
+function schemaOf(value: unknown, depth: number): unknown {
+  if (depth > 7) return "…";
+  if (Array.isArray(value)) return value.length ? [schemaOf(value[0], depth + 1)] : [];
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(value as Record<string, unknown>).slice(0, 40)) {
+      out[k] = schemaOf((value as Record<string, unknown>)[k], depth + 1);
+    }
+    return out;
+  }
+  return typeof value;
+}
+
+/**
  * A privacy-safe structural skeleton of the first order card: every digit is
  * masked to '#' (removes amounts, dates, order numbers, ids) and every text
  * node longer than 15 chars is blanked (removes item names / addresses),

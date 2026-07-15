@@ -49,6 +49,7 @@ export interface AmazonCheck {
   orders: AmazonOrderLite[];
   diagnostic?: Record<string, number | string>; // redacted counts when parsing found nothing
   sample?: string; // redacted structural skeleton of one order card (no values)
+  report?: string; // full copyable diagnostic bundle (counts + JSON schema + skeleton), no values
 }
 
 export type Message =

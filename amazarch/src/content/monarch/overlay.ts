@@ -16,6 +16,7 @@ export interface PanelView {
   amazonNote?: string;
   diagnostic?: Record<string, number | string>;
   sample?: string;
+  report?: string;
 }
 
 let lastView: PanelView | null = null;
@@ -80,18 +81,38 @@ function draw(view: PanelView): void {
     body.append(sectionTitle(`${view.orders.length} Amazon order${view.orders.length === 1 ? "" : "s"} parsed`));
     if (view.orders.length === 0) {
       body.append(muted(view.amazonNote ?? "No orders parsed."));
-      // Show the redacted diagnostic in-panel so no DevTools is needed.
+      // One-click copy of the full redacted diagnostic — no DevTools, no
+      // hunting for a text box. Puts the report straight on the clipboard.
+      if (view.report) {
+        const wrap = el("div", { padding: "6px 12px" });
+        const btn = el("button", {
+          width: "100%", padding: "8px", cursor: "pointer", border: "none",
+          "border-radius": "6px", background: "#2563eb", color: "#fff",
+          font: "12px system-ui,sans-serif",
+        });
+        btn.textContent = "📋 Copy diagnostic to clipboard";
+        const report = view.report;
+        btn.addEventListener("click", () => {
+          navigator.clipboard.writeText(report).then(
+            () => { btn.textContent = "✓ Copied — paste it to the dev"; },
+            () => { btn.textContent = "Copy failed — use the text box below"; },
+          );
+        });
+        wrap.append(btn);
+        body.append(wrap);
+      }
+      // Fallback: show the redacted diagnostic counts in-panel too.
       if (view.diagnostic) {
         body.append(sectionTitle("Order-parse diagnostic (counts only)"));
         for (const [k, v] of Object.entries(view.diagnostic)) {
           body.append(row(k, "", String(v)));
         }
       }
-      if (view.sample) {
-        body.append(sectionTitle("Redacted card skeleton — select all, copy, paste to dev"));
+      if (view.report) {
+        body.append(sectionTitle("…or select all in this box, copy, paste"));
         const ta = document.createElement("textarea");
         ta.readOnly = true;
-        ta.value = view.sample;
+        ta.value = view.report;
         ta.setAttribute(
           "style",
           "width:calc(100% - 24px);margin:4px 12px 8px;height:120px;background:#0b1220;color:#cbd5e1;border:1px solid #334155;border-radius:6px;font:11px/1.4 monospace;padding:6px;",

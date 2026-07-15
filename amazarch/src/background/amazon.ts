@@ -7,6 +7,7 @@ import {
   countOrderCards,
   detectAmazonPage,
   diagnoseOrderHtml,
+  extractOrderJsonSchema,
   pageTitle,
   redactedCardSample,
 } from "../shared/amazon-parse";
@@ -46,7 +47,18 @@ export async function checkAmazon(): Promise<AmazonCheck> {
       const failed = orders.length === 0 && cards > 0;
       const diagnostic = failed ? diagnoseOrderHtml(html) : undefined;
       const sample = failed ? redactedCardSample(html) : undefined;
-      return { status, orders, diagnostic, sample };
+      const report = failed
+        ? [
+            "AMAZARCH ORDER-PARSE DIAGNOSTIC (redacted — no values)",
+            "== counts ==",
+            JSON.stringify(diagnostic, null, 1),
+            "== embedded JSON schema (keys + types only) ==",
+            extractOrderJsonSchema(html),
+            "== HTML card skeleton (digits masked, long text blanked) ==",
+            sample,
+          ].join("\n")
+        : undefined;
+      return { status, orders, diagnostic, sample, report };
     }
     return {
       status: {
