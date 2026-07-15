@@ -3,11 +3,18 @@
 // the background just holds the result in session storage (never on disk) and
 // answers popup status queries.
 import browser from "webextension-polyfill";
-import type { Message, MonarchSessionInfo, ProbeResult, StatusResponse } from "../shared/messages";
+import type {
+  Message,
+  MonarchSessionInfo,
+  ProbeResult,
+  ReadResult,
+  StatusResponse,
+} from "../shared/messages";
 import { tokenPreview } from "../shared/messages";
 
 const SESSION_KEY = "monarchSession";
 const PROBE_KEY = "monarchProbe";
+const READ_KEY = "monarchRead";
 const CS_ORIGINS_KEY = "contentScriptOrigins";
 
 // storage.session is memory-backed and cleared when the browser closes —
@@ -37,9 +44,11 @@ browser.runtime.onMessage.addListener(async (raw: unknown): Promise<StatusRespon
   if (message.type === "monarch-connected") {
     await set(SESSION_KEY, message.session);
     await set(PROBE_KEY, message.probe);
+    await set(READ_KEY, message.read);
     console.info(
       `[Amazarch] ${message.probe.ok ? "connected" : "connection failed"} ` +
-        `(${message.session.authMethod}) — ${message.probe.note}`,
+        `(${message.session.authMethod}) — ${message.probe.note}` +
+        (message.read ? ` | read: ${message.read.note}` : ""),
     );
     return undefined;
   }
@@ -58,6 +67,7 @@ browser.runtime.onMessage.addListener(async (raw: unknown): Promise<StatusRespon
           }
         : null,
       probe: await get<ProbeResult>(PROBE_KEY),
+      read: await get<ReadResult>(READ_KEY),
       contentScriptOrigins: (await get<string[]>(CS_ORIGINS_KEY)) ?? [],
     };
   }

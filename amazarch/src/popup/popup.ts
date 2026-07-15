@@ -36,6 +36,16 @@ async function refresh(): Promise<void> {
     const host = new URL(status.monarch.origin).host;
     setText("monarch-status", `Connected to Monarch (${host}) — API check OK`, true);
     setText("probe", probe.note);
+    const read = status.read;
+    if (read?.ok) {
+      setText(
+        "read",
+        `Amazon transactions: ${read.amazonCount} of ${read.totalScanned} recent${read.totalCount !== null ? ` (${read.totalCount} total in Monarch)` : ""}`,
+        true,
+      );
+    } else if (read) {
+      setText("read", `Transaction read failed — ${read.note}`, false);
+    }
     setText(
       "debug",
       status.monarch.authMethod === "bearer"

@@ -11,7 +11,9 @@ import {
   huntMonarchToken,
 } from "../../shared/monarch-session";
 import { probeMonarchApi, readCookie } from "../../shared/monarch-probe";
+import { readAmazonTransactions } from "../../shared/monarch-read";
 import type { AuthMethod, Message, MonarchSessionInfo } from "../../shared/messages";
+import type { MonarchAuth } from "../../shared/monarch-gql";
 
 const LOG = "[Amazarch]";
 const MAX_ATTEMPTS = 20;
@@ -51,12 +53,8 @@ async function tryConnect(): Promise<boolean> {
   // Cookie auth is the primary path; a found bearer token is a fallback attempt.
   if (!csrftoken && !hunt.token) return false; // nothing to try yet — app not hydrated
 
-  const probe = await probeMonarchApi({
-    origin: location.origin,
-    csrftoken,
-    deviceUuid,
-    token: hunt.token,
-  });
+  const auth: MonarchAuth = { origin: location.origin, csrftoken, deviceUuid, token: hunt.token };
+  const probe = await probeMonarchApi(auth);
 
   if (!probe.ok) {
     // Keep the last failure visible in the popup, but keep retrying while the
@@ -76,7 +74,12 @@ async function tryConnect(): Promise<boolean> {
     strategy: authMethod === "bearer" ? `bearer:${hunt.strategy}` : "cookie+csrftoken",
   };
   console.info(`${LOG} connected to Monarch API via ${authMethod}`);
-  const message: Message = { type: "monarch-connected", session, probe };
+
+  // First read-side proof: how many Amazon-looking transactions are in Monarch?
+  const read = await readAmazonTransactions(auth);
+  console.info(`${LOG} transaction read: ok=${read.ok} — ${read.note}`);
+
+  const message: Message = { type: "monarch-connected", session, probe, read };
   void browser.runtime
     .sendMessage(message)
     .then(() => showConnectedPill())
@@ -100,6 +103,7 @@ function reportFailure(note: string, hunt: ReturnType<typeof huntMonarchToken>, 
     type: "monarch-connected",
     session,
     probe: { ranAt: Date.now(), status: 0, ok: false, note },
+    read: null,
   };
   void browser.runtime.sendMessage(message).catch(() => {});
 }

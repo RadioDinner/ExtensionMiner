@@ -18,14 +18,29 @@ export interface ProbeResult {
   note: string; // short human-readable outcome (no financial data)
 }
 
+export interface ReadResult {
+  ranAt: number;
+  ok: boolean;
+  amazonCount: number;
+  totalScanned: number;
+  totalCount: number | null;
+  note: string;
+}
+
 export type Message =
-  | { type: "monarch-connected"; session: MonarchSessionInfo; probe: ProbeResult }
+  | {
+      type: "monarch-connected";
+      session: MonarchSessionInfo;
+      probe: ProbeResult;
+      read: ReadResult | null;
+    }
   | { type: "content-script-loaded"; origin: string; loadedAt: number }
   | { type: "get-status" };
 
 export interface StatusResponse {
   monarch: (Omit<MonarchSessionInfo, "token"> & { tokenPreview: string }) | null;
   probe: ProbeResult | null;
+  read: ReadResult | null;
   /** Origins where the Monarch content script has reported in this browser session. */
   contentScriptOrigins: string[];
 }

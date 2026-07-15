@@ -538,10 +538,14 @@ operation names:
 
 ## 6. Milestones
 
-- **M0 — Skeleton:** manifests, build (both browsers), token-bridge proves it
-  can read the Monarch session; hello-world overlay in Monarch.
+- **M0 — Skeleton:** ✅ **DONE (2026-07-14).** Manifests + cross-browser build;
+  the content script establishes an authenticated Monarch API session (cookie +
+  CSRF) and a live `me` query returns OK on `app.monarch.com`; connected-pill
+  overlay. Verified in Firefox against a real account.
 - **M1 — Read-only match preview:** Amazon fetcher + Monarch reads + matcher;
   overlay shows proposed matches; **no writes yet.** (Safe end-to-end proof.)
+  - *In progress:* Monarch transaction read (reuse the M0 cookie transport) →
+    surface the count of Amazon-looking transactions as the first read proof.
 - **M2 — Writes + review queue:** notes/rename/category writes, journal +
   Undo, review queue UI, already-edited diff flow (D10).
 - **M3 — Splits + refunds:** split mutations (D1/D8), refund matching (D3),
