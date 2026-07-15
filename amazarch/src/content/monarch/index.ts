@@ -31,6 +31,21 @@ import type {
 import type { MonarchAuth } from "../../shared/monarch-gql";
 import { renderPanel, setPanelStatus } from "./overlay";
 
+// Send a message to the background, retrying to cover the case where Firefox has
+// idle-suspended the event page (first send wakes it, a retry then connects).
+async function sendToBackground<T>(msg: unknown): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < 5; i++) {
+    try {
+      return (await browser.runtime.sendMessage(msg)) as T;
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 // Live status line with a running timer, updated in place during a sync.
 let statusTimer: ReturnType<typeof setInterval> | undefined;
 let statusStart = 0;
@@ -164,7 +179,7 @@ async function tryConnect(): Promise<boolean> {
       let amazonError: string | null = null;
       try {
         statusSet("Opening Amazon…"); // background pushes per-page progress from here
-        check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
+        check = await sendToBackground<AmazonCheck>({ type: "fetch-amazon" });
         console.info(`${LOG} amazon: ${check?.status?.note}`);
         statusSet(`Matching ${check.orders.length} orders to ${read.rows.length} charges…`);
         matches = matchOrdersToCharges(read.rows, check.orders);

@@ -183,3 +183,6 @@ built dist/firefox
 
 47. [v0.4.3 result] still "Done — 500 Amazon charges, 0 orders read." (OLD wording) => means check is NULL: the fetch-amazon sendMessage REJECTED (diagnostic lives in the response, so a rejection hides it). Likely "message port closed" from the long background op (tab + up to 40s decryption wait) exceeding the message-response window / event-page lifetime.
    v0.4.4: surface the actual rejection reason in the status line — doSync now captures amazonError and shows "Amazon fetch error — <reason>" (or "returned nothing"). Definitive diagnosis before the real fix (likely decouple: background pushes result via tabs.sendMessage instead of a long-lived response).
+
+48. [v0.4.4] "Amazon fetch error — Could not establish connection. Receiving end does not exist." + "sync stopped working". ROOT CAUSE: since v0.3.0 sync runs on-CLICK (minutes after load); by then Firefox has idle-SUSPENDED the background event page, so fetch-amazon has no receiver. (Pre-v0.3.0 it ran auto-on-load while bg was awake -> worked.) Panel still shows Connected because the content script self-renders (no bg needed).
+   v0.4.5: sendToBackground() retries the message up to 5x with backoff — the first send wakes the suspended event page, a retry connects. Applied to fetch-amazon.
