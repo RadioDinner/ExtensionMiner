@@ -105,3 +105,14 @@ npm error path E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch\package.json
 No Monarch session yet — open the Monarch web app while signed in.
 
 M0 skeleton — open the Monarch web app to connect. Amazon sync, matching, and the review queue arrive in later milestones (see SPEC.md)" when I have a webpage of https://app.monarch.com/dashboard
+
+21. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch\ExtensionMiner-main\amazarch> Invoke-WebRequest [...zip download + extract + npm install + npm run build:firefox...]
+
+up to date, audited 50 packages in 2s
+[...]
+5 vulnerabilities (3 moderate, 1 high, 1 critical)
+[...]
+> amazarch@0.0.1 build:firefox
+> node build.mjs firefox
+
+built dist/firefox
