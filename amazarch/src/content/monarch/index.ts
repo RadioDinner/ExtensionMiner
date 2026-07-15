@@ -161,23 +161,29 @@ async function tryConnect(): Promise<boolean> {
       }
       let matches: ReturnType<typeof matchOrdersToCharges> = [];
       let check: AmazonCheck | null = null;
+      let amazonError: string | null = null;
       try {
         statusSet("Opening Amazon…"); // background pushes per-page progress from here
         check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
-        console.info(`${LOG} amazon: ${check.status.note}`);
+        console.info(`${LOG} amazon: ${check?.status?.note}`);
         statusSet(`Matching ${check.orders.length} orders to ${read.rows.length} charges…`);
         matches = matchOrdersToCharges(read.rows, check.orders);
       } catch (e) {
+        amazonError = e instanceof Error ? e.message : String(e);
         console.warn(`${LOG} amazon fetch failed:`, e);
       }
       statusStop();
       let done: string;
-      if (check?.status.signedIn === false) {
+      if (amazonError) {
+        done = `Amazon fetch error — ${amazonError}`;
+      } else if (!check) {
+        done = "Amazon fetch returned nothing (no response from background).";
+      } else if (check.status.signedIn === false) {
         done = "Amazon needs sign-in — open amazon.com, sign in, then Sync again.";
-      } else if (check && check.orders.length === 0) {
+      } else if (check.orders.length === 0) {
         done = `Done — ${read.rows.length} charges, but 0 Amazon orders. ${check.status.note}`;
       } else {
-        done = `Done — ${read.rows.length} Amazon charges, ${check?.orders.length ?? 0} orders read.`;
+        done = `Done — ${read.rows.length} Amazon charges, ${check.orders.length} orders read.`;
       }
       renderPanel({
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,

@@ -180,3 +180,6 @@ built dist/firefox
 
 46. [v0.4.1 result] "Done — 500 Amazon charges, 0 orders read." Monarch read FIXED (self-heal worked, name field was the culprit). But Amazon returned 0 ORDERS. Matches all 0.
    v0.4.3: diagnose the Amazon 0-orders. amazon content script now reports diag {cardCount, decrypted, url, waited}; background surfaces it when 0 orders: "0 orders — saw N cards, decrypted=X, waited Ns (url)". Raised MAX_WAIT 25->40s + tab timeout 30->50s (hypothesis: background-tab throttling delays Siege client-side decryption past our old window). doSync shows the diag note in the status line.
+
+47. [v0.4.3 result] still "Done — 500 Amazon charges, 0 orders read." (OLD wording) => means check is NULL: the fetch-amazon sendMessage REJECTED (diagnostic lives in the response, so a rejection hides it). Likely "message port closed" from the long background op (tab + up to 40s decryption wait) exceeding the message-response window / event-page lifetime.
+   v0.4.4: surface the actual rejection reason in the status line — doSync now captures amazonError and shows "Amazon fetch error — <reason>" (or "returned nothing"). Definitive diagnosis before the real fix (likely decouple: background pushes result via tabs.sendMessage instead of a long-lived response).
