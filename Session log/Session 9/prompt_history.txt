@@ -199,3 +199,8 @@ built dist/firefox
 
 52. [v0.4.8] on-load health check = "Background connected checkmark" => background IS reachable at load. So fetch-amazon fails purely due to TIMING: click happens minutes after load, Firefox let the event page go idle (keepalive PORT alone insufficient), and it wont wake for the message.
    v0.4.9 FIX: periodic keepalive PING — content script sends get-status every 15s (under Firefox ~30s idle timeout), keeping the background warm the whole time Monarch is open, so on-demand Sync always reaches a live receiver. (Kept the port too.)
+
+53. [v0.4.8/0.4.9] SYNC WORKS! "Done — 500 charges, 31 orders read. 23 matched, 399 no order, 78 refunds." Matches correct (Omega-3 $47.87 7-6 +1d etc). Keepalive fix cracked it.
+   NEW BUG: "Rename merchant" -> "Failed: cookie@api.monarch.com: HTTP 400, graphql: Something went wrong while processing: None on request_id: None." = Monarch SERVER error (not validation).
+   ROOT CAUSE: v0.3.0 added `name` to the mutation RETURN selection (transaction { id name notes }); `name` is NOT a readable field on Transaction (read self-heal already proved this), so Monarch throws when returning it AFTER the write. This also silently broke the NOTE write since v0.3.0 (validated at v0.2.0 before name was added). `name` is still valid as an INPUT field for rename.
+   v0.4.10 FIX: mutation return selection back to transaction { id notes } (drop name). Should fix BOTH note + rename writes.

@@ -56,9 +56,13 @@ export function buildMerchantName(order: AmazonOrderLite, base = "Amazon"): stri
 
 // --- Writes ------------------------------------------------------------------
 
+// The return selection must NOT include `name` — it isn't a readable field on
+// Monarch's Transaction type, so selecting it makes the server throw AFTER the
+// write ("Something went wrong while processing"). `name` is still valid as an
+// INPUT field for the rename; we just don't read it back.
 const MUTATION = `mutation Web_TransactionDrawerUpdateTransaction($input: UpdateTransactionMutationInput!) {
   updateTransaction(input: $input) {
-    transaction { id name notes }
+    transaction { id notes }
     errors { message }
   }
 }`;
