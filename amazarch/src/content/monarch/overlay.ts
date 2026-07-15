@@ -22,7 +22,11 @@ export interface PanelView {
   orders?: AmazonOrderLite[];
   amazonNote?: string;
   matches?: MatchResult[];
+  synced?: boolean; // false = connected but no sync run yet (light state)
+  syncNote?: string; // status line shown in the light state
+  onSync?: () => Promise<void>;
   onApply?: (chargeId: string, chargeNotes: string, order: AmazonOrderLite) => Promise<ApplyResult>;
+  onRename?: (chargeId: string, currentName: string, order: AmazonOrderLite) => Promise<ApplyResult>;
   diagnostic?: Record<string, number | string>;
   sample?: string;
   report?: string;
@@ -70,14 +74,48 @@ function draw(view: PanelView): void {
     padding: "10px 12px", background: "#1f2937",
   });
   header.append(text("strong", `Amazarch v${version}`, {}));
+  const right = el("div", { display: "flex", "align-items": "center", gap: "8px" });
+  if (view.onSync) {
+    const sync = el("button", {
+      padding: "4px 10px", cursor: "pointer", border: "none", "border-radius": "6px",
+      background: "#2563eb", color: "#fff", font: "11px system-ui,sans-serif",
+    }) as HTMLButtonElement;
+    sync.textContent = "Sync now";
+    sync.addEventListener("click", async () => {
+      sync.disabled = true;
+      sync.textContent = "Syncing…";
+      try {
+        await view.onSync!();
+      } finally {
+        sync.disabled = false;
+        sync.textContent = "Sync now";
+      }
+    });
+    right.append(sync);
+  }
   const close = el("button", {
     background: "none", border: "none", color: "#9ca3af", cursor: "pointer",
     "font-size": "14px", padding: "2px 4px",
   });
   close.textContent = "✕";
   close.addEventListener("click", () => panel.remove());
-  header.append(close);
+  right.append(close);
+  header.append(right);
   panel.append(header);
+
+  // Light state: connected but no sync run yet — do nothing heavy on page load.
+  if (view.onSync && !view.synced) {
+    const body0 = el("div", { padding: "12px" });
+    body0.append(text("div", "Connected to Monarch.", { color: "#a7f3d0", "margin-bottom": "6px" }));
+    body0.append(
+      text("div", view.syncNote ?? "Click “Sync now” to read your Amazon orders and match them to your Monarch charges.", {
+        color: "#9ca3af", "font-size": "12px",
+      }),
+    );
+    panel.append(body0);
+    document.body.appendChild(panel);
+    return;
+  }
 
   const body = el("div", { overflow: "auto" });
 
@@ -97,9 +135,17 @@ function draw(view: PanelView): void {
         ? `${meta.icon} ${m.order.date} · ${m.order.itemTitles[0] ?? (m.order.orderId || "order")}${m.dayDiff !== null ? `  (+${m.dayDiff}d)` : ""}`
         : `${meta.icon} ${m.status === "refund" ? "refund — matched later" : "no matching order"}`;
       body.append(row(m.charge.merchantName, sub, formatCents(m.charge.amountCents), meta.color));
-      // Click-to-apply: add the order's items to the Monarch transaction's notes.
-      if (m.order && (m.status === "auto" || m.status === "review") && view.onApply) {
-        body.append(applyButton(m.charge.id, m.charge.notes, m.order, view.onApply));
+      // Click-to-apply actions for a matched charge (notes + merchant rename).
+      if (m.order && (m.status === "auto" || m.status === "review")) {
+        const actions = el("div", { display: "flex", gap: "6px", padding: "0 12px 8px", "flex-wrap": "wrap" });
+        const order = m.order;
+        if (view.onApply) {
+          actions.append(actionButton("Add note", (r) => r, () => view.onApply!(m.charge.id, m.charge.notes, order)));
+        }
+        if (view.onRename) {
+          actions.append(actionButton("Rename merchant", (r) => r, () => view.onRename!(m.charge.id, m.charge.name, order)));
+        }
+        body.append(actions);
       }
     }
     if (view.matches.length > 60) body.append(muted(`…and ${view.matches.length - 60} more`));
@@ -217,30 +263,29 @@ function rank(status: string): number {
   return { auto: 0, review: 1, unmatched: 2, refund: 3 }[status] ?? 4;
 }
 
-function applyButton(
-  chargeId: string,
-  chargeNotes: string,
-  order: AmazonOrderLite,
-  onApply: NonNullable<PanelView["onApply"]>,
+// A click-to-apply button that runs an action, then flips to an Undo affordance.
+function actionButton(
+  label: string,
+  _identity: (r: ApplyResult) => ApplyResult,
+  run: () => Promise<ApplyResult>,
 ): HTMLElement {
-  const wrap = el("div", { padding: "0 12px 8px" });
   const btn = el("button", {
     padding: "5px 10px", cursor: "pointer", border: "1px solid #374151",
     "border-radius": "6px", background: "#1f2937", color: "#e5e7eb",
     font: "11px system-ui,sans-serif",
   }) as HTMLButtonElement;
-  btn.textContent = "Add items to Monarch note";
+  btn.textContent = label;
   btn.addEventListener("click", async () => {
     btn.disabled = true;
-    btn.textContent = "Adding…";
-    const r = await onApply(chargeId, chargeNotes, order);
+    btn.textContent = "Working…";
+    const r = await run();
     btn.disabled = false;
     if (!r.ok) {
       btn.textContent = `Failed: ${r.note}`;
       return;
     }
     if (r.undo) {
-      btn.textContent = "✓ Added — click to undo";
+      btn.textContent = `✓ ${label} — undo`;
       btn.onclick = async () => {
         btn.disabled = true;
         btn.textContent = "Undoing…";
@@ -253,6 +298,5 @@ function applyButton(
       btn.textContent = `✓ ${r.note}`;
     }
   });
-  wrap.append(btn);
-  return wrap;
+  return btn;
 }

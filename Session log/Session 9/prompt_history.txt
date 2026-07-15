@@ -156,3 +156,10 @@ built dist/firefox
 
 40. is there any way to load the amazon orders to the extension without loading the amazon order page?
    [ANSWER: not in real-time — Amazon encrypts order details client-side (Siege CSD), so the plaintext only exists after the page's JS runs. Real alternative = Amazon's official "Request My Data" export (Privacy Central): user requests it, Amazon emails a ZIP (CSV/JSON) hours later, user uploads it -> no page render, ToS-clean, full history (= the D7 backfill path). Tradeoff: async/manual, not instant. Offered to build the export importer; also offered to make the tab sync on-demand+cached so it renders rarely.]
+
+41. "I like the note feature... I like the idea of changing the merchant from Amazon to 'Amazon - Omega 3 supplement'... summary after the merchant. Can we do that?" => YES (merchant rename, D1).
+42. [mid-turn] "the extension seems to make the monarch app function very poorly." => PERF: heavy sync (up to 500 txns + Amazon tab loading 10 pages) ran on EVERY Monarch load, competing with Monarch startup.
+   v0.3.0 addresses both:
+   - MERCHANT RENAME: buildMerchantName -> "Amazon — <shortItemSummary>" (strips sizes/counts/parentheticals, truncates at word boundary). setTransactionName via same mutation (refactored updateTransaction helper). Second per-match button "Rename merchant" with undo. Added `name` to read query + AmazonTxn (for rename undo). Heuristic summary now; crisp AI paraphrase later (D14).
+   - ON-DEMAND SYNC (perf fix + answers "don't load Amazon page every time"): on Monarch load, NOTHING heavy runs — light panel + "Sync now" button. Read charges + open Amazon tab + match ONLY on click. Amazon tab no longer opens every visit.
+   Pure parts tested (65 tests). NOTE: `name` added to read query — if Monarch's result type lacks `name`, read would break (watch for 0 charges); high confidence it's valid.

@@ -4,7 +4,7 @@ import type { AmazonTxn } from "../src/shared/monarch-read";
 import type { AmazonOrderLite } from "../src/shared/messages";
 
 function charge(id: string, date: string, cents: number): AmazonTxn {
-  return { id, date, amountCents: cents, merchantName: "AMZN Mktp US", notes: "" };
+  return { id, date, amountCents: cents, merchantName: "AMZN Mktp US", name: "AMZN Mktp US", notes: "" };
 }
 function order(orderId: string, date: string, cents: number): AmazonOrderLite {
   return { orderId, date, totalCents: cents, itemTitles: ["thing"] };

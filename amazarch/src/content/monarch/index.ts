@@ -13,14 +13,20 @@ import {
 import { probeMonarchApi, readCookie } from "../../shared/monarch-probe";
 import { readAmazonTransactions } from "../../shared/monarch-read";
 import { matchOrdersToCharges } from "../../shared/matcher";
-import { buildNoteLine, mergeNotes, setTransactionNotes } from "../../shared/monarch-write";
+import {
+  buildMerchantName,
+  buildNoteLine,
+  mergeNotes,
+  setTransactionName,
+  setTransactionNotes,
+} from "../../shared/monarch-write";
 import type { ApplyResult } from "./overlay";
 import type {
   AmazonCheck,
+  AmazonOrderLite,
   AuthMethod,
   Message,
   MonarchSessionInfo,
-  ReadResult,
 } from "../../shared/messages";
 import type { MonarchAuth } from "../../shared/monarch-gql";
 import { renderPanel } from "./overlay";
@@ -85,58 +91,52 @@ async function tryConnect(): Promise<boolean> {
   };
   console.info(`${LOG} connected to Monarch API via ${authMethod}`);
 
-  // Read-side proof: pull the Amazon transactions from Monarch and show them.
-  const read = await readAmazonTransactions(auth);
-  console.info(`${LOG} transaction read: ok=${read.ok} — ${read.note}`);
-  if (read.ok) renderPanel({ txns: read.rows, totalCount: read.totalCount, capped: read.capped });
-  else showConnectedPill();
-
-  // Amazon side: ask the background to fetch + parse the order history, then
-  // show the parsed orders alongside the Monarch charges for validation.
-  try {
-    const check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
-    console.info(`${LOG} amazon: ${check.status.note}`);
-    if (check.diagnostic) {
-      console.warn(
-        `${LOG} amazon order-parse diagnostic (counts only, paste this):`,
-        JSON.stringify(check.diagnostic, null, 2),
-      );
-    }
-    if (read.ok) {
-      const matches = matchOrdersToCharges(read.rows, check.orders);
-      // Click-to-apply: append the order's item details to the Monarch
-      // transaction's notes (additive, never clobbers), with Undo.
-      const onApply = async (chargeId: string, chargeNotes: string, order: NonNullable<(typeof matches)[number]["order"]>): Promise<ApplyResult> => {
-        const line = buildNoteLine(order);
-        const merged = mergeNotes(chargeNotes, order, line);
-        if (!merged.changed) return { ok: true, note: "already noted" };
-        const res = await setTransactionNotes(auth, chargeId, merged.notes);
-        if (!res.ok) return { ok: false, note: res.note };
-        return {
-          ok: true,
-          note: "note added",
-          undo: () => setTransactionNotes(auth, chargeId, chargeNotes),
-        };
-      };
-      renderPanel({
-        txns: read.rows, totalCount: read.totalCount, capped: read.capped,
-        orders: check.orders, amazonNote: check.status.note, matches, onApply,
-        diagnostic: check.diagnostic, sample: check.sample, report: check.report,
-      });
-    }
-  } catch (e) {
-    console.warn(`${LOG} amazon fetch failed:`, e);
-  }
-
-  const readResult: ReadResult = {
-    ranAt: read.ranAt,
-    ok: read.ok,
-    amazonCount: read.amazonCount,
-    totalScanned: read.totalScanned,
-    totalCount: read.totalCount,
-    note: read.note,
+  // Click-to-apply actions (append note / rename merchant) — additive, undoable.
+  const onApply = async (chargeId: string, chargeNotes: string, order: AmazonOrderLite): Promise<ApplyResult> => {
+    const merged = mergeNotes(chargeNotes, order, buildNoteLine(order));
+    if (!merged.changed) return { ok: true, note: "already noted" };
+    const res = await setTransactionNotes(auth, chargeId, merged.notes);
+    if (!res.ok) return { ok: false, note: res.note };
+    return { ok: true, note: "note added", undo: () => setTransactionNotes(auth, chargeId, chargeNotes) };
   };
-  const message: Message = { type: "monarch-connected", session, probe, read: readResult };
+  const onRename = async (chargeId: string, currentName: string, order: AmazonOrderLite): Promise<ApplyResult> => {
+    const target = buildMerchantName(order);
+    if (currentName === target) return { ok: true, note: "already named" };
+    const res = await setTransactionName(auth, chargeId, target);
+    if (!res.ok) return { ok: false, note: res.note };
+    return { ok: true, note: "renamed", undo: () => setTransactionName(auth, chargeId, currentName) };
+  };
+
+  // Heavy work (read charges + open the Amazon tab + match) runs ONLY on demand,
+  // so opening Monarch stays fast and the Amazon tab isn't opened every visit.
+  const doSync = async (): Promise<void> => {
+    const read = await readAmazonTransactions(auth);
+    console.info(`${LOG} transaction read: ok=${read.ok} — ${read.note}`);
+    let matches: ReturnType<typeof matchOrdersToCharges> = [];
+    let check: AmazonCheck | null = null;
+    try {
+      check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
+      console.info(`${LOG} amazon: ${check.status.note}`);
+      if (read.ok) matches = matchOrdersToCharges(read.rows, check.orders);
+    } catch (e) {
+      console.warn(`${LOG} amazon fetch failed:`, e);
+    }
+    renderPanel({
+      txns: read.rows, totalCount: read.totalCount, capped: read.capped,
+      orders: check?.orders, amazonNote: check?.status.note, matches,
+      synced: true, onSync: doSync, onApply, onRename,
+      diagnostic: check?.diagnostic, sample: check?.sample, report: check?.report,
+    });
+  };
+
+  // On connect: show a light panel with a "Sync now" button — no heavy work yet.
+  renderPanel({
+    txns: [], totalCount: null, capped: false,
+    synced: false, onSync: doSync, onApply, onRename,
+    syncNote: 'Click "Sync now" to read your Amazon orders and match them to your Monarch charges.',
+  });
+
+  const message: Message = { type: "monarch-connected", session, probe, read: null };
   void browser.runtime
     .sendMessage(message)
     .catch((e) => console.warn(`${LOG} failed to report connection:`, e));

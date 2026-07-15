@@ -10,6 +10,7 @@ export interface AmazonTxn {
   date: string; // YYYY-MM-DD
   amountCents: number; // integer cents; negative = money out
   merchantName: string;
+  name: string; // current transaction display name (for rename undo)
   notes: string; // current Monarch notes (for never-clobber + undo)
 }
 
@@ -32,6 +33,7 @@ const READ_QUERY = `query Web_GetTransactionsList($offset: Int, $limit: Int, $fi
       id
       date
       amount
+      name
       notes
       merchant { name }
     }
@@ -125,6 +127,7 @@ export function collectAmazon(data: unknown): {
       date: strOrNull(pick(r, "date")) ?? "",
       amountCents: toCents(pick(r, "amount")),
       merchantName: name ?? "",
+      name: strOrNull(pick(r, "name")) ?? name ?? "",
       notes: strOrNull(pick(r, "notes")) ?? "",
     });
   }
