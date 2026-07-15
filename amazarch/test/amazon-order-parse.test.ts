@@ -1,0 +1,64 @@
+import { describe, expect, it } from "vitest";
+import {
+  parseAmazonOrders,
+  parseOrderDate,
+  parseOrderId,
+  parseOrderTotal,
+} from "../src/shared/amazon-order-parse";
+
+// Two order cards resembling Amazon's order-history markup (obfuscated classes,
+// stable visible labels + /dp/ item links).
+const ORDERS_HTML = `
+<div class="a-box-group xyz123">
+  <div class="a-row"><span>Order placed</span><span>July 6, 2026</span></div>
+  <div class="a-column"><span>Total</span><span>$47.47</span></div>
+  <div class="yohtmlc-order-id"><span>Order # 114-1234567-7654321</span></div>
+  <a class="a-link-normal" href="/dp/B0ABCDEFG/ref=x">USB-C Cable 6ft &amp; Adapter</a>
+  <a class="a-link-normal" href="/gp/product/B0HIJKLMN/">AA Batteries 24-pack</a>
+</div>
+<div class="a-box-group xyz123">
+  <div class="a-row"><span>Order placed</span><span>June 28, 2026</span></div>
+  <div class="a-column"><span>Total</span><span>$1,204.99</span></div>
+  <div class="yohtmlc-order-id"><span>Order # 112-7654321-1234567</span></div>
+  <a class="a-link-normal" href="/dp/B0LAPTOP12/">Laptop Stand</a>
+</div>`;
+
+describe("parseAmazonOrders", () => {
+  it("parses each order's date, total (cents), id, and items", () => {
+    const orders = parseAmazonOrders(ORDERS_HTML);
+    expect(orders).toHaveLength(2);
+    expect(orders[0]).toEqual({
+      orderId: "114-1234567-7654321",
+      date: "2026-07-06",
+      totalCents: 4747,
+      itemTitles: ["USB-C Cable 6ft & Adapter", "AA Batteries 24-pack"],
+    });
+    expect(orders[1]).toEqual({
+      orderId: "112-7654321-1234567",
+      date: "2026-06-28",
+      totalCents: 120499,
+      itemTitles: ["Laptop Stand"],
+    });
+  });
+
+  it("returns nothing for a page with no orders", () => {
+    expect(parseAmazonOrders("<html><body>nothing here</body></html>")).toEqual([]);
+  });
+});
+
+describe("field parsers", () => {
+  it("parses month-name dates to ISO", () => {
+    expect(parseOrderDate("Order placed December 1, 2025")).toBe("2025-12-01");
+    expect(parseOrderDate("Order placed Jan 9, 2026")).toBe("2026-01-09");
+    expect(parseOrderDate("no date")).toBeNull();
+  });
+  it("parses totals with commas to integer cents", () => {
+    expect(parseOrderTotal("Total $1,204.99")).toBe(120499);
+    expect(parseOrderTotal("Grand Total: $12.00")).toBe(1200);
+    expect(parseOrderTotal("no total")).toBeNull();
+  });
+  it("parses the 3-7-7 order id", () => {
+    expect(parseOrderId("Order # 114-1234567-7654321")).toBe("114-1234567-7654321");
+    expect(parseOrderId("no id")).toBeNull();
+  });
+});

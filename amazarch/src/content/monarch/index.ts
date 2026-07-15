@@ -12,7 +12,13 @@ import {
 } from "../../shared/monarch-session";
 import { probeMonarchApi, readCookie } from "../../shared/monarch-probe";
 import { readAmazonTransactions } from "../../shared/monarch-read";
-import type { AuthMethod, Message, MonarchSessionInfo, ReadResult } from "../../shared/messages";
+import type {
+  AmazonCheck,
+  AuthMethod,
+  Message,
+  MonarchSessionInfo,
+  ReadResult,
+} from "../../shared/messages";
 import type { MonarchAuth } from "../../shared/monarch-gql";
 import { renderPanel } from "./overlay";
 
@@ -79,8 +85,23 @@ async function tryConnect(): Promise<boolean> {
   // Read-side proof: pull the Amazon transactions from Monarch and show them.
   const read = await readAmazonTransactions(auth);
   console.info(`${LOG} transaction read: ok=${read.ok} — ${read.note}`);
-  if (read.ok) renderPanel(read.rows, read.totalCount, read.capped);
+  if (read.ok) renderPanel({ txns: read.rows, totalCount: read.totalCount, capped: read.capped });
   else showConnectedPill();
+
+  // Amazon side: ask the background to fetch + parse the order history, then
+  // show the parsed orders alongside the Monarch charges for validation.
+  try {
+    const check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
+    console.info(`${LOG} amazon: ${check.status.note}`);
+    if (read.ok) {
+      renderPanel({
+        txns: read.rows, totalCount: read.totalCount, capped: read.capped,
+        orders: check.orders, amazonNote: check.status.note,
+      });
+    }
+  } catch (e) {
+    console.warn(`${LOG} amazon fetch failed:`, e);
+  }
 
   const readResult: ReadResult = {
     ranAt: read.ranAt,

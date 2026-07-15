@@ -4,6 +4,7 @@
 // answers popup status queries.
 import browser from "webextension-polyfill";
 import type {
+  AmazonCheck,
   AmazonStatus,
   Message,
   MonarchSessionInfo,
@@ -36,50 +37,58 @@ async function recordContentScript(origin: string): Promise<void> {
   await set(CS_ORIGINS_KEY, [...origins]);
 }
 
-browser.runtime.onMessage.addListener(async (raw: unknown): Promise<StatusResponse | undefined> => {
-  const message = raw as Message;
+browser.runtime.onMessage.addListener(
+  async (raw: unknown): Promise<StatusResponse | AmazonCheck | undefined> => {
+    const message = raw as Message;
 
-  if (message.type === "content-script-loaded") {
-    await recordContentScript(message.origin);
+    if (message.type === "content-script-loaded") {
+      await recordContentScript(message.origin);
+      return undefined;
+    }
+
+    if (message.type === "monarch-connected") {
+      await set(SESSION_KEY, message.session);
+      await set(PROBE_KEY, message.probe);
+      await set(READ_KEY, message.read);
+      console.info(
+        `[Amazarch] ${message.probe.ok ? "connected" : "connection failed"} ` +
+          `(${message.session.authMethod}) — ${message.probe.note}` +
+          (message.read ? ` | read: ${message.read.note}` : ""),
+      );
+      return undefined;
+    }
+
+    // Silent background fetch of Amazon order history (D5/D9). Cross-origin
+    // fetch belongs in the background; the content script requests it.
+    if (message.type === "fetch-amazon") {
+      const check = await checkAmazon();
+      await set(AMAZON_KEY, check.status);
+      console.info(
+        `[Amazarch] amazon: ok=${check.status.ok} signedIn=${check.status.signedIn} — ${check.status.note}`,
+      );
+      return check;
+    }
+
+    if (message.type === "get-status") {
+      const session = await get<MonarchSessionInfo>(SESSION_KEY);
+      return {
+        monarch: session
+          ? {
+              authMethod: session.authMethod,
+              deviceUuid: session.deviceUuid,
+              origin: session.origin,
+              capturedAt: session.capturedAt,
+              strategy: session.strategy,
+              tokenPreview: tokenPreview(session.token),
+            }
+          : null,
+        probe: await get<ProbeResult>(PROBE_KEY),
+        read: await get<ReadResult>(READ_KEY),
+        amazon: await get<AmazonStatus>(AMAZON_KEY),
+        contentScriptOrigins: (await get<string[]>(CS_ORIGINS_KEY)) ?? [],
+      };
+    }
+
     return undefined;
-  }
-
-  if (message.type === "monarch-connected") {
-    await set(SESSION_KEY, message.session);
-    await set(PROBE_KEY, message.probe);
-    await set(READ_KEY, message.read);
-    console.info(
-      `[Amazarch] ${message.probe.ok ? "connected" : "connection failed"} ` +
-        `(${message.session.authMethod}) — ${message.probe.note}` +
-        (message.read ? ` | read: ${message.read.note}` : ""),
-    );
-    // Now that a Monarch session is active, probe the Amazon side too (D5/D9:
-    // sync when Monarch is opened). Silent background fetch of order history.
-    const amazon = await checkAmazon();
-    await set(AMAZON_KEY, amazon);
-    console.info(`[Amazarch] amazon: ok=${amazon.ok} signedIn=${amazon.signedIn} — ${amazon.note}`);
-    return undefined;
-  }
-
-  if (message.type === "get-status") {
-    const session = await get<MonarchSessionInfo>(SESSION_KEY);
-    return {
-      monarch: session
-        ? {
-            authMethod: session.authMethod,
-            deviceUuid: session.deviceUuid,
-            origin: session.origin,
-            capturedAt: session.capturedAt,
-            strategy: session.strategy,
-            tokenPreview: tokenPreview(session.token),
-          }
-        : null,
-      probe: await get<ProbeResult>(PROBE_KEY),
-      read: await get<ReadResult>(READ_KEY),
-      amazon: await get<AmazonStatus>(AMAZON_KEY),
-      contentScriptOrigins: (await get<string[]>(CS_ORIGINS_KEY)) ?? [],
-    };
-  }
-
-  return undefined;
-});
+  },
+);

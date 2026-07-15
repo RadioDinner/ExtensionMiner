@@ -35,6 +35,20 @@ export interface AmazonStatus {
   note: string;
 }
 
+// AmazonOrder is defined in shared/amazon-order-parse to avoid a cycle; re-export
+// the shape here for message typing.
+export interface AmazonOrderLite {
+  orderId: string;
+  date: string;
+  totalCents: number;
+  itemTitles: string[];
+}
+
+export interface AmazonCheck {
+  status: AmazonStatus;
+  orders: AmazonOrderLite[];
+}
+
 export type Message =
   | {
       type: "monarch-connected";
@@ -43,6 +57,7 @@ export type Message =
       read: ReadResult | null;
     }
   | { type: "content-script-loaded"; origin: string; loadedAt: number }
+  | { type: "fetch-amazon" }
   | { type: "get-status" };
 
 export interface StatusResponse {
