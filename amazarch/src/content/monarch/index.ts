@@ -102,7 +102,8 @@ async function tryConnect(): Promise<boolean> {
     if (read.ok) {
       renderPanel({
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,
-        orders: check.orders, amazonNote: check.status.note, diagnostic: check.diagnostic,
+        orders: check.orders, amazonNote: check.status.note,
+        diagnostic: check.diagnostic, sample: check.sample,
       });
     }
   } catch (e) {

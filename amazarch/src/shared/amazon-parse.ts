@@ -50,7 +50,30 @@ export function diagnoseOrderHtml(html: string): Record<string, number | string>
     isoDates: count(/\d{4}-\d{2}-\d{2}/g),
     orderNumbers: count(/\b\d{3}-\d{7}-\d{7}\b/g),
     dpLinks: count(/href="[^"]*\/(?:gp\/product|dp)\//gi),
+    scriptJson: count(/<script[^>]*type=["']application\/json/gi),
+    keyOrderDate: count(/"(order[_]?date|orderPlacedDate|purchaseDate)"/gi),
+    keyTotal: count(/"(grandTotal|orderTotal|totalAmount|grand_total|order_total)"/gi),
+    dataState: count(/data-a-state/gi),
+    orderedOn: count(/ordered on/gi),
     looksJsShell: /enable JavaScript|noscript|window\.__INITIAL/i.test(html) ? 1 : 0,
     looksCaptcha: /captcha|are you a human|automated access/i.test(html) ? 1 : 0,
   };
+}
+
+/**
+ * A privacy-safe structural skeleton of the first order card: every digit is
+ * masked to '#' (removes amounts, dates, order numbers, ids) and every text
+ * node longer than 15 chars is blanked (removes item names / addresses),
+ * leaving tag names, attribute names, class names, and short labels intact so
+ * the real data structure can be seen without exposing any values.
+ */
+export function redactedCardSample(html: string, span = 2800): string {
+  const i = html.search(/js-order-card|\border-card\b/i);
+  if (i < 0) return "";
+  const start = Math.max(0, i - 250);
+  let slice = html.slice(start, start + span);
+  slice = slice.replace(/[0-9]/g, "#"); // mask all numeric values
+  slice = slice.replace(/>([^<]{16,})</g, ">[text]<"); // blank long text nodes
+  slice = slice.replace(/\s+/g, " ").trim();
+  return slice;
 }

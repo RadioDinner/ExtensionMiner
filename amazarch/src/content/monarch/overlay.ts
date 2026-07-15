@@ -15,6 +15,7 @@ export interface PanelView {
   orders?: AmazonOrderLite[];
   amazonNote?: string;
   diagnostic?: Record<string, number | string>;
+  sample?: string;
 }
 
 let lastView: PanelView | null = null;
@@ -85,6 +86,18 @@ function draw(view: PanelView): void {
         for (const [k, v] of Object.entries(view.diagnostic)) {
           body.append(row(k, "", String(v)));
         }
+      }
+      if (view.sample) {
+        body.append(sectionTitle("Redacted card skeleton — select all, copy, paste to dev"));
+        const ta = document.createElement("textarea");
+        ta.readOnly = true;
+        ta.value = view.sample;
+        ta.setAttribute(
+          "style",
+          "width:calc(100% - 24px);margin:4px 12px 8px;height:120px;background:#0b1220;color:#cbd5e1;border:1px solid #334155;border-radius:6px;font:11px/1.4 monospace;padding:6px;",
+        );
+        ta.addEventListener("focus", () => ta.select());
+        body.append(ta);
       }
     } else {
       for (const o of view.orders.slice(0, 50)) {

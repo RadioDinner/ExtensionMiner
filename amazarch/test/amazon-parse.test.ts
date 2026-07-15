@@ -41,3 +41,26 @@ describe("pageTitle", () => {
     expect(pageTitle("<html></html>")).toBe("");
   });
 });
+
+import { redactedCardSample } from "../src/shared/amazon-parse";
+
+describe("redactedCardSample", () => {
+  const html = `<div class="order-card js-order-card" data-order-id="114-1234567-7654321">
+    <span>Ordered on</span><span>2026-07-06</span><span>Total</span><span>$47.47</span>
+    <a href="/dp/B0ABCDEFG">A Very Long Product Title That Should Be Masked Away</a></div>`;
+
+  it("masks digits and long text but keeps structure/labels", () => {
+    const s = redactedCardSample(html);
+    expect(s).toContain("js-order-card");
+    expect(s).toContain("Total");
+    expect(s).toContain("Ordered on");
+    expect(s).toContain("[text]"); // long product title blanked
+    expect(s).not.toContain("47.47");
+    expect(s).not.toContain("1234567");
+    expect(s).not.toContain("A Very Long Product Title");
+  });
+
+  it("returns empty string when no order card is present", () => {
+    expect(redactedCardSample("<html><body>none</body></html>")).toBe("");
+  });
+});

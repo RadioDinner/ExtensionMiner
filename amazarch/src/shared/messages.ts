@@ -48,6 +48,7 @@ export interface AmazonCheck {
   status: AmazonStatus;
   orders: AmazonOrderLite[];
   diagnostic?: Record<string, number | string>; // redacted counts when parsing found nothing
+  sample?: string; // redacted structural skeleton of one order card (no values)
 }
 
 export type Message =
