@@ -40,7 +40,7 @@ async function refresh(): Promise<void> {
     if (read?.ok) {
       setText(
         "read",
-        `Amazon transactions: ${read.amazonCount} of ${read.totalScanned} recent${read.totalCount !== null ? ` (${read.totalCount} total in Monarch)` : ""}`,
+        `Amazon transactions: ${read.amazonCount} found${read.totalCount !== null ? ` (${read.totalCount.toLocaleString()} total in Monarch)` : ""}`,
         true,
       );
     } else if (read) {

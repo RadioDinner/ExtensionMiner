@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isAmazonMerchant } from "../src/shared/amazon-merchant";
-import { countAmazon } from "../src/shared/monarch-read";
+import { collectAmazon } from "../src/shared/monarch-read";
 
 describe("isAmazonMerchant", () => {
   it("matches real-world Amazon bank-feed names", () => {
@@ -25,34 +25,36 @@ describe("isAmazonMerchant", () => {
   });
 });
 
-describe("countAmazon", () => {
+describe("collectAmazon", () => {
   const payload = {
     allTransactions: {
       totalCount: 812,
       results: [
-        { id: "1", merchant: { name: "AMZN Mktp US*1A2B3C" } },
-        { id: "2", merchant: { name: "Starbucks" } },
-        { id: "3", merchant: { name: "Amazon.com" } },
-        { id: "4", merchant: { name: "Whole Foods Market" } }, // excluded
-        { id: "5", merchant: { name: null } },
+        { id: "1", date: "2026-07-10", amount: -24.99, merchant: { name: "AMZN Mktp US*1A2B3C" } },
+        { id: "2", date: "2026-07-09", amount: -5.75, merchant: { name: "Starbucks" } },
+        { id: "3", date: "2026-07-08", amount: -119.0, merchant: { name: "Amazon.com" } },
+        { id: "4", date: "2026-07-07", amount: -60.0, merchant: { name: "Whole Foods Market" } }, // excluded
+        { id: "5", date: "2026-07-06", amount: -1.0, merchant: { name: null } },
       ],
     },
   };
 
-  it("counts Amazon rows and reports totals", () => {
-    expect(countAmazon(payload)).toEqual({ amazonCount: 2, totalScanned: 5, totalCount: 812 });
+  it("extracts Amazon rows with integer-cent amounts and reports totals", () => {
+    const out = collectAmazon(payload);
+    expect(out.pageLen).toBe(5);
+    expect(out.totalCount).toBe(812);
+    expect(out.rows).toEqual([
+      { id: "1", date: "2026-07-10", amountCents: -2499, merchantName: "AMZN Mktp US*1A2B3C" },
+      { id: "3", date: "2026-07-08", amountCents: -11900, merchantName: "Amazon.com" },
+    ]);
   });
 
   it("is tolerant of malformed/empty payloads", () => {
-    expect(countAmazon(null)).toEqual({ amazonCount: 0, totalScanned: 0, totalCount: null });
-    expect(countAmazon({ allTransactions: {} })).toEqual({
-      amazonCount: 0,
-      totalScanned: 0,
-      totalCount: null,
-    });
-    expect(countAmazon({ allTransactions: { results: "nope" } })).toEqual({
-      amazonCount: 0,
-      totalScanned: 0,
+    expect(collectAmazon(null)).toEqual({ rows: [], pageLen: 0, totalCount: null });
+    expect(collectAmazon({ allTransactions: {} })).toEqual({ rows: [], pageLen: 0, totalCount: null });
+    expect(collectAmazon({ allTransactions: { results: "nope" } })).toEqual({
+      rows: [],
+      pageLen: 0,
       totalCount: null,
     });
   });

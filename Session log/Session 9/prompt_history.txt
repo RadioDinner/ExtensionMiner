@@ -126,3 +126,5 @@ built dist/firefox
 25. [popup result] Connected to Monarch (app.monarch.com) — API check OK / authenticated (cookie) via api.monarch.com / auth: session cookie  => M0 COMPLETE. Live authenticated Monarch API access proven via cookie/CSRF from the extension.
 
 26. [popup] Connected OK (cookie) but "Transaction read failed — cookie@api.monarchmoney.com: TypeError: NetworkError". => fallback (dead) host masked api.monarch.com's real error. Fixed reporting + corrected read query (offset/limit belong on results, not allTransactions).
+
+27. [popup] "Amazon transactions: 6 of 100 recent (17602 total in Monarch)" => M1 read PROVEN against real data. (17,602 total txns.) Next: pull ALL Amazon txns (server-filtered) + show them in an in-Monarch panel.

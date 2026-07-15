@@ -12,8 +12,9 @@ import {
 } from "../../shared/monarch-session";
 import { probeMonarchApi, readCookie } from "../../shared/monarch-probe";
 import { readAmazonTransactions } from "../../shared/monarch-read";
-import type { AuthMethod, Message, MonarchSessionInfo } from "../../shared/messages";
+import type { AuthMethod, Message, MonarchSessionInfo, ReadResult } from "../../shared/messages";
 import type { MonarchAuth } from "../../shared/monarch-gql";
+import { renderPanel } from "./overlay";
 
 const LOG = "[Amazarch]";
 const MAX_ATTEMPTS = 20;
@@ -75,14 +76,23 @@ async function tryConnect(): Promise<boolean> {
   };
   console.info(`${LOG} connected to Monarch API via ${authMethod}`);
 
-  // First read-side proof: how many Amazon-looking transactions are in Monarch?
+  // Read-side proof: pull the Amazon transactions from Monarch and show them.
   const read = await readAmazonTransactions(auth);
   console.info(`${LOG} transaction read: ok=${read.ok} — ${read.note}`);
+  if (read.ok) renderPanel(read.rows, read.totalCount, read.capped);
+  else showConnectedPill();
 
-  const message: Message = { type: "monarch-connected", session, probe, read };
+  const readResult: ReadResult = {
+    ranAt: read.ranAt,
+    ok: read.ok,
+    amazonCount: read.amazonCount,
+    totalScanned: read.totalScanned,
+    totalCount: read.totalCount,
+    note: read.note,
+  };
+  const message: Message = { type: "monarch-connected", session, probe, read: readResult };
   void browser.runtime
     .sendMessage(message)
-    .then(() => showConnectedPill())
     .catch((e) => console.warn(`${LOG} failed to report connection:`, e));
   return true;
 }
