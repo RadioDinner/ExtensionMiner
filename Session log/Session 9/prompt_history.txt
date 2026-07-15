@@ -174,3 +174,6 @@ built dist/firefox
    v0.4.1 FIX:
    - Self-healing read: readAmazonTransactions now probes query-shape combos [search×name] and uses the first Monarch accepts (drops `name` if rejected, then drops search). Fixed a pagination bug (res wasn't reset -> only page 0 fetched); now res=null after each page.
    - Sync never fails silently: doSync wrapped in try/catch; a failed read or thrown error now shows in the status line ("Monarch read failed — <note>" / "Sync error — <msg>") instead of a blank flash.
+
+45. get rid of the .2 second updates. Make it a full second
+   v0.4.2: status timer ticks every 1000ms and shows whole seconds (Math.floor).

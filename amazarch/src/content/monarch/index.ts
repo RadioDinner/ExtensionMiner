@@ -36,7 +36,7 @@ let statusTimer: ReturnType<typeof setInterval> | undefined;
 let statusStart = 0;
 let statusLabel = "";
 function statusTick(): void {
-  const secs = ((Date.now() - statusStart) / 1000).toFixed(1);
+  const secs = Math.floor((Date.now() - statusStart) / 1000);
   setPanelStatus(`${statusLabel}  ·  ${secs}s`);
 }
 function statusBegin(label: string): void {
@@ -44,7 +44,7 @@ function statusBegin(label: string): void {
   statusStart = Date.now();
   statusTick();
   if (statusTimer) clearInterval(statusTimer);
-  statusTimer = setInterval(statusTick, 200);
+  statusTimer = setInterval(statusTick, 1000);
 }
 function statusSet(label: string): void {
   statusLabel = label;
