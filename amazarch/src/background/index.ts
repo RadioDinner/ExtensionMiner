@@ -21,6 +21,13 @@ const READ_KEY = "monarchRead";
 const AMAZON_KEY = "amazonStatus";
 const CS_ORIGINS_KEY = "contentScriptOrigins";
 
+// Accept keep-alive connections from the Monarch content script. Holding an open
+// port keeps this event page alive while a Monarch tab is open, so on-demand
+// sync always has a live receiver (see connectKeepAlive in the content script).
+browser.runtime.onConnect.addListener((port) => {
+  port.onDisconnect.addListener(() => {});
+});
+
 // storage.session is memory-backed and cleared when the browser closes —
 // the right place for session material (never storage.local).
 async function set(key: string, value: unknown): Promise<void> {

@@ -189,3 +189,7 @@ built dist/firefox
 
 49. "seconds timer is tied to specific milestones... I want a pure 1 second timer regardless of status. A vanity timer. Something to indicate life."
    v0.4.6: split the status line into an INDEPENDENT vanity timer span (#-timer) + a phase label span (#-label). A single 1s interval ticks the timer from sync start (syncStartedAt) to sync end, decoupled from statusSet/milestone label changes. setPanelTimer / setPanelStatus update each span separately.
+
+50. [v0.4.6] STILL "Amazon fetch error — Could not establish connection. Receiving end does not exist." even with 5x retry. + user frustration "the sync used to work."
+   ROOT CAUSE confirmed: Firefox idle-suspends the background event page; retries dont reliably wake it. (Pre-v0.3.0 sync ran auto-on-load while bg warm.)
+   v0.4.7 REAL FIX: keep-alive PORT. Content script opens browser.runtime.connect({name:"amazarch-keepalive"}) on load (reconnects on disconnect); background onConnect holds it. An open port wakes + keeps the Firefox event page alive while a Monarch tab is open, so on-demand sync (clicked minutes later) always has a live receiver. Verified both onConnect+onMessage listeners are in the built background.js (bg not crashing at load).

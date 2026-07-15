@@ -31,6 +31,21 @@ import type {
 import type { MonarchAuth } from "../../shared/monarch-gql";
 import { renderPanel, setPanelStatus, setPanelTimer } from "./overlay";
 
+// Keep the background event page alive while a Monarch tab is open. Firefox
+// suspends idle event pages, and once suspended a one-off runtime message can
+// fail with "Receiving end does not exist"; an open port both wakes it and
+// keeps it alive, so on-demand sync (clicked minutes after load) always has a
+// live receiver. Reconnect if the connection ever drops.
+function connectKeepAlive(): void {
+  try {
+    const port = browser.runtime.connect({ name: "amazarch-keepalive" });
+    port.onDisconnect.addListener(() => setTimeout(connectKeepAlive, 1000));
+  } catch {
+    setTimeout(connectKeepAlive, 2000);
+  }
+}
+connectKeepAlive();
+
 // Send a message to the background, retrying to cover the case where Firefox has
 // idle-suspended the event page (first send wakes it, a retry then connects).
 async function sendToBackground<T>(msg: unknown): Promise<T> {
