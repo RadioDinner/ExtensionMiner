@@ -8,6 +8,7 @@ const TARGETS = process.argv[2] ? [process.argv[2]] : ["chrome", "firefox"];
 const ENTRIES = {
   "background.js": "src/background/index.ts",
   "monarch-content.js": "src/content/monarch/index.ts",
+  "amazon-content.js": "src/content/amazon/index.ts",
   "popup.js": "src/popup/popup.ts",
 };
 

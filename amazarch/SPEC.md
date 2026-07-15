@@ -391,6 +391,20 @@ scoped per-user via RLS, and deletable on request.
   JS-rendered, button/scroll pagination, rate-limited (429s), and Amazon has
   already flattened its layout and obfuscated attribute names (AZAD needed a
   third parsing strategy in v1.16.19).
+- **⚠ EMPIRICAL CORRECTION (2026-07-14, live test): Amazon encrypts order
+  details client-side.** The `amazon.com/gp/css/order-history` page is a React
+  app whose order cards embed a `SiegeClientSideDecryption` ("Siege CSD")
+  library; the **dates, totals, and item names are ciphertext in the raw HTML**
+  and are only decrypted by JavaScript in the browser. A silent background
+  `fetch()` therefore returns 10 order-card containers with the **order number
+  readable** (in `data-csa-c-slot-id="amzn1.yourorders.order-card.<3-7-7>"`)
+  but **no plaintext dates/totals** (verified: `orderPlaced:0`, `monthDates:0`,
+  `isoDates:4` for 10 orders). **Consequence: D5's "silent raw fetch" cannot
+  read order details.** Amazarch instead reads the **rendered DOM** — open the
+  orders page in a background tab (or the user's own Amazon tab) and scrape the
+  decrypted, visible content with a content script (the AZAD approach). The
+  order number is still taken from the raw attribute; everything else from the
+  rendered text. The Privacy-Central export (below) remains the clean bulk path.
 - **Anti-bot envelope (copy AZAD's):** ≤6 concurrent same-domain requests,
   ~1 s pacing + hard page caps on transactions, cache everything scraped,
   incremental sync stops at overlap with cache, scrape one year at a time.

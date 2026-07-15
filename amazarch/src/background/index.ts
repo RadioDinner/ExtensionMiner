@@ -13,7 +13,7 @@ import type {
   StatusResponse,
 } from "../shared/messages";
 import { tokenPreview } from "../shared/messages";
-import { checkAmazon } from "./amazon";
+import { fetchAmazonViaTab, resolveAmazonReport } from "./amazon";
 
 const SESSION_KEY = "monarchSession";
 const PROBE_KEY = "monarchProbe";
@@ -38,11 +38,20 @@ async function recordContentScript(origin: string): Promise<void> {
 }
 
 browser.runtime.onMessage.addListener(
-  async (raw: unknown): Promise<StatusResponse | AmazonCheck | undefined> => {
+  async (
+    raw: unknown,
+    sender: browser.Runtime.MessageSender,
+  ): Promise<StatusResponse | AmazonCheck | undefined> => {
     const message = raw as Message;
 
     if (message.type === "content-script-loaded") {
       await recordContentScript(message.origin);
+      return undefined;
+    }
+
+    // An amazon.com content script reported its scraped orders.
+    if (message.type === "amazon-orders") {
+      resolveAmazonReport(sender.tab?.id, message.orders, message.signedIn);
       return undefined;
     }
 
@@ -58,10 +67,10 @@ browser.runtime.onMessage.addListener(
       return undefined;
     }
 
-    // Silent background fetch of Amazon order history (D5/D9). Cross-origin
-    // fetch belongs in the background; the content script requests it.
+    // Read Amazon orders by opening the order-history page in a background tab
+    // and scraping the decrypted, rendered DOM (D5/D9; SPEC.md §R1).
     if (message.type === "fetch-amazon") {
-      const check = await checkAmazon();
+      const check = await fetchAmazonViaTab();
       await set(AMAZON_KEY, check.status);
       console.info(
         `[Amazarch] amazon: ok=${check.status.ok} signedIn=${check.status.signedIn} — ${check.status.note}`,

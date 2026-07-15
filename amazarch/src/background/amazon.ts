@@ -1,95 +1,67 @@
-// Amazon order-history fetch + parse (silent background fetch, SPEC.md D5).
-// The background fetches the order-history page with the user's amazon.com
-// session cookies (content scripts can't do this cross-origin in Chrome), then
-// parses it into structured orders. Diagnostic-first: report what we reached.
-import type { AmazonCheck, AmazonStatus } from "../shared/messages";
-import {
-  countOrderCards,
-  detectAmazonPage,
-  diagnoseOrderHtml,
-  extractOrderJsonSchema,
-  pageTitle,
-  redactedCardSample,
-} from "../shared/amazon-parse";
-import { parseAmazonOrders } from "../shared/amazon-order-parse";
+// Amazon order retrieval via a background tab. Because Amazon encrypts order
+// details client-side (Siege CSD — see SPEC.md §R1), we can't read them from a
+// raw fetch; instead we open the order-history page in a background tab and let
+// the amazon content script scrape the decrypted, rendered DOM, then close it.
+import browser from "webextension-polyfill";
+import type { AmazonCheck, AmazonOrderLite, AmazonStatus } from "../shared/messages";
 
 const ORDERS_URL = "https://www.amazon.com/gp/css/order-history";
+const TAB_TIMEOUT_MS = 30000;
 
-export async function checkAmazon(): Promise<AmazonCheck> {
+// Pending tab scrapes, keyed by tabId → resolver called when its content script reports.
+const pending = new Map<number, (r: { orders: AmazonOrderLite[]; signedIn: boolean }) => void>();
+
+/** Called by the message router when an amazon content script reports orders. */
+export function resolveAmazonReport(
+  tabId: number | undefined,
+  orders: AmazonOrderLite[],
+  signedIn: boolean,
+): void {
+  if (tabId === undefined) return;
+  const resolve = pending.get(tabId);
+  if (resolve) resolve({ orders, signedIn });
+}
+
+export async function fetchAmazonViaTab(): Promise<AmazonCheck> {
+  let tabId: number | undefined;
   try {
-    const res = await fetch(ORDERS_URL, {
-      credentials: "include",
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    });
-    const html = await res.text();
-    const kind = detectAmazonPage(html, res.url);
+    const tab = await browser.tabs.create({ url: ORDERS_URL, active: false });
+    tabId = tab.id;
+    if (tabId === undefined) return errCheck("could not open an Amazon tab");
 
-    if (kind === "login") {
-      return { status: notSignedIn(), orders: [] };
-    }
-    if (kind === "orders") {
-      const cards = countOrderCards(html);
-      const orders = parseAmazonOrders(html);
-      const status: AmazonStatus = {
-        ranAt: Date.now(),
-        ok: true,
-        signedIn: true,
-        orderCardCount: cards,
-        note:
-          orders.length > 0
-            ? `${orders.length} orders parsed (${cards} cards on page 1)`
-            : `0 orders parsed from ${cards} cards — see the [Amazarch] console diagnostic on the Monarch tab`,
-      };
-      // When cards are present but nothing parsed, return a redacted diagnostic
-      // (counts only) + a redacted structural skeleton so the parser can be fixed.
-      const failed = orders.length === 0 && cards > 0;
-      const diagnostic = failed ? diagnoseOrderHtml(html) : undefined;
-      const sample = failed ? redactedCardSample(html) : undefined;
-      const report = failed
-        ? [
-            "AMAZARCH ORDER-PARSE DIAGNOSTIC (redacted — no values)",
-            "== counts ==",
-            JSON.stringify(diagnostic, null, 1),
-            "== embedded JSON schema (keys + types only) ==",
-            extractOrderJsonSchema(html),
-            "== HTML card skeleton (digits masked, long text blanked) ==",
-            sample,
-          ].join("\n")
-        : undefined;
-      return { status, orders, diagnostic, sample, report };
-    }
-    return {
-      status: {
-        ranAt: Date.now(),
-        ok: false,
-        signedIn: false,
-        orderCardCount: 0,
-        note: `unrecognized Amazon page: "${pageTitle(html)}" (HTTP ${res.status}, ${html.length} bytes)`,
-      },
-      orders: [],
+    const result = await new Promise<{ orders: AmazonOrderLite[]; signedIn: boolean }>((resolve) => {
+      const id = tabId as number;
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        resolve({ orders: [], signedIn: true }); // timed out; treat as no orders read
+      }, TAB_TIMEOUT_MS);
+      pending.set(id, (r) => {
+        clearTimeout(timer);
+        pending.delete(id);
+        resolve(r);
+      });
+    });
+
+    const status: AmazonStatus = {
+      ranAt: Date.now(),
+      ok: result.signedIn,
+      signedIn: result.signedIn,
+      orderCardCount: result.orders.length,
+      note: result.signedIn
+        ? `${result.orders.length} orders read from your Amazon order history`
+        : "not signed in to Amazon — open amazon.com and sign in, then re-sync",
     };
+    return { status, orders: result.orders };
   } catch (e) {
-    return {
-      status: {
-        ranAt: Date.now(),
-        ok: false,
-        signedIn: false,
-        orderCardCount: 0,
-        note: `Amazon fetch failed: ${e instanceof Error ? e.message : String(e)}`,
-      },
-      orders: [],
-    };
+    return errCheck(`Amazon tab error: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    if (tabId !== undefined) await browser.tabs.remove(tabId).catch(() => {});
   }
 }
 
-function notSignedIn(): AmazonStatus {
+function errCheck(note: string): AmazonCheck {
   return {
-    ranAt: Date.now(),
-    ok: true,
-    signedIn: false,
-    orderCardCount: 0,
-    note: "not signed in to Amazon — open amazon.com and sign in, then reload Monarch",
+    status: { ranAt: Date.now(), ok: false, signedIn: false, orderCardCount: 0, note },
+    orders: [],
   };
 }
