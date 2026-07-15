@@ -1,15 +1,36 @@
 // The Amazarch panel injected into the Monarch web app (SPEC.md D4). M1 shows
 // the Amazon transactions found in Monarch; later milestones add proposed
 // matches and the review queue here.
+import browser from "webextension-polyfill";
 import { formatCents } from "../../shared/money";
 import type { AmazonTxn } from "../../shared/monarch-read";
 
 const PANEL_ID = "amazarch-panel";
 
+// Keep the last render so we can re-assert the panel if Monarch's SPA wipes it
+// on a route change (React can replace document.body's subtree).
+let lastRender: { rows: AmazonTxn[]; totalCount: number | null; capped: boolean } | null = null;
+let guardStarted = false;
+
 export function renderPanel(rows: AmazonTxn[], totalCount: number | null, capped: boolean): void {
+  lastRender = { rows, totalCount, capped };
+  draw(rows, totalCount, capped);
+  if (!guardStarted) {
+    guardStarted = true;
+    // Cheap, robust re-assert if the SPA removes our node.
+    setInterval(() => {
+      if (lastRender && !document.getElementById(PANEL_ID) && document.body) {
+        draw(lastRender.rows, lastRender.totalCount, lastRender.capped);
+      }
+    }, 2000);
+  }
+}
+
+function draw(rows: AmazonTxn[], totalCount: number | null, capped: boolean): void {
   if (!document.body) return;
   document.getElementById(PANEL_ID)?.remove();
 
+  const version = browser.runtime.getManifest().version;
   const panel = document.createElement("div");
   panel.id = PANEL_ID;
   panel.setAttribute(
@@ -38,7 +59,7 @@ export function renderPanel(rows: AmazonTxn[], totalCount: number | null, capped
     "display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#1f2937;",
   );
   const title = document.createElement("strong");
-  title.textContent = `Amazarch — ${rows.length} Amazon transaction${rows.length === 1 ? "" : "s"}`;
+  title.textContent = `Amazarch v${version} — ${rows.length} Amazon charge${rows.length === 1 ? "" : "s"} in Monarch`;
   const close = document.createElement("button");
   close.textContent = "✕";
   close.setAttribute(
@@ -83,7 +104,7 @@ export function renderPanel(rows: AmazonTxn[], totalCount: number | null, capped
   footer.setAttribute("style", "padding:8px 12px;background:#1f2937;color:#9ca3af;font-size:11px;");
   const total = totalCount !== null ? `${totalCount.toLocaleString()} total txns in Monarch. ` : "";
   const cap = capped ? "Showing a capped subset. " : "";
-  footer.textContent = `${total}${cap}Matching to Amazon orders comes next.`;
+  footer.textContent = `${total}${cap}These are your Monarch bank charges. Next: fetch Amazon orders and match them here.`;
 
   panel.append(header, list, footer);
   document.body.appendChild(panel);

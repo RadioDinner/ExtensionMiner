@@ -12,6 +12,10 @@ function setText(id: string, text: string, ok?: boolean): void {
 }
 
 async function refresh(): Promise<void> {
+  // Build marker so it's obvious which version is loaded after a reload.
+  const v = document.getElementById("version");
+  if (v) v.textContent = `v${browser.runtime.getManifest().version}`;
+
   // 1. Do we even have host access? (Firefox lets users revoke/never grant it.)
   let hasMonarchAccess = true;
   try {
