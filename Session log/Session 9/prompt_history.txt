@@ -168,3 +168,9 @@ built dist/firefox
    v0.4.0:
    - PERF (pre-sync): panel now attaches to document.documentElement (<html>), OUTSIDE Monarch's React <body> tree, so React re-renders don't wipe/retrigger our redraw; re-assert guard slowed 2s->8s. Should stop the redraw churn.
    - LIVE STATUS: panel has a status line (#amazarch-panel-status) with a running timer (ticks every 200ms). doSync drives it: "Sync queued…" -> "Reading Monarch transactions — N so far…" (per page) -> "Opening Amazon…" -> per-page "Reading Amazon orders — page K (X so far, waiting for decryption…)" pushed from the BACKGROUND via tabs.sendMessage(amazon-progress) -> "Matching…" -> final "Done — N charges, M orders". setPanelStatus updates in place (no full re-render) so the timer stays smooth.
+
+44. "It flashes some little message but never actually syncs anything" + [mid-turn] "feels a bit more responsive now though" (documentElement perf fix worked).
+   ROOT CAUSE (hypothesis): the `name` field added to the read query in v0.3.0 likely isn't valid on Monarch's transaction result type -> whole read errors -> 0 charges -> sync produces nothing.
+   v0.4.1 FIX:
+   - Self-healing read: readAmazonTransactions now probes query-shape combos [search×name] and uses the first Monarch accepts (drops `name` if rejected, then drops search). Fixed a pagination bug (res wasn't reset -> only page 0 fetched); now res=null after each page.
+   - Sync never fails silently: doSync wrapped in try/catch; a failed read or thrown error now shows in the status line ("Monarch read failed — <note>" / "Sync error — <msg>") instead of a blank flash.

@@ -143,35 +143,53 @@ async function tryConnect(): Promise<boolean> {
   // Heavy work (read charges + open the Amazon tab + match) runs ONLY on demand,
   // so opening Monarch stays fast and the Amazon tab isn't opened every visit.
   const doSync = async (): Promise<void> => {
-    statusBegin("Sync queued…");
-    statusSet("Reading your Monarch transactions…");
-    const read = await readAmazonTransactions(auth, {}, (loaded) =>
-      statusSet(`Reading Monarch transactions — ${loaded} Amazon charges so far…`),
-    );
-    console.info(`${LOG} transaction read: ok=${read.ok} — ${read.note}`);
-    let matches: ReturnType<typeof matchOrdersToCharges> = [];
-    let check: AmazonCheck | null = null;
     try {
-      statusSet("Opening Amazon…"); // background pushes per-page progress from here
-      check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
-      console.info(`${LOG} amazon: ${check.status.note}`);
-      if (read.ok) {
+      statusBegin("Sync queued…");
+      statusSet("Reading your Monarch transactions…");
+      const read = await readAmazonTransactions(auth, {}, (loaded) =>
+        statusSet(`Reading Monarch transactions — ${loaded} Amazon charges so far…`),
+      );
+      console.info(`${LOG} transaction read: ok=${read.ok} — ${read.note}`);
+      if (!read.ok) {
+        statusStop();
+        renderPanel({
+          txns: [], totalCount: null, capped: false,
+          synced: true, status: `Monarch read failed — ${read.note}`,
+          onSync: doSync, onApply, onRename,
+        });
+        return;
+      }
+      let matches: ReturnType<typeof matchOrdersToCharges> = [];
+      let check: AmazonCheck | null = null;
+      try {
+        statusSet("Opening Amazon…"); // background pushes per-page progress from here
+        check = (await browser.runtime.sendMessage({ type: "fetch-amazon" })) as AmazonCheck;
+        console.info(`${LOG} amazon: ${check.status.note}`);
         statusSet(`Matching ${check.orders.length} orders to ${read.rows.length} charges…`);
         matches = matchOrdersToCharges(read.rows, check.orders);
+      } catch (e) {
+        console.warn(`${LOG} amazon fetch failed:`, e);
       }
+      statusStop();
+      const done =
+        check?.status.signedIn === false
+          ? "Amazon needs sign-in — open amazon.com, sign in, then Sync again."
+          : `Done — ${read.rows.length} Amazon charges, ${check?.orders.length ?? 0} orders read.`;
+      renderPanel({
+        txns: read.rows, totalCount: read.totalCount, capped: read.capped,
+        orders: check?.orders, amazonNote: check?.status.note, matches,
+        synced: true, status: done, onSync: doSync, onApply, onRename,
+        diagnostic: check?.diagnostic, sample: check?.sample, report: check?.report,
+      });
     } catch (e) {
-      console.warn(`${LOG} amazon fetch failed:`, e);
+      statusStop();
+      console.error(`${LOG} sync error:`, e);
+      renderPanel({
+        txns: [], totalCount: null, capped: false,
+        synced: true, status: `Sync error — ${e instanceof Error ? e.message : String(e)}`,
+        onSync: doSync, onApply, onRename,
+      });
     }
-    statusStop();
-    const done = check?.status.signedIn === false
-      ? "Amazon needs sign-in — open amazon.com, sign in, then Sync again."
-      : `Done — ${read.rows.length} Amazon charges, ${check?.orders.length ?? 0} orders read.`;
-    renderPanel({
-      txns: read.rows, totalCount: read.totalCount, capped: read.capped,
-      orders: check?.orders, amazonNote: check?.status.note, matches,
-      synced: true, status: done, onSync: doSync, onApply, onRename,
-      diagnostic: check?.diagnostic, sample: check?.sample, report: check?.report,
-    });
   };
 
   // On connect: show a light panel with a "Sync now" button — no heavy work yet.

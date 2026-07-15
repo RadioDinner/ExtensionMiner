@@ -26,24 +26,28 @@ export interface AmazonReadResult {
   note: string;
 }
 
-const READ_QUERY = `query Web_GetTransactionsList($offset: Int, $limit: Int, $filters: TransactionFilterInput) {
+// `name` is included only when withName is true; if Monarch's schema rejects it
+// we retry without it (self-heal) so the whole read never breaks over one field.
+function readQuery(withName: boolean): string {
+  return `query Web_GetTransactionsList($offset: Int, $limit: Int, $filters: TransactionFilterInput) {
   allTransactions(filters: $filters) {
     totalCount
     results(offset: $offset, limit: $limit) {
       id
       date
       amount
-      name
+      ${withName ? "name" : ""}
       notes
       merchant { name }
     }
   }
 }`;
+}
 
-function buildDoc(offset: number, limit: number, search: string | null) {
+function buildDoc(offset: number, limit: number, search: string | null, withName: boolean) {
   return {
     operationName: "Web_GetTransactionsList",
-    query: READ_QUERY,
+    query: readQuery(withName),
     variables: { offset, limit, filters: search ? { search } : {} },
   };
 }
@@ -63,23 +67,44 @@ export async function readAmazonTransactions(
   const pageSize = opts.pageSize ?? 100;
   const unfilteredScanCap = opts.unfilteredScanCap ?? 1000;
 
+  // Detect a query shape Monarch accepts: try search+name first, then drop name
+  // (schema may not expose it), then drop the search filter, then both.
+  const combos = [
+    { search: true, name: true },
+    { search: true, name: false },
+    { search: false, name: true },
+    { search: false, name: false },
+  ];
   let useSearch = true;
+  let withName = true;
+  let firstRes = null;
+  let lastNote = "no attempt made";
+  for (const c of combos) {
+    const res = await gqlRequest(auth, buildDoc(0, pageSize, c.search ? "amazon" : null, c.name));
+    lastNote = res.note;
+    if (res.ok) {
+      useSearch = c.search;
+      withName = c.name;
+      firstRes = res;
+      break;
+    }
+  }
+  if (!firstRes) {
+    return {
+      ranAt: Date.now(), ok: false, rows: [], amazonCount: 0,
+      totalScanned: 0, totalCount: null, filtered: false, capped: false, note: lastNote,
+    };
+  }
+
   const rows: AmazonTxn[] = [];
   let totalCount: number | null = null;
   let totalScanned = 0;
   let offset = 0;
   let capped = false;
+  let res: typeof firstRes | null = firstRes;
 
   while (rows.length < maxRows) {
-    let res = await gqlRequest(auth, buildDoc(offset, pageSize, useSearch ? "amazon" : null));
-    if (!res.ok && useSearch) {
-      // Monarch may not accept filters.search — fall back to an unfiltered scan.
-      useSearch = false;
-      offset = 0;
-      totalScanned = 0;
-      rows.length = 0;
-      res = await gqlRequest(auth, buildDoc(offset, pageSize, null));
-    }
+    if (res === null) res = await gqlRequest(auth, buildDoc(offset, pageSize, useSearch ? "amazon" : null, withName));
     if (!res.ok) {
       return {
         ranAt: Date.now(), ok: false, rows, amazonCount: rows.length,
@@ -97,6 +122,7 @@ export async function readAmazonTransactions(
     if (page.pageLen < pageSize) break; // last page
     if (!useSearch && totalScanned >= unfilteredScanCap) { capped = true; break; }
     offset += pageSize;
+    res = null; // force a fresh fetch for the next page
   }
 
   return {
