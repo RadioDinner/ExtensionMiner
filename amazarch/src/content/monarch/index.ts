@@ -235,6 +235,14 @@ async function tryConnect(): Promise<boolean> {
     syncNote: 'Click "Sync now" to read your Amazon orders and match them to your Monarch charges.',
   });
 
+  // Health check on load: is the background reachable at all? This runs before
+  // any Sync click, so it isolates "background dead/unreachable" from anything
+  // sync-specific — shown right in the status line, no DevTools needed.
+  void browser.runtime.sendMessage({ type: "get-status" }).then(
+    () => setPanelStatus("Background connected ✓ — ready to Sync"),
+    (e) => setPanelStatus(`⚠ Background NOT reachable: ${e instanceof Error ? e.message : String(e)}`),
+  );
+
   const message: Message = { type: "monarch-connected", session, probe, read: null };
   void browser.runtime
     .sendMessage(message)
