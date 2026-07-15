@@ -14,6 +14,7 @@ export interface PanelView {
   capped: boolean;
   orders?: AmazonOrderLite[];
   amazonNote?: string;
+  diagnostic?: Record<string, number | string>;
 }
 
 let lastView: PanelView | null = null;
@@ -78,6 +79,13 @@ function draw(view: PanelView): void {
     body.append(sectionTitle(`${view.orders.length} Amazon order${view.orders.length === 1 ? "" : "s"} parsed`));
     if (view.orders.length === 0) {
       body.append(muted(view.amazonNote ?? "No orders parsed."));
+      // Show the redacted diagnostic in-panel so no DevTools is needed.
+      if (view.diagnostic) {
+        body.append(sectionTitle("Order-parse diagnostic (counts only)"));
+        for (const [k, v] of Object.entries(view.diagnostic)) {
+          body.append(row(k, "", String(v)));
+        }
+      }
     } else {
       for (const o of view.orders.slice(0, 50)) {
         const label = o.itemTitles[0]
