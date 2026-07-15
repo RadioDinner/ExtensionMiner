@@ -30,7 +30,7 @@ describe("collectAmazon", () => {
     allTransactions: {
       totalCount: 812,
       results: [
-        { id: "1", date: "2026-07-10", amount: -24.99, merchant: { name: "AMZN Mktp US*1A2B3C" } },
+        { id: "1", date: "2026-07-10", amount: -24.99, notes: "existing", merchant: { name: "AMZN Mktp US*1A2B3C" } },
         { id: "2", date: "2026-07-09", amount: -5.75, merchant: { name: "Starbucks" } },
         { id: "3", date: "2026-07-08", amount: -119.0, merchant: { name: "Amazon.com" } },
         { id: "4", date: "2026-07-07", amount: -60.0, merchant: { name: "Whole Foods Market" } }, // excluded
@@ -44,8 +44,8 @@ describe("collectAmazon", () => {
     expect(out.pageLen).toBe(5);
     expect(out.totalCount).toBe(812);
     expect(out.rows).toEqual([
-      { id: "1", date: "2026-07-10", amountCents: -2499, merchantName: "AMZN Mktp US*1A2B3C" },
-      { id: "3", date: "2026-07-08", amountCents: -11900, merchantName: "Amazon.com" },
+      { id: "1", date: "2026-07-10", amountCents: -2499, merchantName: "AMZN Mktp US*1A2B3C", notes: "existing" },
+      { id: "3", date: "2026-07-08", amountCents: -11900, merchantName: "Amazon.com", notes: "" },
     ]);
   });
 

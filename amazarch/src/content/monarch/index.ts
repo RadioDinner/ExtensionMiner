@@ -13,6 +13,8 @@ import {
 import { probeMonarchApi, readCookie } from "../../shared/monarch-probe";
 import { readAmazonTransactions } from "../../shared/monarch-read";
 import { matchOrdersToCharges } from "../../shared/matcher";
+import { buildNoteLine, mergeNotes, setTransactionNotes } from "../../shared/monarch-write";
+import type { ApplyResult } from "./overlay";
 import type {
   AmazonCheck,
   AuthMethod,
@@ -102,9 +104,23 @@ async function tryConnect(): Promise<boolean> {
     }
     if (read.ok) {
       const matches = matchOrdersToCharges(read.rows, check.orders);
+      // Click-to-apply: append the order's item details to the Monarch
+      // transaction's notes (additive, never clobbers), with Undo.
+      const onApply = async (chargeId: string, chargeNotes: string, order: NonNullable<(typeof matches)[number]["order"]>): Promise<ApplyResult> => {
+        const line = buildNoteLine(order);
+        const merged = mergeNotes(chargeNotes, order, line);
+        if (!merged.changed) return { ok: true, note: "already noted" };
+        const res = await setTransactionNotes(auth, chargeId, merged.notes);
+        if (!res.ok) return { ok: false, note: res.note };
+        return {
+          ok: true,
+          note: "note added",
+          undo: () => setTransactionNotes(auth, chargeId, chargeNotes),
+        };
+      };
       renderPanel({
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,
-        orders: check.orders, amazonNote: check.status.note, matches,
+        orders: check.orders, amazonNote: check.status.note, matches, onApply,
         diagnostic: check.diagnostic, sample: check.sample, report: check.report,
       });
     }

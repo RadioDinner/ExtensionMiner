@@ -9,6 +9,12 @@ import { summarize, type MatchResult } from "../../shared/matcher";
 
 const PANEL_ID = "amazarch-panel";
 
+export interface ApplyResult {
+  ok: boolean;
+  note: string;
+  undo?: () => Promise<{ ok: boolean; note: string }>;
+}
+
 export interface PanelView {
   txns: AmazonTxn[];
   totalCount: number | null;
@@ -16,6 +22,7 @@ export interface PanelView {
   orders?: AmazonOrderLite[];
   amazonNote?: string;
   matches?: MatchResult[];
+  onApply?: (chargeId: string, chargeNotes: string, order: AmazonOrderLite) => Promise<ApplyResult>;
   diagnostic?: Record<string, number | string>;
   sample?: string;
   report?: string;
@@ -90,6 +97,10 @@ function draw(view: PanelView): void {
         ? `${meta.icon} ${m.order.date} · ${m.order.itemTitles[0] ?? (m.order.orderId || "order")}${m.dayDiff !== null ? `  (+${m.dayDiff}d)` : ""}`
         : `${meta.icon} ${m.status === "refund" ? "refund — matched later" : "no matching order"}`;
       body.append(row(m.charge.merchantName, sub, formatCents(m.charge.amountCents), meta.color));
+      // Click-to-apply: add the order's items to the Monarch transaction's notes.
+      if (m.order && (m.status === "auto" || m.status === "review") && view.onApply) {
+        body.append(applyButton(m.charge.id, m.charge.notes, m.order, view.onApply));
+      }
     }
     if (view.matches.length > 60) body.append(muted(`…and ${view.matches.length - 60} more`));
   } else {
@@ -204,4 +215,44 @@ function row(left: string, sub: string, right: string, subColor = "#9ca3af"): HT
 
 function rank(status: string): number {
   return { auto: 0, review: 1, unmatched: 2, refund: 3 }[status] ?? 4;
+}
+
+function applyButton(
+  chargeId: string,
+  chargeNotes: string,
+  order: AmazonOrderLite,
+  onApply: NonNullable<PanelView["onApply"]>,
+): HTMLElement {
+  const wrap = el("div", { padding: "0 12px 8px" });
+  const btn = el("button", {
+    padding: "5px 10px", cursor: "pointer", border: "1px solid #374151",
+    "border-radius": "6px", background: "#1f2937", color: "#e5e7eb",
+    font: "11px system-ui,sans-serif",
+  }) as HTMLButtonElement;
+  btn.textContent = "Add items to Monarch note";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+    const r = await onApply(chargeId, chargeNotes, order);
+    btn.disabled = false;
+    if (!r.ok) {
+      btn.textContent = `Failed: ${r.note}`;
+      return;
+    }
+    if (r.undo) {
+      btn.textContent = "✓ Added — click to undo";
+      btn.onclick = async () => {
+        btn.disabled = true;
+        btn.textContent = "Undoing…";
+        const u = await r.undo!();
+        btn.disabled = false;
+        btn.textContent = u.ok ? "Undone" : `Undo failed: ${u.note}`;
+        if (u.ok) btn.onclick = null;
+      };
+    } else {
+      btn.textContent = `✓ ${r.note}`;
+    }
+  });
+  wrap.append(btn);
+  return wrap;
 }
