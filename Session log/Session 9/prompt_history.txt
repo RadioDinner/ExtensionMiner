@@ -124,3 +124,5 @@ built dist/firefox
 24. [popup result] Monarch session detected (app.monarch.com, token 1629...2998) but API check failed — HTTP 400 graphql error; found via localStorage:persist:root.user.id => shape-hunt grabbed the numeric user id (decoy), no real bearer token exists. Confirms cookie-based (session + csrftoken) auth.
 
 25. [popup result] Connected to Monarch (app.monarch.com) — API check OK / authenticated (cookie) via api.monarch.com / auth: session cookie  => M0 COMPLETE. Live authenticated Monarch API access proven via cookie/CSRF from the extension.
+
+26. [popup] Connected OK (cookie) but "Transaction read failed — cookie@api.monarchmoney.com: TypeError: NetworkError". => fallback (dead) host masked api.monarch.com's real error. Fixed reporting + corrected read query (offset/limit belong on results, not allTransactions).

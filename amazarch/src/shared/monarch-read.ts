@@ -14,12 +14,14 @@ export interface AmazonReadResult {
   note: string;
 }
 
+// Matches the community-documented shape: offset/limit are args on `results`,
+// filters is the arg on `allTransactions` (SPEC.md §R3).
 const READ_DOC = {
   operationName: "Web_GetTransactionsList",
   query: `query Web_GetTransactionsList($offset: Int, $limit: Int, $filters: TransactionFilterInput) {
-  allTransactions(offset: $offset, limit: $limit, filters: $filters) {
+  allTransactions(filters: $filters) {
     totalCount
-    results {
+    results(offset: $offset, limit: $limit) {
       id
       date
       amount

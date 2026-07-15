@@ -46,17 +46,14 @@ export async function gqlRequest(auth: MonarchAuth, doc: GqlDoc): Promise<GqlRes
   if (methods.length === 0) methods.push("cookie");
 
   const body = JSON.stringify(doc);
-  let last: GqlResult = {
-    ok: false,
-    status: 0,
-    method: null,
-    host: null,
-    data: null,
-    errors: [],
-    note: "no attempt made",
-  };
+  let best: GqlResult | null = null;
 
   for (const method of methods) {
+    // Try endpoints in order, but a real HTTP RESPONSE is authoritative for its
+    // host — only advance to the fallback host when the primary is unreachable
+    // (a thrown network error). This prevents the deprecated host's NetworkError
+    // from masking the real error returned by api.monarch.com.
+    let methodResult: GqlResult | null = null;
     for (const endpoint of ENDPOINTS) {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -92,7 +89,7 @@ export async function gqlRequest(auth: MonarchAuth, doc: GqlDoc): Promise<GqlRes
             note: `${doc.operationName} ok (${method}) via ${host}`,
           };
         }
-        last = {
+        methodResult = {
           ok: false,
           status: res.status,
           method,
@@ -103,8 +100,9 @@ export async function gqlRequest(auth: MonarchAuth, doc: GqlDoc): Promise<GqlRes
             ? `${method}@${host}: HTTP ${res.status}, graphql: ${errors[0]}`
             : `${method}@${host}: HTTP ${res.status}`,
         };
+        break; // authoritative HTTP response — do not try the fallback host
       } catch (e) {
-        last = {
+        methodResult = {
           ok: false,
           status: 0,
           method,
@@ -113,10 +111,18 @@ export async function gqlRequest(auth: MonarchAuth, doc: GqlDoc): Promise<GqlRes
           errors: [],
           note: `${method}@${host}: ${e instanceof Error ? e.message : String(e)}`,
         };
+        // network error — fall through to the next endpoint
       }
     }
+    // Keep the most informative failure: prefer one with a real HTTP status
+    // (a server response) over a bare network error.
+    if (methodResult && (!best || (best.status === 0 && methodResult.status > 0))) {
+      best = methodResult;
+    }
   }
-  return last;
+  return (
+    best ?? { ok: false, status: 0, method: null, host: null, data: null, errors: [], note: "no attempt made" }
+  );
 }
 
 function dataOf(json: unknown): unknown {
