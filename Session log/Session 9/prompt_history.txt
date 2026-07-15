@@ -186,3 +186,6 @@ built dist/firefox
 
 48. [v0.4.4] "Amazon fetch error — Could not establish connection. Receiving end does not exist." + "sync stopped working". ROOT CAUSE: since v0.3.0 sync runs on-CLICK (minutes after load); by then Firefox has idle-SUSPENDED the background event page, so fetch-amazon has no receiver. (Pre-v0.3.0 it ran auto-on-load while bg was awake -> worked.) Panel still shows Connected because the content script self-renders (no bg needed).
    v0.4.5: sendToBackground() retries the message up to 5x with backoff — the first send wakes the suspended event page, a retry connects. Applied to fetch-amazon.
+
+49. "seconds timer is tied to specific milestones... I want a pure 1 second timer regardless of status. A vanity timer. Something to indicate life."
+   v0.4.6: split the status line into an INDEPENDENT vanity timer span (#-timer) + a phase label span (#-label). A single 1s interval ticks the timer from sync start (syncStartedAt) to sync end, decoupled from statusSet/milestone label changes. setPanelTimer / setPanelStatus update each span separately.

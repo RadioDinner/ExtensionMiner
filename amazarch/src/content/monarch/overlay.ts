@@ -56,10 +56,16 @@ export function renderPanel(view: PanelView): void {
   }
 }
 
-// Update just the status line in place (no full re-render) — keeps the timer
-// smooth and cheap during a sync.
+// Update the status label in place (no full re-render).
 export function setPanelStatus(text: string): void {
-  const el = document.getElementById(`${PANEL_ID}-status`);
+  const el = document.getElementById(`${PANEL_ID}-label`);
+  if (el) el.textContent = text;
+}
+
+// Update the independent vanity timer (a heartbeat that ticks every second
+// regardless of which sync phase is showing).
+export function setPanelTimer(text: string): void {
+  const el = document.getElementById(`${PANEL_ID}-timer`);
   if (el) el.textContent = text;
 }
 
@@ -113,13 +119,18 @@ function draw(view: PanelView): void {
   header.append(right);
   panel.append(header);
 
-  // Live status line (updated in place during a sync via setPanelStatus).
+  // Live status line: an independent vanity timer + the current phase label.
   const status = el("div", {
+    display: "flex", gap: "8px", "align-items": "baseline",
     padding: "6px 12px", "font-size": "11px", color: "#93c5fd",
     "border-bottom": "1px solid #1f2937", "min-height": "16px",
   });
-  status.id = `${PANEL_ID}-status`;
-  status.textContent = view.status ?? "";
+  const timer = el("span", { color: "#a7f3d0", "font-variant-numeric": "tabular-nums", "min-width": "28px" });
+  timer.id = `${PANEL_ID}-timer`;
+  const label = el("span", {});
+  label.id = `${PANEL_ID}-label`;
+  label.textContent = view.status ?? "";
+  status.append(timer, label);
   panel.append(status);
 
   // Light state: connected but no sync run yet — do nothing heavy on page load.

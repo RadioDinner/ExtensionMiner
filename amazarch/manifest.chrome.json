@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Amazarch",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "Match your Amazon orders, refunds, and split shipments to your Monarch Money transactions. Not affiliated with Amazon or Monarch Money.",
   "background": {
     "service_worker": "background.js"

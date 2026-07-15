@@ -1,6 +1,6 @@
 {
   "name": "amazarch",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "description": "Amazarch — match Amazon orders to Monarch Money transactions.",
   "type": "module",

@@ -29,7 +29,7 @@ import type {
   MonarchSessionInfo,
 } from "../../shared/messages";
 import type { MonarchAuth } from "../../shared/monarch-gql";
-import { renderPanel, setPanelStatus } from "./overlay";
+import { renderPanel, setPanelStatus, setPanelTimer } from "./overlay";
 
 // Send a message to the background, retrying to cover the case where Firefox has
 // idle-suspended the event page (first send wakes it, a retry then connects).
@@ -46,30 +46,26 @@ async function sendToBackground<T>(msg: unknown): Promise<T> {
   throw lastErr;
 }
 
-// Live status line with a running timer, updated in place during a sync.
-let statusTimer: ReturnType<typeof setInterval> | undefined;
-let statusStart = 0;
-let statusLabel = "";
-function statusTick(): void {
-  const secs = Math.floor((Date.now() - statusStart) / 1000);
-  setPanelStatus(`${statusLabel}  ·  ${secs}s`);
-}
+// A pure vanity timer: once a sync starts it ticks every second until the sync
+// ends, independent of which phase/status is showing — a simple sign of life.
+let syncStartedAt: number | null = null;
+let vanityTimer: ReturnType<typeof setInterval> | undefined;
 function statusBegin(label: string): void {
-  statusLabel = label;
-  statusStart = Date.now();
-  statusTick();
-  if (statusTimer) clearInterval(statusTimer);
-  statusTimer = setInterval(statusTick, 1000);
+  syncStartedAt = Date.now();
+  setPanelTimer("0s");
+  setPanelStatus(label);
+  if (!vanityTimer) {
+    vanityTimer = setInterval(() => {
+      if (syncStartedAt === null) return;
+      setPanelTimer(`${Math.floor((Date.now() - syncStartedAt) / 1000)}s`);
+    }, 1000);
+  }
 }
 function statusSet(label: string): void {
-  statusLabel = label;
-  statusTick();
+  setPanelStatus(label);
 }
 function statusStop(): void {
-  if (statusTimer) {
-    clearInterval(statusTimer);
-    statusTimer = undefined;
-  }
+  syncStartedAt = null;
 }
 
 // Live progress pushed from the background while it reads the Amazon tab.
