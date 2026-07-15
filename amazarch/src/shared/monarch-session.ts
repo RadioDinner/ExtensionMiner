@@ -49,6 +49,7 @@ const ALNUM_RE = /^[A-Za-z0-9._-]{20,}$/;
 
 export function classifyString(s: string): StringClass {
   if (UUID_RE.test(s)) return "uuid";
+  if (/^\d+$/.test(s)) return "other"; // pure digits = numeric id/timestamp, never a token
   if (JWT_RE.test(s)) return "jwt";
   if (s.includes("@")) return "email";
   if (/^https?:\/\//i.test(s)) return "url";
@@ -67,7 +68,8 @@ function isSearchableContainer(key: string): boolean {
 }
 
 // Leaf names that look tokenish but are known NOT to be the API bearer token.
-const DENY_LEAF_RE = /(uuid|device|oauthstate|^state$|anon|csrf|_persist|refresh)/i;
+// Anything ending in "id" (id, userId, accountId, uuid) is a decoy, not a token.
+const DENY_LEAF_RE = /(uuid|device|oauthstate|^state$|anon|csrf|_persist|refresh|id$)/i;
 // Leaf names that strongly indicate the API bearer token.
 const PREFER_LEAF_RE = /(^|\.)(token|authToken|accessToken|apiToken|sessionToken)$/i;
 

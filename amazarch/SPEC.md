@@ -450,13 +450,29 @@ operation names:
 | Tags | `GetHouseholdTransactionTags` (list), `Common_CreateTransactionTag` (name+color), `Web_SetTransactionTags` (transactionId, tagIds[]) |
 | Create/delete transactions | `Common_CreateTransactionMutation` / `Common_DeleteTransactionMutation` |
 
-- **Auth from an extension:** the web app stores the token in localStorage —
-  `JSON.parse(JSON.parse(localStorage.getItem('persist:root')).user).token` —
-  and the device id under `monarchDeviceUUID`. Requests send
-  `Authorization: Token <token>`, `device-uuid`, `Client-Platform: web`.
-  This exact pattern ships today in `alex-peck/monarch-amazon-sync` and the
-  Monarch-Money-Tweaks extension (Chrome + Firefox, v5.12) — direct proof the
-  session-reuse approach works in production extensions.
+- **Auth from an extension:** the web app *historically* stored a bearer token
+  in localStorage (`persist:root.user.token`) used as `Authorization: Token
+  <token>`. **⚠ EMPIRICAL CORRECTION (2026-07-14, live Firefox test against a
+  real account):** current Monarch (`app.monarch.com`) has **no bearer token in
+  localStorage** — `persist:root.user` holds only profile fields (id, email,
+  …), there is a new `persist:auth` slice containing `oAuthStateString`, and
+  auth is carried by a **session cookie + `csrftoken` cookie** (Django-style).
+  So the extension authenticates its API calls the way the web app itself does:
+  a **credentialed same-origin request** (from the content script on
+  `app.monarch.com`, `credentials: 'include'`) with the `csrftoken` echoed in
+  the `X-CSRFToken` header — no bearer token needed. `device-uuid` (from the
+  `monarchDeviceUUID` cookie/localStorage) and `Client-Platform: web` are still
+  sent. The bearer-token path is kept only as a fallback for accounts that
+  still expose one. This is actually the more robust path R3 originally
+  recommended ("prefer same-origin fetch so cookies/CSRF attach automatically").
+  Amazarch's token bridge searches localStorage by value *shape* only as a
+  fallback and to stay resilient if Monarch changes storage again.
+  - **Cross-browser note:** the credentialed cross-origin fetch works from a
+    **content script** in Firefox (host_permissions bypass CORS there). Chrome
+    MV3 restricts content-script CORS bypass to the service worker, so the
+    Chrome build will route the API call through the background with
+    `declarativeNetRequestWithHostAccess` setting Origin/Referer — a milestone
+    concern, not needed for the Firefox validation.
 - **⚠ The API host migrated `api.monarchmoney.com` → `api.monarch.com`
   (reported 2026-01-16)**, breaking hardcoded clients (525/auth errors).
   Design consequence: endpoint and operation strings live in one

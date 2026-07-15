@@ -21,6 +21,10 @@ describe("classifyString", () => {
     expect(classifyString("https://x.test/a")).toBe("url");
     expect(classifyString("short")).toBe("other");
   });
+
+  it("treats a long numeric id/timestamp as NOT a token (regression: user.id decoy)", () => {
+    expect(classifyString("162934567890122998")).toBe("other");
+  });
 });
 
 describe("huntMonarchToken", () => {
@@ -62,6 +66,13 @@ describe("huntMonarchToken", () => {
 
   it("finds a bare token localStorage key", () => {
     expect(huntMonarchToken({ token: HEX40 })).toEqual({ token: HEX40, strategy: "token" });
+  });
+
+  it("does NOT grab a numeric user id (regression: found via persist:root.user.id)", () => {
+    const entries = {
+      "persist:root": persistRoot({ id: "162934567890122998", email: "me@x.test" }),
+    };
+    expect(huntMonarchToken(entries)).toEqual({ token: null, strategy: null });
   });
 
   it("returns null on empty/garbage storage", () => {

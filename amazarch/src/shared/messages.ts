@@ -1,11 +1,14 @@
 // Runtime messages between the content scripts, background, and popup.
 
+export type AuthMethod = "cookie" | "bearer" | "none";
+
 export interface MonarchSessionInfo {
-  token: string;
+  authMethod: AuthMethod;
+  token: string | null; // present only for bearer auth
   deviceUuid: string | null;
   origin: string; // which Monarch host the session was captured from
   capturedAt: number; // epoch ms
-  strategy: string; // which token-hunt strategy found it (diagnostics)
+  strategy: string; // how the session was established (diagnostics)
 }
 
 export interface ProbeResult {
@@ -16,7 +19,7 @@ export interface ProbeResult {
 }
 
 export type Message =
-  | { type: "monarch-session-detected"; session: MonarchSessionInfo }
+  | { type: "monarch-connected"; session: MonarchSessionInfo; probe: ProbeResult }
   | { type: "content-script-loaded"; origin: string; loadedAt: number }
   | { type: "get-status" };
 
@@ -27,8 +30,9 @@ export interface StatusResponse {
   contentScriptOrigins: string[];
 }
 
-/** Redact a token down to a short identifiable preview (never log/show full tokens). */
-export function tokenPreview(token: string): string {
+/** Redact a token for display; describe cookie sessions plainly. Never emit a full token. */
+export function tokenPreview(token: string | null): string {
+  if (!token) return "(cookie session)";
   if (token.length <= 8) return "****";
   return `${token.slice(0, 4)}…${token.slice(-4)}`;
 }

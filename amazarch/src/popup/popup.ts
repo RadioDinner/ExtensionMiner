@@ -20,40 +20,44 @@ async function refresh(): Promise<void> {
     // permissions API hiccup — assume granted and let the other checks speak
   }
 
-  const message: Message = { type: "get-status" };
   let status: StatusResponse | undefined;
   try {
+    const message: Message = { type: "get-status" };
     status = (await browser.runtime.sendMessage(message)) as StatusResponse;
   } catch {
     setText("monarch-status", "Background not reachable — try reloading the extension.", false);
     return;
   }
 
-  if (status?.monarch) {
-    const when = new Date(status.monarch.capturedAt).toLocaleTimeString();
+  const probe = status?.probe ?? null;
+
+  // Success: the live API check passed.
+  if (probe?.ok && status?.monarch) {
+    const host = new URL(status.monarch.origin).host;
+    setText("monarch-status", `Connected to Monarch (${host}) — API check OK`, true);
+    setText("probe", probe.note);
     setText(
-      "monarch-status",
-      `Monarch session detected (${new URL(status.monarch.origin).host}, token ${status.monarch.tokenPreview}, ${when})`,
-      true,
+      "debug",
+      status.monarch.authMethod === "bearer"
+        ? `auth: bearer token ${status.monarch.tokenPreview}`
+        : "auth: session cookie",
     );
-    setText("debug", `found via ${status.monarch.strategy}`);
-    // Report the live API check outcome.
-    const probe = status.probe;
-    if (!probe) {
-      setText("probe", "API check: running…");
-    } else if (probe.ok) {
-      setText("probe", `API check: OK — ${probe.note}`, true);
-    } else {
-      setText("probe", `API check failed — ${probe.note}`, false);
-    }
     return;
   }
 
-  // No session — say WHY as precisely as we can.
+  // We ran but the API check failed — show the reason.
+  if (status?.monarch && probe) {
+    setText("monarch-status", "Found Monarch, but the API check failed.", false);
+    setText("probe", probe.note);
+    setText("debug", "Open DevTools (F12) on the Monarch tab and copy the [Amazarch] diagnostic.");
+    return;
+  }
+
+  // No connection attempt recorded — say why as precisely as we can.
   if (!hasMonarchAccess) {
     setText(
       "monarch-status",
-      "Firefox has not granted Amazarch access to Monarch's site. Open about:addons → Amazarch → Permissions and enable access to app.monarch.com / app.monarchmoney.com, then reload the Monarch tab.",
+      "Firefox has not granted Amazarch access to Monarch's site. Open about:addons → Amazarch → Permissions and enable app.monarch.com / app.monarchmoney.com, then reload the Monarch tab.",
       false,
     );
     return;
@@ -62,13 +66,13 @@ async function refresh(): Promise<void> {
   if (origins.length === 0) {
     setText(
       "monarch-status",
-      "No Monarch session yet — the Monarch page hasn't been visited since the extension loaded. Open (or reload) app.monarch.com while signed in.",
+      "No Monarch session yet — open (or reload) app.monarch.com while signed in.",
       false,
     );
   } else {
     setText(
       "monarch-status",
-      `Amazarch is running on ${origins.map((o) => new URL(o).host).join(", ")} but couldn't find the session token. Open DevTools (F12) on the Monarch tab and copy the [Amazarch] diagnostic from the console.`,
+      `Amazarch is running on ${origins.map((o) => new URL(o).host).join(", ")} — connecting… reopen this popup in a few seconds, or check the [Amazarch] console diagnostic.`,
       false,
     );
   }
