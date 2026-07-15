@@ -196,3 +196,6 @@ built dist/firefox
 
 51. [v0.4.7] STILL "receiving end does not exist" even WITH keepalive port. Since connect() would wake a merely-sleeping bg, the background is genuinely UNREACHABLE (likely erroring at load so listeners never register, despite being in the bundle) — NOT just asleep.
    v0.4.8: on-load background HEALTH CHECK — content pings get-status right after connect (before any Sync), shows "Background connected ✓" or "⚠ Background NOT reachable: <err>" in the status line. Isolates bg-dead vs sync-specific, no DevTools. ALSO need user to check: (a) toolbar POPUP (does it show session or "background not reachable"?), (b) about:debugging -> Amazarch -> Inspect -> Console for a red load error.
+
+52. [v0.4.8] on-load health check = "Background connected checkmark" => background IS reachable at load. So fetch-amazon fails purely due to TIMING: click happens minutes after load, Firefox let the event page go idle (keepalive PORT alone insufficient), and it wont wake for the message.
+   v0.4.9 FIX: periodic keepalive PING — content script sends get-status every 15s (under Firefox ~30s idle timeout), keeping the background warm the whole time Monarch is open, so on-demand Sync always reaches a live receiver. (Kept the port too.)

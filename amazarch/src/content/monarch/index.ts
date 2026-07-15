@@ -46,6 +46,14 @@ function connectKeepAlive(): void {
 }
 connectKeepAlive();
 
+// A port alone doesn't reliably hold a Firefox event page open, so also poke the
+// background every 15s (under Firefox's ~30s idle timeout). This keeps it warm
+// the whole time Monarch is open, so on-demand Sync — clicked minutes later —
+// always reaches a live receiver.
+setInterval(() => {
+  browser.runtime.sendMessage({ type: "get-status" }).catch(() => {});
+}, 15000);
+
 // Send a message to the background, retrying to cover the case where Firefox has
 // idle-suspended the event page (first send wakes it, a retry then connects).
 async function sendToBackground<T>(msg: unknown): Promise<T> {
