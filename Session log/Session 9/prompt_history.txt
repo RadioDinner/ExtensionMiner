@@ -177,3 +177,6 @@ built dist/firefox
 
 45. get rid of the .2 second updates. Make it a full second
    v0.4.2: status timer ticks every 1000ms and shows whole seconds (Math.floor).
+
+46. [v0.4.1 result] "Done — 500 Amazon charges, 0 orders read." Monarch read FIXED (self-heal worked, name field was the culprit). But Amazon returned 0 ORDERS. Matches all 0.
+   v0.4.3: diagnose the Amazon 0-orders. amazon content script now reports diag {cardCount, decrypted, url, waited}; background surfaces it when 0 orders: "0 orders — saw N cards, decrypted=X, waited Ns (url)". Raised MAX_WAIT 25->40s + tab timeout 30->50s (hypothesis: background-tab throttling delays Siege client-side decryption past our old window). doSync shows the diag note in the status line.

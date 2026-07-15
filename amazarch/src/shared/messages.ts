@@ -61,7 +61,12 @@ export type Message =
     }
   | { type: "content-script-loaded"; origin: string; loadedAt: number }
   | { type: "fetch-amazon" }
-  | { type: "amazon-orders"; orders: AmazonOrderLite[]; signedIn: boolean }
+  | {
+      type: "amazon-orders";
+      orders: AmazonOrderLite[];
+      signedIn: boolean;
+      diag?: { cardCount: number; decrypted: boolean; url: string; waited: number };
+    }
   | { type: "amazon-progress"; label: string }
   | { type: "get-status" };
 

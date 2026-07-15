@@ -13,7 +13,7 @@ import {
 import type { AmazonOrderLite } from "../../shared/messages";
 
 const LOG = "[Amazarch/amazon]";
-const MAX_WAIT = 25; // seconds to wait for decryption/render
+const MAX_WAIT = 40; // seconds to wait for decryption/render (background tabs are throttled)
 
 console.info(`${LOG} active on ${location.href}`);
 
@@ -41,10 +41,23 @@ function scrapeOrders(): AmazonOrderLite[] {
   return orders;
 }
 
-function report(orders: AmazonOrderLite[], signedIn: boolean): void {
+function diag(waited: number): { cardCount: number; decrypted: boolean; url: string; waited: number } {
+  const cards = document.querySelectorAll<HTMLElement>(".js-order-card, .order-card");
+  const first = cards[0];
+  return {
+    cardCount: cards.length,
+    decrypted: first ? looksDecrypted(first.textContent ?? "") : false,
+    url: location.href.slice(0, 120),
+    waited,
+  };
+}
+
+function report(orders: AmazonOrderLite[], signedIn: boolean, waited: number): void {
+  const d = diag(waited);
   void browser.runtime
-    .sendMessage({ type: "amazon-orders", orders, signedIn })
+    .sendMessage({ type: "amazon-orders", orders, signedIn, diag: d })
     .catch((e) => console.warn(`${LOG} could not reach background:`, e));
+  console.info(`${LOG} report: ${orders.length} orders, cards=${d.cardCount}, decrypted=${d.decrypted}`);
   showPill(signedIn ? `Amazarch: read ${orders.length} Amazon orders` : "Amazarch: please sign in to Amazon");
 }
 
@@ -54,14 +67,14 @@ const timer = setInterval(() => {
   tries += 1;
   if (detectLogin()) {
     clearInterval(timer);
-    report([], false);
+    report([], false, tries);
     return;
   }
   const anyCard = document.querySelector(".js-order-card, .order-card");
   const decrypted = anyCard ? looksDecrypted(anyCard.textContent ?? "") : false;
   if (decrypted || tries >= MAX_WAIT) {
     clearInterval(timer);
-    report(scrapeOrders(), true);
+    report(scrapeOrders(), true, tries);
   }
 }, 1000);
 

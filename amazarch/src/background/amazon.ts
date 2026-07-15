@@ -5,7 +5,7 @@
 import browser from "webextension-polyfill";
 import type { AmazonCheck, AmazonOrderLite, AmazonStatus } from "../shared/messages";
 
-const TAB_TIMEOUT_MS = 30000;
+const TAB_TIMEOUT_MS = 50000; // must exceed the content script's decryption wait
 const PAGE_SIZE = 10;
 const MAX_PAGES = 10; // up to ~100 recent orders; full backfill is a later feature (D7)
 
@@ -13,21 +13,34 @@ function pageUrl(startIndex: number): string {
   return `https://www.amazon.com/gp/css/order-history?startIndex=${startIndex}`;
 }
 
+interface Diag {
+  cardCount: number;
+  decrypted: boolean;
+  url: string;
+  waited: number;
+}
+interface Report {
+  orders: AmazonOrderLite[];
+  signedIn: boolean;
+  diag?: Diag;
+}
+
 // Pending tab scrapes, keyed by tabId → resolver called when its content script reports.
-const pending = new Map<number, (r: { orders: AmazonOrderLite[]; signedIn: boolean }) => void>();
+const pending = new Map<number, (r: Report) => void>();
 
 /** Called by the message router when an amazon content script reports orders. */
 export function resolveAmazonReport(
   tabId: number | undefined,
   orders: AmazonOrderLite[],
   signedIn: boolean,
+  diag?: Diag,
 ): void {
   if (tabId === undefined) return;
   const resolve = pending.get(tabId);
-  if (resolve) resolve({ orders, signedIn });
+  if (resolve) resolve({ orders, signedIn, diag });
 }
 
-function waitForReport(tabId: number): Promise<{ orders: AmazonOrderLite[]; signedIn: boolean }> {
+function waitForReport(tabId: number): Promise<Report> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       pending.delete(tabId);
@@ -52,6 +65,7 @@ export async function fetchAmazonViaTab(
   const all = new Map<string, AmazonOrderLite>();
   let signedIn = true;
   let pagesRead = 0;
+  let lastDiag: Diag | undefined;
 
   try {
     onProgress?.("Opening Amazon in a background tab…");
@@ -64,6 +78,7 @@ export async function fetchAmazonViaTab(
       onProgress?.(`Reading Amazon orders — page ${page + 1} (${all.size} so far, waiting for decryption…)`);
       const r = await waitForReport(tabId);
       signedIn = r.signedIn;
+      if (r.diag) lastDiag = r.diag;
       if (!r.signedIn) break;
       pagesRead += 1;
       let added = 0;
@@ -84,14 +99,23 @@ export async function fetchAmazonViaTab(
   }
 
   const orders = [...all.values()];
+  let note: string;
+  if (!signedIn) {
+    note = "not signed in to Amazon — open amazon.com and sign in, then re-sync";
+  } else if (orders.length > 0) {
+    note = `${orders.length} orders read from ${pagesRead} page${pagesRead === 1 ? "" : "s"} of your Amazon history`;
+  } else {
+    // Diagnostic so we can see WHY nothing was read (throttled decryption vs. no cards vs. wrong page).
+    note = lastDiag
+      ? `0 orders — saw ${lastDiag.cardCount} cards, decrypted=${lastDiag.decrypted}, waited ${lastDiag.waited}s (${lastDiag.url})`
+      : "0 orders — the Amazon tab never reported (timed out)";
+  }
   const status: AmazonStatus = {
     ranAt: Date.now(),
     ok: signedIn,
     signedIn,
     orderCardCount: orders.length,
-    note: signedIn
-      ? `${orders.length} orders read from ${pagesRead} page${pagesRead === 1 ? "" : "s"} of your Amazon history`
-      : "not signed in to Amazon — open amazon.com and sign in, then re-sync",
+    note,
   };
   return { status, orders };
 }

@@ -171,10 +171,14 @@ async function tryConnect(): Promise<boolean> {
         console.warn(`${LOG} amazon fetch failed:`, e);
       }
       statusStop();
-      const done =
-        check?.status.signedIn === false
-          ? "Amazon needs sign-in — open amazon.com, sign in, then Sync again."
-          : `Done — ${read.rows.length} Amazon charges, ${check?.orders.length ?? 0} orders read.`;
+      let done: string;
+      if (check?.status.signedIn === false) {
+        done = "Amazon needs sign-in — open amazon.com, sign in, then Sync again.";
+      } else if (check && check.orders.length === 0) {
+        done = `Done — ${read.rows.length} charges, but 0 Amazon orders. ${check.status.note}`;
+      } else {
+        done = `Done — ${read.rows.length} Amazon charges, ${check?.orders.length ?? 0} orders read.`;
+      }
       renderPanel({
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,
         orders: check?.orders, amazonNote: check?.status.note, matches,
