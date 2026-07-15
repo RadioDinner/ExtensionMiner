@@ -12,6 +12,7 @@ import {
 } from "../../shared/monarch-session";
 import { probeMonarchApi, readCookie } from "../../shared/monarch-probe";
 import { readAmazonTransactions } from "../../shared/monarch-read";
+import { matchOrdersToCharges } from "../../shared/matcher";
 import type {
   AmazonCheck,
   AuthMethod,
@@ -100,9 +101,10 @@ async function tryConnect(): Promise<boolean> {
       );
     }
     if (read.ok) {
+      const matches = matchOrdersToCharges(read.rows, check.orders);
       renderPanel({
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,
-        orders: check.orders, amazonNote: check.status.note,
+        orders: check.orders, amazonNote: check.status.note, matches,
         diagnostic: check.diagnostic, sample: check.sample, report: check.report,
       });
     }

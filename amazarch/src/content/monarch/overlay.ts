@@ -5,6 +5,7 @@ import browser from "webextension-polyfill";
 import { formatCents } from "../../shared/money";
 import type { AmazonTxn } from "../../shared/monarch-read";
 import type { AmazonOrderLite } from "../../shared/messages";
+import { summarize, type MatchResult } from "../../shared/matcher";
 
 const PANEL_ID = "amazarch-panel";
 
@@ -14,10 +15,18 @@ export interface PanelView {
   capped: boolean;
   orders?: AmazonOrderLite[];
   amazonNote?: string;
+  matches?: MatchResult[];
   diagnostic?: Record<string, number | string>;
   sample?: string;
   report?: string;
 }
+
+const STATUS_META: Record<string, { icon: string; color: string }> = {
+  auto: { icon: "✓", color: "#a7f3d0" },
+  review: { icon: "?", color: "#fcd34d" },
+  unmatched: { icon: "—", color: "#9ca3af" },
+  refund: { icon: "↩", color: "#93c5fd" },
+};
 
 let lastView: PanelView | null = null;
 let guardStarted = false;
@@ -65,15 +74,34 @@ function draw(view: PanelView): void {
 
   const body = el("div", { overflow: "auto" });
 
-  // Section: Monarch Amazon charges
-  body.append(sectionTitle(`${view.txns.length} Amazon charge${view.txns.length === 1 ? "" : "s"} in Monarch`));
-  if (view.txns.length === 0) {
-    body.append(muted("No Amazon transactions found."));
-  } else {
-    for (const t of view.txns.slice(0, 50)) {
-      body.append(row(t.merchantName, t.date, formatCents(t.amountCents)));
+  // Section: proposed matches (the headline). Falls back to raw charge list
+  // until Amazon orders have been read.
+  if (view.matches) {
+    const s = summarize(view.matches);
+    body.append(sectionTitle("Proposed matches"));
+    body.append(
+      muted(`${s.auto} matched · ${s.review} review · ${s.unmatched} no order · ${s.refund} refunds`),
+    );
+    // Show matched/review first, then the rest.
+    const ordered = [...view.matches].sort((a, b) => rank(a.status) - rank(b.status));
+    for (const m of ordered.slice(0, 60)) {
+      const meta = STATUS_META[m.status] ?? STATUS_META.unmatched!;
+      const sub = m.order
+        ? `${meta.icon} ${m.order.date} · ${m.order.itemTitles[0] ?? (m.order.orderId || "order")}${m.dayDiff !== null ? `  (+${m.dayDiff}d)` : ""}`
+        : `${meta.icon} ${m.status === "refund" ? "refund — matched later" : "no matching order"}`;
+      body.append(row(m.charge.merchantName, sub, formatCents(m.charge.amountCents), meta.color));
     }
-    if (view.txns.length > 50) body.append(muted(`…and ${view.txns.length - 50} more`));
+    if (view.matches.length > 60) body.append(muted(`…and ${view.matches.length - 60} more`));
+  } else {
+    body.append(sectionTitle(`${view.txns.length} Amazon charge${view.txns.length === 1 ? "" : "s"} in Monarch`));
+    if (view.txns.length === 0) {
+      body.append(muted("No Amazon transactions found."));
+    } else {
+      for (const t of view.txns.slice(0, 50)) {
+        body.append(row(t.merchantName, t.date, formatCents(t.amountCents)));
+      }
+      if (view.txns.length > 50) body.append(muted(`…and ${view.txns.length - 50} more`));
+    }
   }
 
   // Section: parsed Amazon orders (once fetched)
@@ -133,9 +161,9 @@ function draw(view: PanelView): void {
   panel.append(body);
 
   // Footer
+  const orderCount = view.orders ? `${view.orders.length} Amazon orders read. ` : "";
   const total = view.totalCount !== null ? `${view.totalCount.toLocaleString()} Amazon txns in Monarch. ` : "";
-  const cap = view.capped ? "Charges list capped. " : "";
-  panel.append(text("div", `${total}${cap}Next: match orders to charges (amount + date window).`, {
+  panel.append(text("div", `${orderCount}${total}Preview only — nothing written to Monarch yet.`, {
     padding: "8px 12px", background: "#1f2937", color: "#9ca3af", "font-size": "11px",
   }));
 
@@ -161,15 +189,19 @@ function sectionTitle(t: string): HTMLElement {
 function muted(t: string): HTMLElement {
   return text("div", t, { padding: "4px 12px", color: "#9ca3af" });
 }
-function row(left: string, sub: string, right: string): HTMLElement {
+function row(left: string, sub: string, right: string, subColor = "#9ca3af"): HTMLElement {
   const item = el("div", {
     display: "flex", "justify-content": "space-between", gap: "8px",
     padding: "6px 12px", "border-top": "1px solid #1f2937",
   });
   const l = el("div", { "min-width": "0" });
   l.append(text("div", left, { "white-space": "nowrap", overflow: "hidden", "text-overflow": "ellipsis" }));
-  l.append(text("div", sub, { color: "#9ca3af", "font-size": "11px" }));
+  l.append(text("div", sub, { color: subColor, "font-size": "11px", "white-space": "nowrap", overflow: "hidden", "text-overflow": "ellipsis" }));
   item.append(l);
-  item.append(text("div", right, { "white-space": "nowrap", color: "#a7f3d0" }));
+  item.append(text("div", right, { "white-space": "nowrap", color: "#e5e7eb" }));
   return item;
+}
+
+function rank(status: string): number {
+  return { auto: 0, review: 1, unmatched: 2, refund: 3 }[status] ?? 4;
 }
