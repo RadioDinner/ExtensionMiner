@@ -1,11 +1,14 @@
 // Amazarch background (Chrome: MV3 service worker; Firefox: event page).
 // M0 scope: receive the Monarch session from the content script, hold it in
-// session storage (never persisted to disk), and answer popup status queries.
+// session storage (never on disk), run a live API connectivity probe, and
+// answer popup status queries.
 import browser from "webextension-polyfill";
-import type { Message, MonarchSessionInfo, StatusResponse } from "../shared/messages";
+import type { Message, MonarchSessionInfo, ProbeResult, StatusResponse } from "../shared/messages";
 import { tokenPreview } from "../shared/messages";
+import { probeMonarch } from "./monarch-api";
 
 const SESSION_KEY = "monarchSession";
+const PROBE_KEY = "monarchProbe";
 const CS_ORIGINS_KEY = "contentScriptOrigins";
 
 // storage.session is memory-backed and cleared when the browser closes —
@@ -17,6 +20,15 @@ async function saveSession(session: MonarchSessionInfo): Promise<void> {
 async function loadSession(): Promise<MonarchSessionInfo | null> {
   const found = await browser.storage.session.get(SESSION_KEY);
   return (found[SESSION_KEY] as MonarchSessionInfo | undefined) ?? null;
+}
+
+async function saveProbe(probe: ProbeResult): Promise<void> {
+  await browser.storage.session.set({ [PROBE_KEY]: probe });
+}
+
+async function loadProbe(): Promise<ProbeResult | null> {
+  const found = await browser.storage.session.get(PROBE_KEY);
+  return (found[PROBE_KEY] as ProbeResult | undefined) ?? null;
 }
 
 async function recordContentScript(origin: string): Promise<void> {
@@ -33,11 +45,13 @@ async function loadContentScriptOrigins(): Promise<string[]> {
 
 browser.runtime.onMessage.addListener(async (raw: unknown): Promise<StatusResponse | undefined> => {
   const message = raw as Message;
+
   if (message.type === "content-script-loaded") {
     console.info("[Amazarch] content script reported in from", message.origin);
     await recordContentScript(message.origin);
     return undefined;
   }
+
   if (message.type === "monarch-session-detected") {
     console.info(
       "[Amazarch] Monarch session received from",
@@ -46,8 +60,17 @@ browser.runtime.onMessage.addListener(async (raw: unknown): Promise<StatusRespon
       message.session.strategy,
     );
     await saveSession(message.session);
+    // Verify the token actually authenticates against the live API.
+    const probe = await probeMonarch({
+      token: message.session.token,
+      deviceUuid: message.session.deviceUuid,
+      origin: message.session.origin,
+    });
+    await saveProbe(probe);
+    console.info(`[Amazarch] API probe: ok=${probe.ok} status=${probe.status} — ${probe.note}`);
     return undefined;
   }
+
   if (message.type === "get-status") {
     const session = await loadSession();
     return {
@@ -60,8 +83,10 @@ browser.runtime.onMessage.addListener(async (raw: unknown): Promise<StatusRespon
             tokenPreview: tokenPreview(session.token),
           }
         : null,
+      probe: await loadProbe(),
       contentScriptOrigins: await loadContentScriptOrigins(),
     };
   }
+
   return undefined;
 });

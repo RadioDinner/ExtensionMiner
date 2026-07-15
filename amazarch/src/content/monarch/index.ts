@@ -71,7 +71,7 @@ function logDiagnostics(): void {
     .split(";")
     .map((c) => c.split("=")[0]?.trim())
     .filter(Boolean);
-  // Key NAMES and object shapes only — no values, no tokens.
+  // Key NAMES, object shapes, and per-field class/length only — no values.
   console.warn(
     `${LOG} no Monarch token found after ${MAX_ATTEMPTS}s. ` +
       `Paste this diagnostic object into the bug report:`,
@@ -80,6 +80,7 @@ function logDiagnostics(): void {
         origin: location.origin,
         localStorageKeys: local.keys,
         localStoragePersistShapes: local.persistShapes,
+        authFieldFingerprint: local.fingerprint,
         sessionStorageKeys: session.keys,
         cookieNames,
       },

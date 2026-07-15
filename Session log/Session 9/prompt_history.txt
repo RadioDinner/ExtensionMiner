@@ -116,3 +116,7 @@ up to date, audited 50 packages in 2s
 > node build.mjs firefox
 
 built dist/firefox
+
+22. [console diagnostic pasted] content script active on https://app.monarch.com; no Monarch token found after 30s. localStorage has persist:root (slices: _persist, client, dashboard, employee, flags, persistentUi, user) + persist:auth (slices: _persist, oAuthStateString) + monarchDeviceUUID; cookies: monarchDeviceUUID, csrftoken, ajs_user_id, ajs_anonymous_id, _dd_s. => token NOT in persist:root.user.token anymore (OAuth flow post Jan-2026 migration).
+
+23. [mid-turn] Permissions are ON for app.monarchmoney.com, app.monarch.com, api.monarchmoney.com, api.monarch.com, www.amazon.com

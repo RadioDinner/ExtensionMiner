@@ -37,6 +37,15 @@ async function refresh(): Promise<void> {
       true,
     );
     setText("debug", `found via ${status.monarch.strategy}`);
+    // Report the live API check outcome.
+    const probe = status.probe;
+    if (!probe) {
+      setText("probe", "API check: running…");
+    } else if (probe.ok) {
+      setText("probe", `API check: OK — ${probe.note}`, true);
+    } else {
+      setText("probe", `API check failed — ${probe.note}`, false);
+    }
     return;
   }
 

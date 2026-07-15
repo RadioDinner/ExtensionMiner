@@ -8,6 +8,13 @@ export interface MonarchSessionInfo {
   strategy: string; // which token-hunt strategy found it (diagnostics)
 }
 
+export interface ProbeResult {
+  ranAt: number;
+  status: number; // HTTP status, or 0 if the request never completed
+  ok: boolean; // true only when the API returned an authenticated `me`
+  note: string; // short human-readable outcome (no financial data)
+}
+
 export type Message =
   | { type: "monarch-session-detected"; session: MonarchSessionInfo }
   | { type: "content-script-loaded"; origin: string; loadedAt: number }
@@ -15,6 +22,7 @@ export type Message =
 
 export interface StatusResponse {
   monarch: (Omit<MonarchSessionInfo, "token"> & { tokenPreview: string }) | null;
+  probe: ProbeResult | null;
   /** Origins where the Monarch content script has reported in this browser session. */
   contentScriptOrigins: string[];
 }
