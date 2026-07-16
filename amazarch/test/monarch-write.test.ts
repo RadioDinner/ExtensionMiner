@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildMerchantName, buildNoteLine, mergeNotes, shortItemSummary } from "../src/shared/monarch-write";
+import {
+  buildMerchantName,
+  buildNoteLine,
+  mergeNotes,
+  mutationDoc,
+  readBackFromMutation,
+  shortItemSummary,
+} from "../src/shared/monarch-write";
 import type { AmazonOrderLite } from "../src/shared/messages";
 
 const order: AmazonOrderLite = {
@@ -59,5 +66,54 @@ describe("shortItemSummary / buildMerchantName", () => {
     const long = shortItemSummary(["Super Ultra Deluxe Premium Professional Grade Stainless Steel Water Bottle Insulated"]);
     expect(long.length).toBeLessThanOrEqual(42);
     expect(long.endsWith(" ")).toBe(false);
+  });
+});
+
+describe("mutationDoc", () => {
+  it("never selects bare `name` — it is unreadable and breaks the write server-side", () => {
+    // The v0.4.10 lesson: selecting Transaction.name makes Monarch throw AFTER
+    // applying the write. merchant { name } is the readable route. Scan the
+    // WHOLE doc after removing the allowed merchant block, so `name` cannot be
+    // reintroduced anywhere (before, after, or nested).
+    for (const rich of [true, false]) {
+      const withoutMerchantBlock = mutationDoc(rich).replace(/merchant \{ name \}/g, "");
+      expect(withoutMerchantBlock).not.toMatch(/\bname\b/);
+    }
+  });
+
+  it("rich selection reads back notes and merchant name; minimal reads only id", () => {
+    expect(mutationDoc(true)).toContain("notes merchant { name }");
+    expect(mutationDoc(false)).toContain("transaction { id }");
+    expect(mutationDoc(false)).not.toContain("merchant");
+  });
+});
+
+describe("readBackFromMutation", () => {
+  it("extracts post-write notes and merchant name", () => {
+    const data = {
+      updateTransaction: {
+        transaction: { id: "t1", notes: "hello", merchant: { name: "Amazon — USB-C Cable" } },
+        errors: [],
+      },
+    };
+    expect(readBackFromMutation(data)).toEqual({
+      hasTransaction: true,
+      notes: "hello",
+      merchantName: "Amazon — USB-C Cable",
+    });
+  });
+
+  it("reports a present transaction whose selected values are null (cleared notes)", () => {
+    // GraphQL always includes selected fields, possibly null — a null here is a
+    // real post-write value, which the caller compares as "".
+    const data = { updateTransaction: { transaction: { id: "t1", notes: null, merchant: null } } };
+    expect(readBackFromMutation(data)).toEqual({ hasTransaction: true, notes: null, merchantName: null });
+  });
+
+  it("reports hasTransaction=false for odd payloads", () => {
+    expect(readBackFromMutation(null)).toEqual({ hasTransaction: false, notes: null, merchantName: null });
+    expect(readBackFromMutation({})).toEqual({ hasTransaction: false, notes: null, merchantName: null });
+    expect(readBackFromMutation({ updateTransaction: { transaction: null } }))
+      .toEqual({ hasTransaction: false, notes: null, merchantName: null });
   });
 });

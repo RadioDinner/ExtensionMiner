@@ -9,10 +9,16 @@ import { summarize, type MatchResult } from "../../shared/matcher";
 
 const PANEL_ID = "amazarch-panel";
 
-export interface ApplyResult {
+export interface ApplyOutcome {
   ok: boolean;
   note: string;
-  undo?: () => Promise<{ ok: boolean; note: string }>;
+  /** From write verification: true = Monarch's response confirms the change;
+   *  false = Monarch reported the field unchanged; null/undefined = unknown. */
+  verified?: boolean | null;
+}
+
+export interface ApplyResult extends ApplyOutcome {
+  undo?: () => Promise<ApplyOutcome>;
 }
 
 export interface PanelView {
@@ -114,7 +120,10 @@ function draw(view: PanelView): void {
     "font-size": "14px", padding: "2px 4px",
   });
   close.textContent = "✕";
-  close.addEventListener("click", () => panel.remove());
+  close.addEventListener("click", () => {
+    lastView = null; // otherwise the 8s guard resurrects the panel the user just closed
+    panel.remove();
+  });
   right.append(close);
   header.append(right);
   panel.append(header);
@@ -170,10 +179,10 @@ function draw(view: PanelView): void {
         const actions = el("div", { display: "flex", gap: "6px", padding: "0 12px 8px", "flex-wrap": "wrap" });
         const order = m.order;
         if (view.onApply) {
-          actions.append(actionButton("Add note", (r) => r, () => view.onApply!(m.charge.id, m.charge.notes, order)));
+          actions.append(actionButton("Add note", `${m.charge.id}:note`, () => view.onApply!(m.charge.id, m.charge.notes, order)));
         }
         if (view.onRename) {
-          actions.append(actionButton("Rename merchant", (r) => r, () => view.onRename!(m.charge.id, m.charge.name, order)));
+          actions.append(actionButton("Rename merchant", `${m.charge.id}:rename`, () => view.onRename!(m.charge.id, m.charge.name, order)));
         }
         body.append(actions);
       }
@@ -250,7 +259,7 @@ function draw(view: PanelView): void {
   // Footer
   const orderCount = view.orders ? `${view.orders.length} Amazon orders read. ` : "";
   const total = view.totalCount !== null ? `${view.totalCount.toLocaleString()} Amazon txns in Monarch. ` : "";
-  panel.append(text("div", `${orderCount}${total}Preview only — nothing written to Monarch yet.`, {
+  panel.append(text("div", `${orderCount}${total}Writes happen only when you click a button — refresh Monarch to see applied changes.`, {
     padding: "8px 12px", background: "#1f2937", color: "#9ca3af", "font-size": "11px",
   }));
 
@@ -293,39 +302,92 @@ function rank(status: string): number {
   return { auto: 0, review: 1, unmatched: 2, refund: 3 }[status] ?? 4;
 }
 
+// Armed-but-unused undos, keyed by charge id + action. Button state otherwise
+// lives in the element's closure, and draw() rebuilds the panel from scratch
+// (Sync re-render, the 8s guard) — without this registry a redraw would
+// silently discard a pending undo.
+const armedUndos = new Map<string, { undo: () => Promise<ApplyOutcome>; label: string }>();
+
 // A click-to-apply button that runs an action, then flips to an Undo affordance.
-function actionButton(
-  label: string,
-  _identity: (r: ApplyResult) => ApplyResult,
-  run: () => Promise<ApplyResult>,
-): HTMLElement {
+// ONE listener + an explicit state machine. (Through v0.4.10 the undo was wired
+// by assigning btn.onclick while the original addEventListener handler stayed
+// attached, so clicking Undo ALSO re-ran the action: two racing writes, and
+// whichever response landed last set the label — Undo looked like a no-op, and
+// clicks after "Undone" silently re-applied the action.)
+//
+// Verification semantics: verified === false is Monarch AFFIRMING the change
+// did not take effect — a refuted apply returns to idle (retry; there is
+// nothing to undo), a refuted undo stays armed (retry is idempotent-safe).
+// verified === null (unknown) is labeled "(unconfirmed)", never a plain ✓ path
+// identical to a confirmed one.
+export function actionButton(label: string, key: string, run: () => Promise<ApplyResult>): HTMLElement {
   const btn = el("button", {
     padding: "5px 10px", cursor: "pointer", border: "1px solid #374151",
     "border-radius": "6px", background: "#1f2937", color: "#e5e7eb",
     font: "11px system-ui,sans-serif",
   }) as HTMLButtonElement;
-  btn.textContent = label;
+  // idle → (apply) → armed → (undo) → spent; failures return to the previous
+  // state so the click can be retried. "busy" guards re-entry mid-flight.
+  let state: "idle" | "busy" | "armed" | "spent" = "idle";
+  let undo: (() => Promise<ApplyOutcome>) | null = null;
+  const restored = armedUndos.get(key);
+  if (restored) {
+    state = "armed";
+    undo = restored.undo;
+    btn.textContent = restored.label;
+  } else {
+    btn.textContent = label;
+  }
+  const arm = (u: () => Promise<ApplyOutcome>, text: string): void => {
+    state = "armed";
+    undo = u;
+    btn.textContent = text;
+    armedUndos.set(key, { undo: u, label: text });
+  };
+  const disarm = (to: "idle" | "spent", text: string): void => {
+    state = to;
+    undo = null;
+    btn.textContent = text;
+    armedUndos.delete(key);
+  };
   btn.addEventListener("click", async () => {
+    if (state === "busy" || state === "spent") return;
+    const from = state;
+    state = "busy";
     btn.disabled = true;
-    btn.textContent = "Working…";
-    const r = await run();
-    btn.disabled = false;
-    if (!r.ok) {
-      btn.textContent = `Failed: ${r.note}`;
-      return;
-    }
-    if (r.undo) {
-      btn.textContent = `✓ ${label} — undo`;
-      btn.onclick = async () => {
-        btn.disabled = true;
-        btn.textContent = "Undoing…";
-        const u = await r.undo!();
-        btn.disabled = false;
-        btn.textContent = u.ok ? "Undone" : `Undo failed: ${u.note}`;
-        if (u.ok) btn.onclick = null;
-      };
-    } else {
-      btn.textContent = `✓ ${r.note}`;
+    btn.textContent = from === "idle" ? "Working…" : "Undoing…";
+    try {
+      if (from === "idle") {
+        const r = await run();
+        if (!r.ok) {
+          disarm("idle", `Failed: ${r.note} — retry`);
+        } else if (r.verified === false) {
+          disarm("idle", `⚠ ${r.note} — retry`); // refuted: nothing applied, nothing to undo
+        } else if (r.undo) {
+          arm(r.undo, `✓ ${r.note} — undo`);
+        } else {
+          disarm("spent", `✓ ${r.note}`);
+        }
+      } else {
+        const u = await undo!();
+        if (!u.ok) {
+          arm(undo!, `Undo failed: ${u.note} — retry`); // re-arm so the warning survives a redraw
+        } else if (u.verified === false) {
+          arm(undo!, "⚠ Undo not applied — retry"); // refuted: the field still holds the applied value
+        } else {
+          disarm("spent", u.verified === null ? "Undone (unconfirmed)" : "Undone ✓");
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (from === "armed" && undo) {
+        arm(undo, `Undo failed: ${msg} — retry`);
+      } else {
+        state = from;
+        btn.textContent = `Failed: ${msg} — retry`;
+      }
+    } finally {
+      btn.disabled = false;
     }
   });
   return btn;

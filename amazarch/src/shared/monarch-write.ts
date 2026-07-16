@@ -56,43 +56,115 @@ export function buildMerchantName(order: AmazonOrderLite, base = "Amazon"): stri
 
 // --- Writes ------------------------------------------------------------------
 
-// The return selection must NOT include `name` — it isn't a readable field on
-// Monarch's Transaction type, so selecting it makes the server throw AFTER the
-// write ("Something went wrong while processing"). `name` is still valid as an
-// INPUT field for the rename; we just don't read it back.
-const MUTATION = `mutation Web_TransactionDrawerUpdateTransaction($input: UpdateTransactionMutationInput!) {
+// Two return selections. The RICH one reads back `notes` and `merchant { name }`
+// so the mutation response itself proves whether the write took effect —
+// merchant.name is readable on Transaction (the read query selects it). Bare
+// `name` must NEVER appear in the selection: it isn't readable and makes the
+// server throw AFTER applying the write (`name` stays valid as an INPUT field).
+// If Monarch ever rejects the rich selection, we self-heal: retry the write
+// (idempotent — it sets absolute values) with the MINIMAL selection and report
+// verified=null instead of failing the whole write over a read-back field.
+export function mutationDoc(rich: boolean): string {
+  const fields = rich ? "id notes merchant { name }" : "id";
+  return `mutation Web_TransactionDrawerUpdateTransaction($input: UpdateTransactionMutationInput!) {
   updateTransaction(input: $input) {
-    transaction { id notes }
+    transaction { ${fields} }
     errors { message }
   }
 }`;
+}
 
 export interface WriteResult {
   ok: boolean;
   note: string;
+  /** true = response proves the write took effect; false = response shows the
+   *  field UNCHANGED after an accepted write; null = accepted, not confirmable. */
+  verified: boolean | null;
+  /** The post-write value Monarch reported for the checked field, if any. */
+  readBack: string | null;
+}
+
+/** Pure: pull the post-write notes + merchant name out of a mutation response.
+ *  hasTransaction distinguishes "no transaction object at all" from a selected
+ *  field whose post-write VALUE is null (e.g. cleared notes) — GraphQL always
+ *  includes selected fields in the response map, possibly with value null. */
+export function readBackFromMutation(data: unknown): {
+  hasTransaction: boolean;
+  notes: string | null;
+  merchantName: string | null;
+} {
+  const txn = pick(pick(data, "updateTransaction"), "transaction");
+  return {
+    hasTransaction: typeof txn === "object" && txn !== null,
+    notes: strOrNull(pick(txn, "notes")),
+    merchantName: strOrNull(pick(pick(txn, "merchant"), "name")),
+  };
 }
 
 async function updateTransaction(
   auth: MonarchAuth,
   input: Record<string, unknown>,
+  field: "notes" | "merchantName",
+  expected: string,
 ): Promise<WriteResult> {
-  const res = await gqlRequest(auth, {
+  const doc = (rich: boolean) => ({
     operationName: "Web_TransactionDrawerUpdateTransaction",
-    query: MUTATION,
+    query: mutationDoc(rich),
     variables: { input },
   });
-  if (!res.ok) return { ok: false, note: res.note };
+  let res = await gqlRequest(auth, doc(true));
+  let verifiable = true;
+  if (!res.ok && res.errors.length > 0) {
+    // Only a GraphQL-level rejection warrants the minimal-selection fallback.
+    // Transport failures (network error, 429, 5xx) return as plain failures so
+    // the button offers a retry — no immediate second POST, no false
+    // "selection rejected" diagnosis.
+    res = await gqlRequest(auth, doc(false));
+    verifiable = false;
+  }
+  if (!res.ok) return { ok: false, note: res.note, verified: null, readBack: null };
   const payloadError = firstPayloadError(res.data);
-  if (payloadError) return { ok: false, note: `Monarch rejected the update: ${payloadError}` };
-  return { ok: true, note: "updated" };
+  if (payloadError) {
+    return { ok: false, note: `Monarch rejected the update: ${payloadError}`, verified: null, readBack: null };
+  }
+  if (!verifiable) {
+    return { ok: true, note: "updated (read-back selection rejected — unconfirmed)", verified: null, readBack: null };
+  }
+  const rb = readBackFromMutation(res.data);
+  if (!rb.hasTransaction) {
+    return { ok: true, note: "updated (no transaction in response)", verified: null, readBack: null };
+  }
+  // The rich selection succeeded, so a null field is a REAL post-write value
+  // (e.g. notes cleared to empty) — compare it as "" rather than "unknown".
+  // Whitespace-insensitive: don't cry wolf if Monarch trims/collapses spaces.
+  const readBack = rb[field];
+  const verified = norm(readBack ?? "") === norm(expected);
+  return {
+    ok: true,
+    verified,
+    readBack,
+    note: verified ? "updated — confirmed by Monarch" : "updated, but Monarch reports a different value",
+  };
+}
+
+function norm(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
 }
 
 export function setTransactionNotes(auth: MonarchAuth, id: string, notes: string): Promise<WriteResult> {
-  return updateTransaction(auth, { id, notes });
+  return updateTransaction(auth, { id, notes }, "notes", notes);
 }
 
 export function setTransactionName(auth: MonarchAuth, id: string, name: string): Promise<WriteResult> {
-  return updateTransaction(auth, { id, name });
+  return updateTransaction(auth, { id, name }, "merchantName", name);
+}
+
+function pick(obj: unknown, key: string): unknown {
+  if (typeof obj !== "object" || obj === null) return null;
+  return (obj as Record<string, unknown>)[key] ?? null;
+}
+function strOrNull(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
 }
 
 function firstPayloadError(data: unknown): string | null {

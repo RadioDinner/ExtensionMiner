@@ -19,6 +19,7 @@ import {
   mergeNotes,
   setTransactionName,
   setTransactionNotes,
+  type WriteResult,
 } from "../../shared/monarch-write";
 import type { ApplyResult } from "./overlay";
 import type {
@@ -159,19 +160,53 @@ async function tryConnect(): Promise<boolean> {
   console.info(`${LOG} connected to Monarch API via ${authMethod}`);
 
   // Click-to-apply actions (append note / rename merchant) — additive, undoable.
+  // Each write is verified from the mutation response (see monarch-write.ts) and
+  // the result is reported honestly in the status line: Monarch's own UI does
+  // NOT refetch after our write, so a successful change is invisible until the
+  // page is refreshed — say so instead of letting it read as "did nothing".
+  const reportWrite = (what: string, res: WriteResult): void => {
+    if (res.verified === true) {
+      setPanelStatus(`${what} confirmed by Monarch ✓ — refresh the page to see it.`);
+    } else if (res.verified === false) {
+      const reads = res.readBack === null ? "a different value" : `“${res.readBack.slice(0, 40)}”`;
+      setPanelStatus(`⚠ ${what}: Monarch accepted the write but reports ${reads} — refresh and check.`);
+    } else {
+      setPanelStatus(`${what} accepted (couldn't confirm from the response) — refresh the page to check.`);
+    }
+  };
   const onApply = async (chargeId: string, chargeNotes: string, order: AmazonOrderLite): Promise<ApplyResult> => {
     const merged = mergeNotes(chargeNotes, order, buildNoteLine(order));
     if (!merged.changed) return { ok: true, note: "already noted" };
     const res = await setTransactionNotes(auth, chargeId, merged.notes);
     if (!res.ok) return { ok: false, note: res.note };
-    return { ok: true, note: "note added", undo: () => setTransactionNotes(auth, chargeId, chargeNotes) };
+    reportWrite("Note write", res);
+    return {
+      ok: true,
+      note: res.verified === false ? "note not applied" : res.verified === null ? "note added (unconfirmed)" : "note added",
+      verified: res.verified,
+      undo: async () => {
+        const u = await setTransactionNotes(auth, chargeId, chargeNotes);
+        if (u.ok) reportWrite("Note undo", u);
+        return u;
+      },
+    };
   };
   const onRename = async (chargeId: string, currentName: string, order: AmazonOrderLite): Promise<ApplyResult> => {
     const target = buildMerchantName(order);
     if (currentName === target) return { ok: true, note: "already named" };
     const res = await setTransactionName(auth, chargeId, target);
     if (!res.ok) return { ok: false, note: res.note };
-    return { ok: true, note: "renamed", undo: () => setTransactionName(auth, chargeId, currentName) };
+    reportWrite("Rename", res);
+    return {
+      ok: true,
+      note: res.verified === false ? "rename not applied" : res.verified === null ? "renamed (unconfirmed)" : "renamed",
+      verified: res.verified,
+      undo: async () => {
+        const u = await setTransactionName(auth, chargeId, currentName);
+        if (u.ok) reportWrite("Rename undo", u);
+        return u;
+      },
+    };
   };
 
   // Heavy work (read charges + open the Amazon tab + match) runs ONLY on demand,
