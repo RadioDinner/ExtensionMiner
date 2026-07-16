@@ -21,7 +21,10 @@ import {
   setTransactionNotes,
   type WriteResult,
 } from "../../shared/monarch-write";
+import { loadSettings } from "../../shared/settings";
+import { planAutoApply, runAutoApply, summarizeAutoApply } from "../../shared/auto-apply";
 import type { ApplyResult } from "./overlay";
+import { armUndo } from "./overlay";
 import type {
   AmazonCheck,
   AmazonOrderLite,
@@ -254,12 +257,41 @@ async function tryConnect(): Promise<boolean> {
       } else {
         done = `Done — ${read.rows.length} Amazon charges, ${check.orders.length} orders read.`;
       }
-      renderPanel({
+      const view = {
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,
         orders: check?.orders, amazonNote: check?.status.note, matches,
         synced: true, status: done, onSync: doSync, onApply, onRename,
         diagnostic: check?.diagnostic, sample: check?.sample, report: check?.report,
-      });
+      };
+      renderPanel(view);
+
+      // Auto match (popup settings): apply the enabled actions to EXACT ("auto")
+      // matches, politely paced, through the SAME onApply/onRename paths as the
+      // buttons — then re-render so every auto-applied action shows its armed
+      // Undo. "review" matches always stay manual.
+      const settings = await loadSettings();
+      const plan = planAutoApply(matches, settings);
+      if (plan.length > 0) {
+        console.info(`${LOG} auto-match: ${plan.length} actions queued`);
+        const summary = await runAutoApply(
+          plan,
+          async (a) => {
+            const m = a.match;
+            const r =
+              a.kind === "note"
+                ? await onApply(m.charge.id, m.charge.notes, m.order!)
+                : await onRename(m.charge.id, m.charge.name, m.order!);
+            armUndo(`${m.charge.id}:${a.kind}`, r);
+            return r;
+          },
+          {
+            onProgress: (n, total, a) => statusSet(`Auto-match: ${a.kind} ${n}/${total}…`),
+            pause: () => new Promise((r) => setTimeout(r, 300)),
+          },
+        );
+        console.info(`${LOG} auto-match done: ${JSON.stringify(summary)}`);
+        renderPanel({ ...view, status: summarizeAutoApply(summary) });
+      }
     } catch (e) {
       statusStop();
       console.error(`${LOG} sync error:`, e);

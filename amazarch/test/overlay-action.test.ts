@@ -13,7 +13,7 @@ vi.mock("webextension-polyfill", () => ({
   default: { runtime: { getManifest: () => ({ version: "0.0.0-test" }) } },
 }));
 
-import { actionButton, type ApplyOutcome, type ApplyResult } from "../src/content/monarch/overlay";
+import { actionButton, armUndo, type ApplyOutcome, type ApplyResult } from "../src/content/monarch/overlay";
 
 let keyCounter = 0;
 function freshKey(): string {
@@ -234,5 +234,42 @@ describe("armed-undo registry (survives panel redraws)", () => {
       verified: true,
     })) as HTMLButtonElement;
     expect(rebuilt.textContent).toBe("Rename merchant"); // fresh idle button
+  });
+});
+
+describe("armUndo (external arming for auto-apply)", () => {
+  it("arms a button created afterwards, and its click runs the auto-apply undo", async () => {
+    const key = freshKey();
+    let undos = 0;
+    armUndo(key, {
+      ok: true,
+      note: "note added",
+      verified: true,
+      undo: async () => {
+        undos += 1;
+        return { ok: true, note: "restored", verified: true };
+      },
+    });
+    const btn = actionButton("Add note", key, async () => {
+      throw new Error("must not re-run the action");
+    }) as HTMLButtonElement;
+    expect(btn.textContent).toBe("✓ note added — undo");
+    await click(btn);
+    expect(undos).toBe(1);
+    expect(btn.textContent).toBe("Undone ✓");
+  });
+
+  it("does NOT arm for refuted, failed, or no-op results", () => {
+    const cases: ApplyResult[] = [
+      { ok: false, note: "HTTP 500" },
+      { ok: true, note: "rename not applied", verified: false, undo: async () => ({ ok: true, note: "x" }) },
+      { ok: true, note: "already noted" }, // no undo — nothing changed
+    ];
+    for (const r of cases) {
+      const key = freshKey();
+      armUndo(key, r);
+      const btn = actionButton("Add note", key, async () => ({ ok: true, note: "note added", verified: true }));
+      expect(btn.textContent).toBe("Add note"); // stayed idle
+    }
   });
 });

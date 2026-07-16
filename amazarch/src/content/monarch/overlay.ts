@@ -308,6 +308,14 @@ function rank(status: string): number {
 // silently discard a pending undo.
 const armedUndos = new Map<string, { undo: () => Promise<ApplyOutcome>; label: string }>();
 
+/** Pre-arm a button's undo from outside (auto-apply). Same rules as a manual
+ *  click: only an ok, non-refuted result that changed something arms — the
+ *  next renderPanel() picks it up via the registry. */
+export function armUndo(key: string, r: ApplyResult): void {
+  if (!r.ok || r.verified === false || !r.undo) return;
+  armedUndos.set(key, { undo: r.undo, label: `✓ ${r.note} — undo` });
+}
+
 // A click-to-apply button that runs an action, then flips to an Undo affordance.
 // ONE listener + an explicit state machine. (Through v0.4.10 the undo was wired
 // by assigning btn.onclick while the original addEventListener handler stayed

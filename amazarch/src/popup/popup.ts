@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import type { Message, StatusResponse } from "../shared/messages";
+import { loadSettings, saveSettings, type AmazarchSettings } from "../shared/settings";
 
 const MONARCH_ORIGINS = ["https://app.monarchmoney.com/*", "https://app.monarch.com/*"];
 
@@ -102,4 +103,56 @@ async function refresh(): Promise<void> {
   }
 }
 
+// --- Settings (Auto match + sub-toggles) --------------------------------------
+
+function checkbox(id: string): HTMLInputElement {
+  return document.getElementById(id) as HTMLInputElement;
+}
+
+async function initSettings(): Promise<void> {
+  const master = checkbox("auto-match");
+  const note = checkbox("auto-note");
+  const rename = checkbox("auto-rename");
+  const subs = document.getElementById("auto-subs");
+  const hint = document.getElementById("settings-hint");
+  if (!master || !note || !rename) return;
+
+  const s = await loadSettings();
+  master.checked = s.autoMatch;
+  note.checked = s.autoNote;
+  rename.checked = s.autoRename;
+
+  const reflect = (cur: AmazarchSettings): void => {
+    note.disabled = !cur.autoMatch;
+    rename.disabled = !cur.autoMatch;
+    subs?.classList.toggle("off", !cur.autoMatch);
+    if (hint) {
+      hint.textContent = !cur.autoMatch
+        ? ""
+        : !cur.autoNote && !cur.autoRename
+          ? "Auto match is on but no action is selected — nothing will be applied."
+          : "Applies on the next Sync. Every auto-applied action gets an Undo button in the panel.";
+    }
+  };
+  reflect(s);
+
+  const onChange = async (): Promise<void> => {
+    const cur: AmazarchSettings = {
+      autoMatch: master.checked,
+      autoNote: note.checked,
+      autoRename: rename.checked,
+    };
+    reflect(cur);
+    try {
+      await saveSettings(cur);
+    } catch {
+      if (hint) hint.textContent = "Could not save settings — try reopening the popup.";
+    }
+  };
+  master.addEventListener("change", onChange);
+  note.addEventListener("change", onChange);
+  rename.addEventListener("change", onChange);
+}
+
 void refresh();
+void initSettings();

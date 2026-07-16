@@ -11,10 +11,18 @@
         color: #111827;
       }
       h1 { font-size: 14px; margin: 0 0 8px; }
+      h2 { font-size: 12px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; }
       .status { padding: 8px 10px; border-radius: 8px; background: #f3f4f6; }
       .ok { background: #ecfdf5; color: #065f46; }
       .warn { background: #fffbeb; color: #92400e; }
       .muted { color: #6b7280; font-size: 12px; margin-top: 8px; }
+      .settings { border-top: 1px solid #e5e7eb; margin-top: 12px; }
+      .toggle { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; cursor: pointer; }
+      .toggle input { margin: 2px 0 0; accent-color: #2563eb; }
+      .toggle .desc { color: #6b7280; font-size: 11px; }
+      .subs { margin-left: 22px; }
+      .subs.off { opacity: 0.45; }
+      #settings-hint { margin-top: 4px; }
     </style>
   </head>
   <body>
@@ -24,9 +32,27 @@
     <div id="read" class="muted"></div>
     <div id="amazon" class="muted"></div>
     <div id="debug" class="muted"></div>
+    <div class="settings">
+      <h2>Settings</h2>
+      <label class="toggle">
+        <input type="checkbox" id="auto-match" />
+        <span>Auto match<br /><span class="desc">On Sync, automatically apply the actions below to exact (✓) matches. Review (?) matches stay manual.</span></span>
+      </label>
+      <div class="subs" id="auto-subs">
+        <label class="toggle">
+          <input type="checkbox" id="auto-note" />
+          <span>Automatically add the order note</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="auto-rename" />
+          <span>Automatically rename the merchant</span>
+        </label>
+      </div>
+      <div class="muted" id="settings-hint"></div>
+    </div>
     <p class="muted">
-      M0 skeleton — open the Monarch web app to connect. Amazon sync, matching,
-      and the review queue arrive in later milestones (see SPEC.md).
+      Open the Monarch web app and click “Sync now” in the Amazarch panel to
+      read your Amazon orders and match them to your charges.
     </p>
     <script src="popup.js"></script>
   </body>

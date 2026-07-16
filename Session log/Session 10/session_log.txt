@@ -1,6 +1,8 @@
 SESSION 10 — HANDOFF LOG
 ========================
 Date: 2026-07-16 (UTC). WEB session (Claude-Code-on-the-web).
+TWO deliverables this session: (A) v0.4.11 Undo bug fix + write verification,
+(B) v0.5.0 Auto match settings (see "PART B" at the bottom).
 
 BRANCH / WORKFLOW:
   - Session was assigned branch claude/merchant-rename-undo-bug-4dk77r, but the
@@ -95,3 +97,44 @@ OPEN ITEMS / NEXT SESSION
 
 PROJECT STATE OTHERWISE: miner/dashboard untouched. amazarch is the active
 workstream (see Session 9 log + amazarch/SPEC.md for full context).
+
+================================================================================
+PART B — v0.5.0: AUTO MATCH SETTINGS (second prompt of this session)
+================================================================================
+User request: an "Auto match" TOGGLE in the extension settings (popup), with
+SUB-toggles choosing whether the note is auto-applied and/or the merchant is
+auto-renamed.
+
+SHIPPED:
+1. src/shared/settings.ts — AmazarchSettings {autoMatch, autoNote, autoRename}
+   persisted in browser.storage.local (key "amazarchSettings"); pure
+   parseSettings + loadSettings/saveSettings. DEFAULTS: autoMatch OFF;
+   when enabled, note ON / rename OFF (rename is the invasive write).
+2. Popup (popup.html/ts) — new "Settings" section: Auto match master checkbox
+   with indented sub-toggles (grayed + disabled when master off), saved on
+   change, hint line ("no action selected — nothing will be applied" /
+   "applies on the next Sync…"). Stale "M0 skeleton" footer copy replaced.
+3. src/shared/auto-apply.ts — pure planner/runner: planAutoApply targets ONLY
+   status==="auto" (exact) matches — "review" ALWAYS stays manual; runAutoApply
+   executes sequentially with onProgress + pause (index.ts paces 300ms between
+   writes), counts applied/skipped(already done)/refuted/failed, a thrown
+   action doesn't stop the run; summarizeAutoApply builds the status line.
+4. index.ts doSync — after the normal render, loads settings, runs the plan
+   through the SAME onApply/onRename paths as the manual buttons (so all
+   v0.4.11 verification semantics apply), arms each successful action's undo
+   via overlay.armUndo(chargeId:kind), then re-renders: auto-applied actions
+   show "✓ note added — undo" etc., status shows e.g. "Auto-match: 12 applied,
+   4 already done — refresh Monarch to see changes."
+5. overlay.ts — exported armUndo(key, ApplyResult): external arming with the
+   same rules as a manual click (only ok + non-refuted + has undo).
+6. Tests: settings.test.ts, auto-apply.test.ts, armUndo cases in
+   overlay-action.test.ts. 99 tests total, typecheck + both builds green.
+
+NEXT SESSION / OPEN:
+- User still needs to live-confirm v0.4.11 writes AND the new auto-match flow
+  (panel header must say "Amazarch v0.5.0"). Suggested test: enable Auto match
+  + note only, Sync, expect progress "Auto-match: note k/n…" then the summary
+  line; each auto-noted row's button reads "✓ note added — undo".
+- Idempotence on re-sync: auto actions skip via "already noted"/"already
+  named" (mergeNotes orderId check; currentName===target check) → counted as
+  "already done".
