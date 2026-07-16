@@ -204,3 +204,5 @@ built dist/firefox
    NEW BUG: "Rename merchant" -> "Failed: cookie@api.monarch.com: HTTP 400, graphql: Something went wrong while processing: None on request_id: None." = Monarch SERVER error (not validation).
    ROOT CAUSE: v0.3.0 added `name` to the mutation RETURN selection (transaction { id name notes }); `name` is NOT a readable field on Transaction (read self-heal already proved this), so Monarch throws when returning it AFTER the write. This also silently broke the NOTE write since v0.3.0 (validated at v0.2.0 before name was added). `name` is still valid as an INPUT field for rename.
    v0.4.10 FIX: mutation return selection back to transaction { id notes } (drop name). Should fix BOTH note + rename writes.
+
+54. Write the handoff, commit it to main and wrap this session

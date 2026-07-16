@@ -3,158 +3,174 @@ SESSION 9 — HANDOFF LOG
 Date: 2026-07-14 (UTC). WEB session (Claude-Code-on-the-web).
 
 BRANCH / WORKFLOW:
-  - Session ASSIGNED branch: claude/monarch-amazon-matcher-gntufh. ALL work
-    committed and pushed there (NOT main).
-  - PR #5 (https://github.com/RadioDinner/ExtensionMiner/pull/5) was created
-    by the USER from the Claude Code UI for this branch — pushes to the branch
-    update it. Do not open another PR.
-  - Commits: b40d77e (spec draft + decision record), 8bc037a (research
-    integration), + final commit (R3 Monarch-API findings + this log).
+  - Session ASSIGNED branch: claude/monarch-amazon-matcher-gntufh.
+  - PR #5 (that branch) was MERGED to main early on. From prompt 20 onward the
+    user said "keep working in main" — ALL work since is committed & pushed to
+    MAIN. (The assigned branch was restarted from main once; then abandoned.)
+  - No new PR opened. Everything is on origin/main. Latest commit: v0.4.10.
 
-MIGRATIONS: none this session. Lowest is still 988 → NEXT NEW = 987.
+MIGRATIONS: none this session (this session is a NEW product, not the miner).
+  Miner Supabase migrations unchanged: lowest is still 988 → NEXT NEW = 987.
 
 ================================================================================
 WHAT THIS SESSION WAS
 ================================================================================
-NEW PRODUCT KICKOFF, not miner work. The user wants a Firefox+Chrome browser
-extension that plugs into Monarch Money (personal finance app) and matches the
-user's Amazon transactions (orders, refunds, amounts) to Monarch transactions —
-replacing their manual two-window matching workflow. Stored in this repo for
-now under monarch-amazon-matcher/.
+NEW PRODUCT built from scratch: **Amazarch** — a Firefox+Chrome browser
+extension that matches the user's Amazon orders/refunds to their Monarch Money
+transactions (the manual two-window chore the user wanted gone). Lives in the
+repo under **amazarch/**. This is NOT the ExtensionMiner miner/dashboard (that
+was untouched).
 
-The user asked for the "/grill-me" skill to elicit requirements. That skill
-does not exist in this environment (checked session skills + claude.ai skills),
-so the interview was run directly via AskUserQuestion in rounds.
+Full requirements interview + decision record + research is in **amazarch/SPEC.md**.
+Decisions D1–D17 (grill session). Name "Amazarch" (D16). Positioning D17 =
+full independent matcher (option b) with the official Monarch extension's gaps
+(refunds, full-history backfill, Firefox, reliability) as headline features,
+multi-app (YNAB/Lunch Money) later. Paid at launch (D13), rules+optional-Claude
+categorizer (D14), full cloud sync intended (D15) — NOT built yet.
 
-================================================================================
-WHAT WAS PRODUCED (single deliverable)
-================================================================================
-monarch-amazon-matcher/SPEC.md — full product spec containing:
-  - Decision record D1–D12 (all answered by the user, 3 grill rounds):
-    D1 writes = notes + merchant rename + auto-categorize + splits (ALL).
-    D2 autonomy = auto-apply exact matches + review queue for fuzzy.
-    D3 coverage = orders + split shipments + refunds/returns (NOT S&S/digital/
-       Whole Foods/Fresh in v1).
-    D4 UI = injected INTO the Monarch web app (badges + review-queue overlay).
-    D5 Amazon = silent background fetch on user's logged-in session.
-    D6 Monarch writes = unofficial internal GraphQL API (user accepted ToS/
-       breakage risk explicitly).
-    D7 backfill = EVERYTHING (entire Amazon history), checkpointed/resumable.
-    D8 splits only when a charge mixes categories.
-    D9 cadence = sync on opening Monarch + manual "Sync now".
-    D10 already-manually-edited transactions are NEVER auto-clobbered → review
-        queue with diff.
-    D11 multi-Amazon-account support desired (v1 single, v1.x multi).
-    D12 publish to BOTH stores (Chrome Web Store + AMO) — it's a product.
-  - OPEN decisions (grill round 4 NEVER reached the user — the AskUserQuestion
-    permission stream aborted 3x; defaults taken and flagged in the spec):
-    OPEN-1 audience/monetization → defaulted free-at-launch.
-    OPEN-2 categorizer → defaulted rules + optional user-keyed Claude AI.
-    OPEN-3 privacy → defaulted local-only storage.
-    OPEN-4 name → placeholder "monarch-amazon-matcher".
-  - STRAT-0 (NEW, from research — THE decision the user must make before any
-    code): Monarch ships an OFFICIAL free "Retail purchase sync" Chrome
-    extension (~90k users, 4.27★, v1.0.22) doing Amazon→Monarch matching with
-    AI splits/notes/categories. A straight clone is dead. BUT its stated gaps
-    = exactly this spec's differentiators: NO refunds handling, ~3-month
-    history limit, no Firefox, no Whole Foods/digital/business, reliability
-    complaints. Options in spec: (a) gap-filler/companion [research-recommended],
-    (b) full independent matcher, (c) kill, (d) multi-app pivot (YNAB is where
-    PAID demand is proven — Ace My Budget / Bridge Your Budget SaaS).
-  - Research findings §R1–R4 (fan-out research workflow, 17 agents, key claims
-    adversarially verified; monarch-api topic re-run as single agent after the
-    workflow pass returned malformed output for it):
-    R1 Amazon: /cpe/yourpayments/transactions is the per-CHARGE ledger (incl.
-       refunds + card last-4) → primary matcher source; Privacy Central
-       "Request My Data" ZIP = ToS-clean deep-backfill path; AZAD
-       (philipmulcahy/azad) is the reference implementation + politeness
-       envelope (≤6 concurrent, 1s pacing, caches, logout/429 detection).
-    R2 Prior art: third-party Monarch tools all free/OSS/mostly dead;
-       eshaffer321/itemize is the living blueprint; alex-peck/
-       monarch-amazon-sync's 24 open issues = free pain-point list.
-    R3 Monarch GraphQL: ALL needed ops verified by name —
-       Web_GetTransactionsList (read), Web_TransactionDrawerUpdateTransaction
-       (rename/category/notes), Common_SplitTransactionMutation (splits; must
-       sum exactly), Web_SetTransactionTags. Token from localStorage
-       persist:root → user.token + monarchDeviceUUID header. ⚠ API host
-       MIGRATED to api.monarch.com (Jan 2026) — keep endpoint configurable,
-       cover both *.monarchmoney.com and *.monarch.com. No known bans for
-       unofficial-API use; no official public API yet.
-    R4 Store policy: CWS Aug-1-2026 disclosure enforcement; AMO
-       data_collection_permissions manifest key mandatory since Nov 2025;
-       MV3 service-worker chunking via chrome.alarms or offscreen doc;
-       naming must be "<Distinctive> for Monarch Money" (trademark).
-  - Milestones M0–M5 (M1 is read-only match preview before any writes) and
-    risk register (risk 0 = first-party competition).
+KEY RESEARCH FINDINGS (in SPEC.md §5, verified live this session):
+  - Monarch API is cookie/CSRF session auth (NOT a bearer token in localStorage
+    anymore; token/`name` are not readable fields). Endpoint api.monarch.com.
+  - Amazon "Your Orders" is a React app that ENCRYPTS order details client-side
+    ("Siege" CSD) → a raw background fetch gets ciphertext; must read the
+    RENDERED DOM. Order id is in data-csa-c-slot-id (plaintext).
+  - Monarch ships an official free "Retail purchase sync" extension (~90k users)
+    — Amazarch's wedge is its gaps.
 
 ================================================================================
-LATE-SESSION UPDATE (prompt 9): OPEN-1..4 RESOLVED BY USER IN CHAT
+CURRENT STATE — WORKING END TO END (v0.4.10)
 ================================================================================
-The user's earlier dialog answers never arrived (stream aborts); they answered
-in plain text instead. Now in the spec as D13–D16:
-  D13 (was OPEN-1): PAID AT LAUNCH. Licensing via our own backend; ~$2–5/mo
-      + trial is the researched norm; pitch must sell official-tool gaps.
-  D14 (was OPEN-2): rules + optional Claude ("Claude organizer" per user);
-      with a backend, server-proxied Claude under our key is an option —
-      decide proxy-vs-user-key at build time.
-  D15 (was OPEN-3): FULL CLOUD SYNC. Supabase (Auth+Postgres+RLS) + Vercel;
-      extension IndexedDB = working copy; backend carries licensing; heavy
-      disclosure obligations (CWS Aug-2026, AMO data_collection_permissions).
-  D16 (was OPEN-4): name = "Amazarch" (tagline: Match Amazon orders to
-      Monarch transactions). AMAZ- prefix trademark caution documented with
-      mitigations ("for Monarch Money" subtitle, disclaimers, fallback name).
-FOLDER RENAMED: monarch-amazon-matcher/ -> amazarch/ (git mv). Spec updated
-throughout (privacy section now cloud, milestones +M4.5 cloud/billing, risks
-+cloud-custody +paid-friction). New milestone order: M0..M4, M4.5, M5.
+Verified by the user on their machine (Firefox, temporary add-on):
+  ✅ Connects to Monarch via cookie/CSRF, live `me` query OK.
+  ✅ Reads the user's Amazon-looking Monarch charges (server-filtered, paginated;
+     ~500 shown of 1,216).
+  ✅ Reads REAL Amazon orders by opening the order-history page in a BACKGROUND
+     TAB and scraping the decrypted, rendered DOM, paginating startIndex.
+  ✅ Matches orders↔charges by exact amount + date window (±). User confirmed
+     "matching looks correct" (23 matched, right dates/amounts/items).
+  ✅ In-Monarch panel (attached to <html>) shows "Proposed matches" with a live
+     vanity timer + phase status, on-demand "Sync now".
+  ✅ Writes to Monarch: "Add note" (append item list + order link, never
+     clobbers, idempotent) and "Rename merchant" (Amazon — <short item
+     summary>), each with Undo. **Write fix in v0.4.10 (see below) is UNCONFIRMED
+     by the user — they were mid-testing when they asked to wrap.**
+
+LAST OPEN THREAD (verify first next session):
+  - v0.4.10 fixes BOTH writes: the mutation return selection was
+    `transaction { id name notes }`; `name` is not readable on Transaction so
+    Monarch threw "Something went wrong while processing" AFTER the write. This
+    silently broke the note-write since v0.3.0 and made rename fail outright.
+    Fixed to `transaction { id notes }`. USER HAD NOT YET CONFIRMED the rebuilt
+    v0.4.10 rename+note work. FIRST THING NEXT SESSION: confirm both writes +
+    Undo succeed on v0.4.10.
 
 ================================================================================
-LATE-SESSION UPDATE 2 (prompt 10): STRAT-0 RESOLVED (D17) + M0 BUILT
+THE LONG DEBUG ARC (so next session doesn't re-litigate)
 ================================================================================
-STRAT-0 decided by user (verbatim in prompt_history #10): start with (b) full
-independent matcher, with (a)'s gap-filler features (refunds/returns matching,
-Firefox, fix ALL official-extension complaints) as core parts of (b), and (d)
-multi-app expansion eventually. Recorded in SPEC.md as D17 + §1.5 updated +
-post-v1 milestone line (non-US Amazon/WF/digital/business, then YNAB + Lunch
-Money backends behind the same matcher core).
+Milestones M0→matcher→writes, then a long reliability grind. Key resolved bugs:
+  - Monarch auth: NOT a localStorage bearer token; it's cookie + X-CSRFToken.
+    Same-origin request from the content script. (v0.0.x)
+  - Read query self-heals: tries [search×name] combos; `name` field is rejected
+    by Monarch's read schema, so it drops to a name-less query. (v0.4.1)
+  - Amazon orders: raw fetch = ciphertext (Siege CSD). Read rendered DOM via a
+    background tab + amazon content script. (v0.0.9)
+  - Amazon "0 orders": background-tab decryption timing; MAX_WAIT raised to 40s;
+    diagnostic added (cardCount/decrypted/url/waited). (v0.4.3)
+  - **THE BIG ONE — sync "stopped working" ("Receiving end does not exist"):**
+    Making sync on-demand (v0.3.0) meant fetch-amazon is sent minutes after
+    load, by which point Firefox idle-suspended the background EVENT PAGE, and
+    it would not wake for the message. Retries (v0.4.5) and a keepalive PORT
+    (v0.4.7) were insufficient. FIX = periodic keepalive PING: the content
+    script sends get-status every 15s (under Firefox's ~30s idle timeout) to
+    keep the background warm the whole time Monarch is open. (v0.4.9) A on-load
+    background health check ("Background connected ✓") isolated it. (v0.4.8)
+  - Perf: attach the panel to document.documentElement (not <body>) so
+    Monarch's React doesn't wipe it and retrigger redraws; sync is on-demand
+    (no heavy work on page load). (v0.3.0 + v0.4.0)
+  - Vanity timer: an independent 1s heartbeat, decoupled from status labels. (v0.4.6)
 
-M0 SKELETON BUILT under amazarch/ (per SPEC §6 M0) — VERIFIED in this env:
-npm run build (dist/chrome + dist/firefox), tsc --noEmit clean, vitest 12/12.
-  - package.json / tsconfig.json / build.mjs (esbuild, iife bundles; targets
-    chrome|firefox|both; copies manifest.<target>.json -> manifest.json).
-  - manifest.chrome.json (MV3 service worker) / manifest.firefox.json (MV3
-    event page, gecko id amazarch@radiodinner.dev, data_collection_permissions
-    FIRST DRAFT [authenticationInfo, financialAndPaymentInfo] — re-validate
-    category names against AMO before submission). Host permissions: both
-    Monarch app+api domains (monarchmoney.com AND monarch.com) + www.amazon.com.
-  - src/shared/monarch-session.ts: extractMonarchToken (persist:root double-
-    decode) + extractDeviceUuid — PURE, tested.
-  - src/shared/money.ts: integer-cents parse/format/sum — PURE, tested.
-  - src/content/monarch/index.ts: token bridge (polls localStorage up to 30s
-    for app hydration, sends session to background) + "Amazarch connected"
-    pill (M0 overlay proof).
-  - src/background/index.ts: holds session in storage.session ONLY (memory-
-    backed, never disk), answers get-status with REDACTED token preview.
-  - src/popup/*: shows detected-session status.
-  - README.md: build/load instructions (chrome://extensions load-unpacked;
-    Firefox about:debugging temporary), M5 store notes.
-  - NOT verifiable here (egress 403): live token capture on app.monarch.com —
-    needs a local browser; that's the first thing to check next session.
+DISTRIBUTION FRICTION (user's machine): git clone to github.com intermittently
+fails ("could not connect" / "receiving end") though the browser + Invoke-
+WebRequest usually work. WORKFLOW used all session: user downloads the main.zip
+via a retry PowerShell snippet, `npm run build:firefox`, loads dist/firefox as a
+temporary add-on in about:debugging. Each new build bumps the version so the
+panel header (e.g. "Amazarch v0.4.10") confirms the right build is loaded.
 
 ================================================================================
-OPEN ITEMS FOR NEXT SESSION (in priority order)
+CODE MAP (amazarch/)
 ================================================================================
-1. USER: load dist/chrome (or firefox) locally against real Monarch and
-   confirm the token bridge + pill work (M0 exit criterion).
-2. M1 (read-only match preview): Amazon fetchers (order list + transactions
-   page parsers w/ fixtures), Monarch GraphQL reads (Web_GetTransactionsList),
-   matcher core (per-charge exact -> order-total -> combination -> refunds),
-   overlay preview of proposed matches. NO WRITES in M1.
-3. Consider extracting amazarch/ to its own repo before it grows (user said
-   "store it in the repo for now").
-4. AskUserQuestion tool was flaky all session (permission stream aborts) —
-   the user got the questions but their answers never reached the agent.
-   Prefer plain-text questions in chat for this user until that's resolved.
+  manifest.chrome.json / manifest.firefox.json  MV3; hosts = both Monarch
+    domains + api hosts + www.amazon.com; permissions storage/alarms/tabs;
+    two content scripts (Monarch app + amazon order-history). Firefox
+    strict_min_version 142 (data_collection_permissions).
+  build.mjs        esbuild → dist/<target>/ (iife). `npm run build[:chrome|:firefox]`.
+  src/shared/
+    monarch-gql.ts     gqlRequest transport (cookie primary, bearer fallback).
+    monarch-probe.ts   probeMonarchApi (me{id}).
+    monarch-read.ts    readAmazonTransactions (self-healing query combos,
+                       pagination, onProgress) + collectAmazon; AmazonTxn.
+    monarch-write.ts   setTransactionNotes / setTransactionName (shared
+                       updateTransaction), buildNoteLine/mergeNotes,
+                       buildMerchantName/shortItemSummary. **Mutation return
+                       selection = transaction { id notes } — do NOT add name.**
+    monarch-session.ts token/csrf/deviceUuid extraction + storage diagnostics.
+    matcher.ts         matchOrdersToCharges (amount + date window; auto/review/
+                       unmatched/refund) + summarize + dayDiff. Pure, tested.
+    amazon-parse.ts / amazon-order-parse.ts / amazon-dom-parse.ts  Amazon page
+                       detectors, order parsing (label-based, resilient to class
+                       churn), rendered-DOM helpers. Pure, tested.
+    amazon-merchant.ts isAmazonMerchant (excludes Whole Foods/Fresh in v1).
+    money.ts           integer-cents parse/format.
+    messages.ts        all runtime message + shared types.
+  src/background/
+    index.ts   onConnect (keepalive) + onMessage router; holds session/probe/
+               read/amazon status in storage.session; drives fetch-amazon.
+    amazon.ts  fetchAmazonViaTab — opens order-history in a background tab,
+               waits for the amazon content script's scrape, paginates,
+               reports progress + a 0-orders diagnostic.
+  src/content/monarch/index.ts   the orchestrator: connect (cookie), keepalive
+               port + 15s ping, on-demand doSync (read→amazon→match), render,
+               click-to-apply note/rename with Undo, vanity timer.
+  src/content/monarch/overlay.ts the in-Monarch panel (matches, buttons,
+               status/timer, diagnostics). Attached to <html>.
+  src/content/amazon/index.ts    scrapes the decrypted Amazon order DOM, reports.
+  src/popup/*  toolbar popup (status).
+  test/        vitest — 65 tests, all pure logic (matcher, parsers, money,
+               token hunt, write helpers). `npm test`.
 
-KEY CONTEXT: the ExtensionMiner miner/dashboard work (Sessions 1–8) was NOT
-touched this session. Miner state is unchanged from Session 8 handoff (apply
-migrations 989+988, etc. still pending on the user).
+Every build this session: `npm run typecheck` clean, `npm test` 65/65,
+`npm run build` both targets, `web-ext lint dist/firefox` 0 warnings.
+
+================================================================================
+OPEN ITEMS / NEXT STEPS (priority order)
+================================================================================
+1. CONFIRM v0.4.10 writes: user tests "Rename merchant" + "Add note" + Undo on
+   a real transaction. (The fix is unverified.)
+2. Remaining original wish-list (D1/D3/D8):
+   - Auto-CATEGORY (rules + optional Claude — D14; needs category-id resolution
+     via GetCategories + Common a category set).
+   - SPLITS for multi-item charges when categories differ (Common_SplitTransaction
+     Mutation; amounts must sum exactly).
+   - REFUNDS: 78 showed as "refund — matched later"; match refund credits to
+     returns (needs Amazon returns/transactions data — the /cpe/yourpayments/
+     transactions page per R1).
+3. The 399 "no order" charges are mostly OLDER than the ~10 pages (≈100 orders)
+   we currently pull → full-history BACKFILL (D7): parse Amazon's Privacy-Central
+   "Request My Data" export (upload a file; no page render, ToS-clean).
+4. Auto-apply for exact-unique matches (currently everything is click-to-apply;
+   the review queue concept D2/D10 exists implicitly via status colors).
+5. Persistent Undo journal (currently Undo is in-memory per button).
+6. Chrome path for the cross-origin work (SW vs event page differences) before
+   store submission (D12); AMO source-package + privacy policy (cloud sync D15
+   still unbuilt).
+7. Wire the Claude summarizer for crisp renames ("Amazon — Omega 3 supplement"
+   vs the current heuristic "Amazon — Triple Strength DHA Omega 3 Fish Oil").
+
+KEY GOTCHAS TO REMEMBER:
+  - Do NOT add `name` (or other non-readable fields) to the updateTransaction
+    RETURN selection — Monarch 500s after the write.
+  - Keep the 15s background keepalive ping (Firefox suspends the event page).
+  - amazon.com order data is client-side ENCRYPTED — must scrape rendered DOM in
+    a tab, can't raw-fetch.
+  - This env can't reach amazon.com/Monarch (egress) — pure logic is testable
+    here; live behavior only on the user's machine.
