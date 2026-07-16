@@ -20,6 +20,7 @@ const s = (over: Partial<AmazarchSettings>): AmazarchSettings => ({
   autoMatch: true,
   autoNote: true,
   autoRename: true,
+  lookbackMonths: 3,
   ...over,
 });
 

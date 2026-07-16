@@ -23,6 +23,9 @@
       .subs { margin-left: 22px; }
       .subs.off { opacity: 0.45; }
       #settings-hint { margin-top: 4px; }
+      .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0 2px; }
+      .row select { font: 12px system-ui, sans-serif; padding: 2px 4px; }
+      .linkish { background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; font: 12px system-ui, sans-serif; text-decoration: underline; }
     </style>
   </head>
   <body>
@@ -49,6 +52,18 @@
         </label>
       </div>
       <div class="muted" id="settings-hint"></div>
+      <div class="row">
+        <span>Initial sync history</span>
+        <select id="lookback">
+          <option value="3">3 months (Amazon default)</option>
+          <option value="6">6 months</option>
+          <option value="12">1 year</option>
+          <option value="24">2 years</option>
+          <option value="36">3 years</option>
+          <option value="60">5 years</option>
+        </select>
+      </div>
+      <div class="muted" id="lookback-hint"></div>
     </div>
     <p class="muted">
       Open the Monarch web app and click “Sync now” in the Amazarch panel to

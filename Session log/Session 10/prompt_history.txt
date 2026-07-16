@@ -1,3 +1,5 @@
 1. Lets kick off a new session. I clicked rename merchant and it gives me the option to undo, but it didn't do anything. Always commit to main for the remainder of this session
 
 2. ok in the extension settings tab, I want the ability to automatically match the amazon transactions that have matches. Rather, I want the "Auto match" setting to be a toggle. A sub toggle on those settings I want the option to set if the note should automatically be applied and or the merchant to automatically be renamed
+
+3. current it is only getting the last 3 months of orders. Can you make an option in the extension menu to set how far back to look for the initial sync

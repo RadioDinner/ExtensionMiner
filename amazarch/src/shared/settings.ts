@@ -8,15 +8,22 @@ export interface AmazarchSettings {
   autoMatch: boolean; // master toggle
   autoNote: boolean; // sub-toggle: automatically add the order note
   autoRename: boolean; // sub-toggle: automatically rename the merchant
+  lookbackMonths: number; // how far back the INITIAL sync reads Amazon orders
 }
 
 export const DEFAULT_SETTINGS: AmazarchSettings = {
   autoMatch: false,
   autoNote: true,
   autoRename: false, // renaming is the more invasive write — opt in explicitly
+  lookbackMonths: 3, // Amazon's own default window
 };
 
 const KEY = "amazarchSettings";
+
+function clampMonths(v: unknown): number {
+  if (typeof v !== "number" || !Number.isFinite(v)) return DEFAULT_SETTINGS.lookbackMonths;
+  return Math.min(120, Math.max(1, Math.round(v)));
+}
 
 /** Pure: coerce whatever is in storage into a valid settings object. */
 export function parseSettings(raw: unknown): AmazarchSettings {
@@ -25,6 +32,7 @@ export function parseSettings(raw: unknown): AmazarchSettings {
     autoMatch: typeof obj["autoMatch"] === "boolean" ? obj["autoMatch"] : DEFAULT_SETTINGS.autoMatch,
     autoNote: typeof obj["autoNote"] === "boolean" ? obj["autoNote"] : DEFAULT_SETTINGS.autoNote,
     autoRename: typeof obj["autoRename"] === "boolean" ? obj["autoRename"] : DEFAULT_SETTINGS.autoRename,
+    lookbackMonths: clampMonths(obj["lookbackMonths"]),
   };
 }
 

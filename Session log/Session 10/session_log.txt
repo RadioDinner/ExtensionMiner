@@ -138,3 +138,46 @@ NEXT SESSION / OPEN:
 - Idempotence on re-sync: auto actions skip via "already noted"/"already
   named" (mergeNotes orderId check; currentName===target check) → counted as
   "already done".
+
+================================================================================
+PART C — v0.6.0: INITIAL SYNC LOOKBACK (third prompt of this session)
+================================================================================
+User report: sync only reads the last 3 months of Amazon orders. Cause: the
+order-history URL had NO time filter, and Amazon defaults that page to "past
+three months". Request: a setting for how far back the INITIAL sync looks.
+
+SHIPPED:
+1. src/shared/lookback.ts (pure, tested) — planLookback(todayIso, months):
+   <=3 months → [null] (Amazon default page); longer → one timeFilter per
+   calendar year, newest first (["year-2026","year-2025",…]), plus cutoffIso.
+   minusMonthsIso (day-clamped), pageAllOlderThan (early pagination stop),
+   yearFilterMismatch (detects Amazon ignoring the filter — a past-year fetch
+   whose orders contain nothing from that year), filterLabel.
+2. src/shared/deep-sync.ts — DEEP-SYNC-ONCE bookkeeping in storage.local
+   (key "amazarchDeepSync" {months, at}): effectiveLookbackMonths(settings,
+   record) = full depth until a deep fetch >= setting succeeded, then 3.
+   Raising the setting re-triggers deep; popup can clear the record.
+3. settings.ts — lookbackMonths (default 3, clamped 1..120).
+4. background/amazon.ts — pageUrl now takes a filter and sends BOTH
+   timeFilter= and orderFilter= (React page vs legacy param; extras ignored;
+   UNVERIFIED against live Amazon from this env — the mismatch detector +
+   note warning is the safety net). Fetch loops filters × pages (20/filter,
+   was 10 total), dedupes across filters, stops a filter when a page adds
+   nothing new or is entirely older than cutoff. Note shows
+   "(N-month lookback)" + a ⚠ warning listing filters Amazon may have ignored.
+   recordDeepSync ONLY when signedIn && orders>0 && months>3 && NO filter
+   warnings (unproven coverage must not mark the deep pass done).
+5. Popup — "Initial sync history" select (3mo default/6mo/1y/2y/3y/5y) +
+   dynamic hint: shallow ("every sync reads past 3 months"), pending deep
+   ("next sync reads N year by year — takes longer"), or done ("Deep sync done
+   (N) — [Fetch deep again on next sync]" button → clearDeepSync).
+6. Tests: lookback.test.ts, deep-sync.test.ts, settings clamp cases;
+   116 tests total, typecheck + both builds green. Version 0.6.0.
+
+OPEN / VERIFY LIVE (next session):
+- The timeFilter/orderFilter param against real Amazon: if the sync note says
+  "⚠ Amazon may have ignored the time filter for: …", the param name is wrong
+  for the user's page — next step is reading the filter dropdown's real URL
+  from the rendered page (content script can report it).
+- Deep sync duration: up to 20 pages/year × up to 40s decryption wait worst
+  case — progress labels show "Reading 2025 orders — page N".

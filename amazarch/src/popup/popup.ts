@@ -1,6 +1,7 @@
 import browser from "webextension-polyfill";
 import type { Message, StatusResponse } from "../shared/messages";
 import { loadSettings, saveSettings, type AmazarchSettings } from "../shared/settings";
+import { clearDeepSync, loadDeepSync } from "../shared/deep-sync";
 
 const MONARCH_ORIGINS = ["https://app.monarchmoney.com/*", "https://app.monarch.com/*"];
 
@@ -109,18 +110,63 @@ function checkbox(id: string): HTMLInputElement {
   return document.getElementById(id) as HTMLInputElement;
 }
 
+function monthsLabel(months: number): string {
+  return months % 12 === 0 ? `${months / 12} year${months === 12 ? "" : "s"}` : `${months} months`;
+}
+
 async function initSettings(): Promise<void> {
   const master = checkbox("auto-match");
   const note = checkbox("auto-note");
   const rename = checkbox("auto-rename");
+  const lookback = document.getElementById("lookback") as HTMLSelectElement;
   const subs = document.getElementById("auto-subs");
   const hint = document.getElementById("settings-hint");
-  if (!master || !note || !rename) return;
+  const lookbackHint = document.getElementById("lookback-hint");
+  if (!master || !note || !rename || !lookback) return;
 
   const s = await loadSettings();
   master.checked = s.autoMatch;
   note.checked = s.autoNote;
   rename.checked = s.autoRename;
+  // Select the stored lookback; add an option for a non-standard stored value.
+  if (!Array.from(lookback.options).some((o) => o.value === String(s.lookbackMonths))) {
+    const extra = document.createElement("option");
+    extra.value = String(s.lookbackMonths);
+    extra.textContent = monthsLabel(s.lookbackMonths);
+    lookback.append(extra);
+  }
+  lookback.value = String(s.lookbackMonths);
+
+  // How-far-back status: show whether the next sync is deep or fast, and let
+  // the user re-run the deep fetch at the same depth.
+  const reflectLookback = async (): Promise<void> => {
+    if (!lookbackHint) return;
+    const months = Number(lookback.value);
+    const done = await loadDeepSync();
+    lookbackHint.textContent = "";
+    if (months <= 3) {
+      lookbackHint.textContent = "Every sync reads Amazon's default window (past 3 months).";
+      return;
+    }
+    if (done && done.months >= months) {
+      lookbackHint.append(
+        `Deep sync done (${monthsLabel(done.months)}) — later syncs read the last 3 months. `,
+      );
+      const again = document.createElement("button");
+      again.className = "linkish";
+      again.textContent = "Fetch deep again on next sync";
+      again.addEventListener("click", async () => {
+        await clearDeepSync();
+        await reflectLookback();
+      });
+      lookbackHint.append(again);
+    } else {
+      lookbackHint.textContent =
+        `The next sync reads ${monthsLabel(months)} of order history year by year — ` +
+        "it takes noticeably longer than a normal sync. Later syncs only read recent orders.";
+    }
+  };
+  await reflectLookback();
 
   const reflect = (cur: AmazarchSettings): void => {
     note.disabled = !cur.autoMatch;
@@ -141,8 +187,10 @@ async function initSettings(): Promise<void> {
       autoMatch: master.checked,
       autoNote: note.checked,
       autoRename: rename.checked,
+      lookbackMonths: Number(lookback.value) || s.lookbackMonths,
     };
     reflect(cur);
+    await reflectLookback();
     try {
       await saveSettings(cur);
     } catch {
@@ -152,6 +200,7 @@ async function initSettings(): Promise<void> {
   master.addEventListener("change", onChange);
   note.addEventListener("change", onChange);
   rename.addEventListener("change", onChange);
+  lookback.addEventListener("change", onChange);
 }
 
 void refresh();

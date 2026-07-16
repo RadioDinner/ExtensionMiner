@@ -17,8 +17,8 @@ describe("parseSettings", () => {
   it("keeps stored booleans and fills the rest with defaults", () => {
     expect(parseSettings({ autoMatch: true })).toEqual({ ...DEFAULT_SETTINGS, autoMatch: true });
     expect(parseSettings({ autoMatch: true, autoRename: true })).toEqual({
+      ...DEFAULT_SETTINGS,
       autoMatch: true,
-      autoNote: DEFAULT_SETTINGS.autoNote,
       autoRename: true,
     });
   });
@@ -27,7 +27,21 @@ describe("parseSettings", () => {
     expect(parseSettings({ autoMatch: "yes", autoNote: 1, autoRename: {} })).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("defaults are conservative: auto match OFF, rename OFF, note ON", () => {
-    expect(DEFAULT_SETTINGS).toEqual({ autoMatch: false, autoNote: true, autoRename: false });
+  it("defaults are conservative: auto match OFF, rename OFF, note ON, 3-month lookback", () => {
+    expect(DEFAULT_SETTINGS).toEqual({
+      autoMatch: false,
+      autoNote: true,
+      autoRename: false,
+      lookbackMonths: 3,
+    });
+  });
+
+  it("parses and clamps lookbackMonths", () => {
+    expect(parseSettings({ lookbackMonths: 12 }).lookbackMonths).toBe(12);
+    expect(parseSettings({ lookbackMonths: 12.6 }).lookbackMonths).toBe(13);
+    expect(parseSettings({ lookbackMonths: 0 }).lookbackMonths).toBe(1);
+    expect(parseSettings({ lookbackMonths: 999 }).lookbackMonths).toBe(120);
+    expect(parseSettings({ lookbackMonths: "12" }).lookbackMonths).toBe(3); // non-number → default
+    expect(parseSettings({ lookbackMonths: NaN }).lookbackMonths).toBe(3);
   });
 });
