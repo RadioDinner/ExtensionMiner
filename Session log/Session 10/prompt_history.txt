@@ -1,0 +1,1 @@
+1. Lets kick off a new session. I clicked rename merchant and it gives me the option to undo, but it didn't do anything. Always commit to main for the remainder of this session

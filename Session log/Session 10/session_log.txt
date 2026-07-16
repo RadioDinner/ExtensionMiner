@@ -1,0 +1,97 @@
+SESSION 10 — HANDOFF LOG
+========================
+Date: 2026-07-16 (UTC). WEB session (Claude-Code-on-the-web).
+
+BRANCH / WORKFLOW:
+  - Session was assigned branch claude/merchant-rename-undo-bug-4dk77r, but the
+    user's first prompt said "Always commit to main for the remainder of this
+    session" — ALL work is committed & pushed to MAIN. No PR opened.
+
+MIGRATIONS: none this session. Miner Supabase migrations unchanged:
+  lowest is still 988 → NEXT NEW = 987.
+
+================================================================================
+WHAT THIS SESSION WAS
+================================================================================
+Bug-fix session on **Amazarch** (amazarch/), shipped as **v0.4.11**.
+User report: "I clicked rename merchant and it gives me the option to undo,
+but it didn't do anything."
+
+ROOT CAUSE FOUND (definite, by code reading — the API itself is unreachable
+from this environment):
+  In overlay.ts actionButton(), the initial "Rename merchant"/"Add note"
+  handler was attached with addEventListener and NEVER removed; the undo was
+  wired by assigning btn.onclick, which ADDS a second listener. Clicking
+  "— undo" therefore fired BOTH: it re-ran the rename AND ran the undo — two
+  conflicting writes racing at Monarch — and whichever response landed last
+  rewrote the label (usually back to "✓ … — undo"), so the Undo click looked
+  like a no-op. After "Undone", further clicks silently re-applied the action.
+
+SECOND PROBLEM FIXED (why even a SUCCESSFUL rename reads as "did nothing"):
+  Monarch's own UI does not refetch after our write — a successful rename is
+  invisible until the page is refreshed, and nothing verified the write took
+  effect server-side. The panel footer even still said "nothing written to
+  Monarch yet".
+
+================================================================================
+WHAT SHIPPED IN v0.4.11
+================================================================================
+1. overlay.ts — actionButton rewritten as ONE listener + explicit state machine
+   (idle → busy → armed → spent). Failures return to the previous state with a
+   "— retry" label. Undo runs exactly once. Registry (armedUndos Map keyed by
+   chargeId:action) preserves armed undos across panel redraws (Sync re-render,
+   8s guard). ✕ close now clears lastView so the 8s guard no longer resurrects
+   a panel the user closed.
+2. monarch-write.ts — WRITE VERIFICATION. The mutation return selection is now
+   rich: `transaction { id notes merchant { name } }` (merchant.name IS
+   readable — proven by the read query; bare `name` remains FORBIDDEN, it
+   throws server-side AFTER the write, the v0.4.10 lesson). The response is
+   compared to what was written → WriteResult.verified: true / false / null
+   (+readBack). null read-back on an accepted rich selection is treated as a
+   REAL value (compared as ""), so a silent no-op write is REFUTED
+   (verified=false) and an undo-to-empty-notes verifies true. Self-heal: if the
+   rich selection is rejected at the GraphQL level (res.errors non-empty), the
+   write retries once with a minimal `transaction { id }` selection
+   (idempotent-safe) and reports verified=null; transport failures (network,
+   429, 5xx) do NOT trigger the fallback — they surface as failures with retry.
+3. Verification semantics in the UI (index.ts + overlay.ts):
+   - verified=true  → "✓ renamed — undo"; status: "Rename confirmed by Monarch
+     ✓ — refresh the page to see it."  ← the refresh hint is the key UX truth.
+   - verified=null  → "✓ renamed (unconfirmed) — undo" / "Undone (unconfirmed)".
+   - verified=false → apply returns to idle: "⚠ rename not applied — retry"
+     (nothing applied → nothing to undo); a refuted UNDO stays ARMED:
+     "⚠ Undo not applied — retry". Status line shows what Monarch reports.
+   - Footer now says writes are click-only + refresh to see changes.
+4. Tests: NEW test/overlay-action.test.ts (jsdom; jsdom added as devDependency)
+   pins the state machine — the "undo must not re-run the action" and "spent
+   is inert" cases FAIL on the v0.4.10 code. monarch-write.test.ts extended:
+   whole-doc bare-`name` guard (old regex only scanned to the first "}"),
+   readBackFromMutation null-vs-absent cases. 83 tests total, all passing.
+   typecheck + build (chrome/firefox) green.
+
+QUALITY PROCESS: an adversarial multi-agent review (4 lenses × 2 skeptics per
+finding) ran on the first version of the fix; it produced 9 confirmed findings
+(refuted-undo-goes-spent, redraw loses armed undo, over-broad self-heal,
+null-readback conflation incl. one MAJOR silent-no-op case, indistinguishable
+unconfirmed labels, weak name-guard regex). ALL were applied, then a second
+verification agent confirmed each resolved on the final diff.
+
+================================================================================
+OPEN ITEMS / NEXT SESSION
+================================================================================
+- USER MUST CONFIRM on their machine (Firefox temp add-on, panel header must
+  say "Amazarch v0.4.11"): (a) Rename merchant → status line should say
+  "Rename confirmed by Monarch ✓ — refresh the page to see it", and after a
+  refresh the merchant shows the new name; (b) Undo → "Undone ✓" and refresh
+  shows the original; (c) same for Add note. If rename now reports
+  "⚠ rename not applied — retry", the verification layer has REFUTED the write
+  — that means input field `name` doesn't rename the merchant, and the next
+  step is finding the right mutation (the status line + readBack will say what
+  Monarch reports).
+- v0.4.10's open question ("do the writes work at all?") is now self-answering
+  via the verification layer — whatever the user sees IS the diagnosis.
+- Distribution workflow unchanged: user downloads main.zip via the PowerShell
+  retry snippet, `npm run build:firefox`, loads dist/firefox in about:debugging.
+
+PROJECT STATE OTHERWISE: miner/dashboard untouched. amazarch is the active
+workstream (see Session 9 log + amazarch/SPEC.md for full context).
