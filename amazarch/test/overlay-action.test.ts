@@ -13,7 +13,7 @@ vi.mock("webextension-polyfill", () => ({
   default: { runtime: { getManifest: () => ({ version: "0.0.0-test" }) } },
 }));
 
-import { actionButton, armUndo, type ApplyOutcome, type ApplyResult } from "../src/content/monarch/overlay";
+import { actionButton, armUndo, fmtDayDiff, type ApplyOutcome, type ApplyResult } from "../src/content/monarch/overlay";
 
 let keyCounter = 0;
 function freshKey(): string {
@@ -271,5 +271,14 @@ describe("armUndo (external arming for auto-apply)", () => {
       const btn = actionButton("Add note", key, async () => ({ ok: true, note: "note added", verified: true }));
       expect(btn.textContent).toBe("Add note"); // stayed idle
     }
+  });
+});
+
+describe("fmtDayDiff", () => {
+  it("signs the value itself — no garbled '(+-1d)' for pre-order charges", () => {
+    expect(fmtDayDiff(3)).toBe("  (+3d)");
+    expect(fmtDayDiff(0)).toBe("  (+0d)");
+    expect(fmtDayDiff(-1)).toBe("  (-1d)");
+    expect(fmtDayDiff(null)).toBe("");
   });
 });

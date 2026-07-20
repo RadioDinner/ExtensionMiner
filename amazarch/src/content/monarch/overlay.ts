@@ -174,10 +174,11 @@ function draw(view: PanelView): void {
       // kind of match this is); status still drives the row color.
       const icon = m.kind === "refund" ? "↩" : meta.icon;
       const label = m.order ? (m.order.itemTitles[0] ?? (m.order.orderId || "order")) : "";
+      const dd = fmtDayDiff(m.dayDiff);
       const sub = m.order
         ? m.kind === "refund"
-          ? `${icon} ${m.refundMatch === "partial" ? "partial refund of" : "refund of"} ${m.order.date} order · ${label}${m.dayDiff !== null ? `  (+${m.dayDiff}d)` : ""}`
-          : `${icon} ${m.order.date} · ${label}${m.dayDiff !== null ? `  (+${m.dayDiff}d)` : ""}`
+          ? `${icon} ${m.refundMatch === "partial" ? "partial refund of" : "refund of"} ${m.order.date} order · ${label}${dd}`
+          : `${icon} ${m.order.date} · ${label}${dd}`
         : `${icon} ${m.status === "refund" ? "refund — no order matched in the sync window" : "no matching order"}`;
       body.append(row(m.charge.merchantName, sub, formatCents(m.charge.amountCents), meta.color));
       // Click-to-apply actions for a matched charge or refund (notes + rename).
@@ -264,7 +265,7 @@ function draw(view: PanelView): void {
   // Footer
   const orderCount = view.orders ? `${view.orders.length} Amazon orders read. ` : "";
   const total = view.totalCount !== null ? `${view.totalCount.toLocaleString()} Amazon txns in Monarch. ` : "";
-  panel.append(text("div", `${orderCount}${total}Writes happen only when you click a button — refresh Monarch to see applied changes.`, {
+  panel.append(text("div", `${orderCount}${total}Writes happen only when you click a button (or via your Auto match settings) — refresh Monarch to see applied changes.`, {
     padding: "8px 12px", background: "#1f2937", color: "#9ca3af", "font-size": "11px",
   }));
 
@@ -305,6 +306,14 @@ function row(left: string, sub: string, right: string, subColor = "#9ca3af"): HT
 
 function rank(status: string): number {
   return { auto: 0, review: 1, unmatched: 2, refund: 3 }[status] ?? 4;
+}
+
+/** "  (+3d)" / "  (-1d)" — charges may be dated up to backDays BEFORE the
+ *  order, so the sign comes from the value (a literal "+" prefix rendered
+ *  "(+-1d)"). Exported for tests. */
+export function fmtDayDiff(dd: number | null): string {
+  if (dd === null) return "";
+  return `  (${dd >= 0 ? "+" : ""}${dd}d)`;
 }
 
 // Armed-but-unused undos, keyed by charge id + action. Button state otherwise

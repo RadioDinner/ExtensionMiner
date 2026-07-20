@@ -4,8 +4,9 @@
 
 **Status: M2+ (v0.7.0).** Builds for Chrome + Firefox. Working today: Monarch
 session detection, Amazon order sync with configurable multi-year lookback,
-charge matching, **refund matching** (full refunds auto when unique; partials
-queue for review), verified notes + merchant-rename writes with Undo, and
+charge matching, **refund matching** (full refunds auto when unique or singled
+out by the card's return status; partials queue for review), verified notes +
+merchant-rename writes with Undo, and
 auto-match settings. Not yet: splits, categorization (see SPEC.md §6).
 
 ## Develop
