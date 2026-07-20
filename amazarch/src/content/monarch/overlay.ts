@@ -4,7 +4,7 @@
 import browser from "webextension-polyfill";
 import { formatCents } from "../../shared/money";
 import type { AmazonTxn } from "../../shared/monarch-read";
-import type { AmazonOrderLite } from "../../shared/messages";
+import type { AmazonAccountSummary, AmazonOrderLite } from "../../shared/messages";
 import { summarize, type MatchResult } from "../../shared/matcher";
 
 const PANEL_ID = "amazarch-panel";
@@ -34,9 +34,51 @@ export interface PanelView {
   onSync?: () => Promise<void>;
   onApply?: (m: MatchResult) => Promise<ApplyResult>;
   onRename?: (m: MatchResult) => Promise<ApplyResult>;
+  accounts?: AmazonAccountSummary[]; // known Amazon accounts (multi-account, D11)
+  activeAccount?: string | null; // the account signed in during the last sync
+  onForgetAccount?: (label: string) => void; // drop an account's cached orders
   diagnostic?: Record<string, number | string>;
   sample?: string;
   report?: string;
+}
+
+// --- Panel UI state (draggable + minimizable), persisted in storage.local -----
+
+export interface PanelUiState {
+  x: number | null; // left px; null = default corner
+  y: number | null; // top px; null = default corner
+  minimized: boolean; // collapsed to a floating chip
+}
+
+const UI_KEY = "amazarchPanelUi";
+
+/** Pure: coerce stored UI state into a valid object. x/y only count when both
+ *  are finite numbers (a half-set position falls back to the default corner). */
+export function parsePanelUi(raw: unknown): PanelUiState {
+  const o = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const x = num(o["x"]);
+  const y = num(o["y"]);
+  const both = x !== null && y !== null;
+  return { x: both ? x : null, y: both ? y : null, minimized: o["minimized"] === true };
+}
+
+/** Pure: keep a box of size w×h fully on screen with a margin. */
+export function clampToViewport(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  vw: number,
+  vh: number,
+  margin = 8,
+): { x: number; y: number } {
+  const maxX = Math.max(margin, vw - w - margin);
+  const maxY = Math.max(margin, vh - h - margin);
+  return {
+    x: Math.min(Math.max(x, margin), maxX),
+    y: Math.min(Math.max(y, margin), maxY),
+  };
 }
 
 const STATUS_META: Record<string, { icon: string; color: string }> = {
@@ -51,6 +93,7 @@ let guardStarted = false;
 
 export function renderPanel(view: PanelView): void {
   lastView = view;
+  ensureUiLoaded();
   draw(view);
   if (!guardStarted) {
     guardStarted = true;
@@ -60,6 +103,128 @@ export function renderPanel(view: PanelView): void {
       if (lastView && !document.getElementById(PANEL_ID) && document.documentElement) draw(lastView);
     }, 8000);
   }
+}
+
+// Draggable/minimizable position, kept in a module var (so it survives the
+// frequent full redraws) and mirrored to storage.local (so it survives reloads).
+let uiState: PanelUiState = { x: null, y: null, minimized: false };
+let uiLoadStarted = false;
+
+function ensureUiLoaded(): void {
+  if (uiLoadStarted) return;
+  uiLoadStarted = true;
+  void browser.storage.local
+    .get(UI_KEY)
+    .then((got) => {
+      const loaded = parsePanelUi((got as Record<string, unknown>)?.[UI_KEY]);
+      const changed = loaded.x !== uiState.x || loaded.y !== uiState.y || loaded.minimized !== uiState.minimized;
+      uiState = loaded;
+      // Re-draw once with the restored position/minimized state.
+      if (changed && lastView) draw(lastView);
+    })
+    .catch(() => {});
+}
+
+function savePanelUi(): void {
+  void browser.storage.local.set({ [UI_KEY]: uiState }).catch(() => {});
+}
+
+// Once a positioned element is in the DOM its real size is known — re-clamp so a
+// panel restored from a chip dragged near an edge (or after a viewport resize)
+// never renders off-screen. No-op when using the default corner.
+function clampAfterAppend(node: HTMLElement): void {
+  if (uiState.x === null || uiState.y === null) return;
+  const c = clampToViewport(uiState.x, uiState.y, node.offsetWidth, node.offsetHeight, window.innerWidth, window.innerHeight);
+  if (c.x !== uiState.x || c.y !== uiState.y) {
+    uiState.x = c.x;
+    uiState.y = c.y;
+    applyPosition(node);
+    savePanelUi();
+  }
+}
+
+// Apply the current position to a fixed element: a stored x/y pins it via
+// left/top, otherwise it sits in the default bottom-right corner.
+function applyPosition(node: HTMLElement): void {
+  if (uiState.x !== null && uiState.y !== null) {
+    node.style.left = `${uiState.x}px`;
+    node.style.top = `${uiState.y}px`;
+    node.style.right = "auto";
+    node.style.bottom = "auto";
+  } else {
+    node.style.right = "16px";
+    node.style.bottom = "16px";
+    node.style.left = "auto";
+    node.style.top = "auto";
+  }
+}
+
+// Make `handle` drag `moveTarget` around, persisting the clamped position. A
+// press that doesn't move past a small threshold is treated as a click and
+// forwarded to onTap (used to restore the minimized chip). Presses that start
+// on a <button> are ignored so the header's buttons keep working.
+function attachDrag(handle: HTMLElement, moveTarget: HTMLElement, onTap?: () => void): void {
+  handle.style.cursor = "grab";
+  handle.addEventListener("pointerdown", (ev: Event) => {
+    const e = ev as PointerEvent;
+    if ((e.target as HTMLElement | null)?.closest("button")) return;
+    e.preventDefault();
+    const rect = moveTarget.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let moved = false;
+    handle.style.cursor = "grabbing";
+    const onMove = (mv: Event): void => {
+      const m = mv as PointerEvent;
+      const dx = m.clientX - startX;
+      const dy = m.clientY - startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+      const c = clampToViewport(
+        rect.left + dx, rect.top + dy,
+        moveTarget.offsetWidth, moveTarget.offsetHeight,
+        window.innerWidth, window.innerHeight,
+      );
+      uiState.x = c.x;
+      uiState.y = c.y;
+      applyPosition(moveTarget);
+    };
+    const onUp = (): void => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      handle.style.cursor = "grab";
+      if (moved) savePanelUi();
+      else if (onTap) onTap();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  });
+}
+
+// Collapse to / restore from the floating chip.
+function setMinimized(min: boolean): void {
+  uiState.minimized = min;
+  savePanelUi();
+  if (lastView) draw(lastView);
+}
+
+// The minimized floating chip — click to pop the panel back out; draggable too.
+function drawChip(): void {
+  const host = document.documentElement;
+  if (!host) return;
+  const chip = el("div", {
+    position: "fixed", "z-index": "2147483647",
+    display: "flex", "align-items": "center", gap: "6px",
+    padding: "8px 12px", "border-radius": "999px",
+    background: "#111827", color: "#f9fafb",
+    "box-shadow": "0 4px 16px rgba(0,0,0,.35)", font: "12px/1 system-ui,sans-serif",
+    "user-select": "none",
+  });
+  chip.id = PANEL_ID;
+  applyPosition(chip);
+  chip.append(text("span", "◧ Amazarch", {}));
+  chip.title = "Click to open Amazarch — drag to move";
+  attachDrag(chip, chip, () => setMinimized(false));
+  host.appendChild(chip);
 }
 
 // Update the status label in place (no full re-render).
@@ -80,22 +245,30 @@ function draw(view: PanelView): void {
   if (!host) return;
   document.getElementById(PANEL_ID)?.remove();
 
+  // Minimized: show only the floating chip.
+  if (uiState.minimized) {
+    drawChip();
+    return;
+  }
+
   const version = browser.runtime.getManifest().version;
   const panel = el("div", {
-    position: "fixed", right: "16px", bottom: "16px", "z-index": "2147483647",
+    position: "fixed", "z-index": "2147483647",
     width: "340px", "max-height": "70vh", display: "flex", "flex-direction": "column",
     background: "#111827", color: "#f9fafb", "border-radius": "12px",
     "box-shadow": "0 8px 30px rgba(0,0,0,.35)", font: "13px/1.45 system-ui,sans-serif",
     overflow: "hidden",
   });
   panel.id = PANEL_ID;
+  applyPosition(panel);
 
-  // Header
+  // Header — doubles as the drag handle (grab anywhere but the buttons).
   const header = el("div", {
     display: "flex", "align-items": "center", "justify-content": "space-between",
-    padding: "10px 12px", background: "#1f2937",
+    padding: "10px 12px", background: "#1f2937", "user-select": "none",
   });
   header.append(text("strong", `Amazarch v${version}`, {}));
+  attachDrag(header, panel);
   const right = el("div", { display: "flex", "align-items": "center", gap: "8px" });
   if (view.onSync) {
     const sync = el("button", {
@@ -115,11 +288,20 @@ function draw(view: PanelView): void {
     });
     right.append(sync);
   }
+  const minimize = el("button", {
+    background: "none", border: "none", color: "#9ca3af", cursor: "pointer",
+    "font-size": "16px", padding: "2px 4px", "line-height": "1",
+  });
+  minimize.textContent = "—";
+  minimize.title = "Minimize to a floating icon";
+  minimize.addEventListener("click", () => setMinimized(true));
+  right.append(minimize);
   const close = el("button", {
     background: "none", border: "none", color: "#9ca3af", cursor: "pointer",
     "font-size": "14px", padding: "2px 4px",
   });
   close.textContent = "✕";
+  close.title = "Close (reopens on the next sync)";
   close.addEventListener("click", () => {
     lastView = null; // otherwise the 8s guard resurrects the panel the user just closed
     panel.remove();
@@ -153,6 +335,7 @@ function draw(view: PanelView): void {
     );
     panel.append(body0);
     host.appendChild(panel);
+    clampAfterAppend(panel);
     return;
   }
 
@@ -260,6 +443,24 @@ function draw(view: PanelView): void {
     }
   }
 
+  // Section: Amazon accounts (multi-account, D11). Amazon allows only one active
+  // session at a time, so we accumulate each account's orders and prompt the
+  // user to switch accounts to sync the other one.
+  if (view.accounts && view.accounts.length > 0) {
+    body.append(sectionTitle("Amazon accounts"));
+    for (const a of view.accounts) {
+      body.append(accountRow(a, view.onForgetAccount));
+    }
+    const active = view.activeAccount;
+    body.append(
+      muted(
+        active
+          ? `Signed in as ${active}. To include another account, switch accounts on amazon.com, then Sync again.`
+          : "Switch accounts on amazon.com and Sync to add another account.",
+      ),
+    );
+  }
+
   panel.append(body);
 
   // Footer
@@ -270,6 +471,7 @@ function draw(view: PanelView): void {
   }));
 
   host.appendChild(panel);
+  clampAfterAppend(panel);
 }
 
 function el(tag: string, style: Record<string, string>): HTMLElement {
@@ -306,6 +508,47 @@ function row(left: string, sub: string, right: string, subColor = "#9ca3af"): HT
 
 function rank(status: string): number {
   return { auto: 0, review: 1, unmatched: 2, refund: 3 }[status] ?? 4;
+}
+
+/** Compact relative time, e.g. "just now", "3h ago", "2d ago". */
+export function ago(then: number, now = Date.now()): string {
+  const s = Math.max(0, Math.round((now - then) / 1000));
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+// One Amazon-account row: active dot + label, order count + last-sync sub-line,
+// and a ✕ to forget its cached orders.
+function accountRow(a: AmazonAccountSummary, onForget?: (label: string) => void): HTMLElement {
+  const item = el("div", {
+    display: "flex", "justify-content": "space-between", "align-items": "center",
+    gap: "8px", padding: "6px 12px", "border-top": "1px solid #1f2937",
+  });
+  const l = el("div", { "min-width": "0" });
+  l.append(
+    text("div", `${a.active ? "● " : "○ "}${a.label}`, {
+      color: a.active ? "#a7f3d0" : "#e5e7eb",
+      "white-space": "nowrap", overflow: "hidden", "text-overflow": "ellipsis",
+    }),
+  );
+  const when = a.lastSync ? ` · synced ${ago(a.lastSync)}` : "";
+  l.append(text("div", `${a.count} order${a.count === 1 ? "" : "s"}${when}`, { color: "#9ca3af", "font-size": "11px" }));
+  item.append(l);
+  if (onForget) {
+    const forget = el("button", {
+      background: "none", border: "1px solid #374151", color: "#9ca3af", cursor: "pointer",
+      "border-radius": "6px", "font-size": "11px", padding: "2px 6px",
+    }) as HTMLButtonElement;
+    forget.textContent = "Forget";
+    forget.title = `Forget ${a.label}'s cached orders`;
+    forget.addEventListener("click", () => onForget(a.label));
+    item.append(forget);
+  }
+  return item;
 }
 
 /** "  (+3d)" / "  (-1d)" — charges may be dated up to backDays BEFORE the

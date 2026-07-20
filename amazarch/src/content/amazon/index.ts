@@ -11,6 +11,7 @@ import {
   parseOrderDate,
   parseOrderId,
 } from "../../shared/amazon-dom-parse";
+import { parseAmazonAccountLabel } from "../../shared/amazon-account";
 import type { AmazonOrderLite } from "../../shared/messages";
 
 const LOG = "[Amazarch/amazon]";
@@ -20,6 +21,16 @@ console.info(`${LOG} active on ${location.href}`);
 
 function detectLogin(): boolean {
   return /\/ap\/signin/i.test(location.href) || !!document.getElementById("ap_email");
+}
+
+// Which Amazon account is signed in — the "Hello, <Name>" nav greeting. Used to
+// tag orders by account (multi-account, D11). Null when it can't be read.
+function readAccountLabel(): string | null {
+  const greeting =
+    document.getElementById("nav-link-accountList-nav-line-1")?.textContent ??
+    document.querySelector("#nav-link-accountList .nav-line-1")?.textContent ??
+    null;
+  return parseAmazonAccountLabel(greeting);
 }
 
 function scrapeOrders(): AmazonOrderLite[] {
@@ -61,10 +72,13 @@ function diag(waited: number): { cardCount: number; decrypted: boolean; url: str
 
 function report(orders: AmazonOrderLite[], signedIn: boolean, waited: number): void {
   const d = diag(waited);
+  const account = signedIn ? readAccountLabel() : null;
   void browser.runtime
-    .sendMessage({ type: "amazon-orders", orders, signedIn, diag: d })
+    .sendMessage({ type: "amazon-orders", orders, signedIn, account, diag: d })
     .catch((e) => console.warn(`${LOG} could not reach background:`, e));
-  console.info(`${LOG} report: ${orders.length} orders, cards=${d.cardCount}, decrypted=${d.decrypted}`);
+  console.info(
+    `${LOG} report: ${orders.length} orders${account ? ` for ${account}` : ""}, cards=${d.cardCount}, decrypted=${d.decrypted}`,
+  );
   showPill(signedIn ? `Amazarch: read ${orders.length} Amazon orders` : "Amazarch: please sign in to Amazon");
 }
 

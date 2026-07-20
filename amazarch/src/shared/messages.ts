@@ -35,6 +35,14 @@ export interface AmazonStatus {
   note: string;
 }
 
+/** One known Amazon account and how much of its order history we hold. */
+export interface AmazonAccountSummary {
+  label: string; // display name read from the Amazon nav ("Derrick"), or a default
+  count: number; // orders cached for this account
+  lastSync: number; // epoch ms of the last successful scrape
+  active: boolean; // the account signed in during the most recent sync
+}
+
 // AmazonOrder is defined in shared/amazon-order-parse to avoid a cycle; re-export
 // the shape here for message typing.
 export interface AmazonOrderLite {
@@ -45,11 +53,16 @@ export interface AmazonOrderLite {
   /** Card text shows a completed return/refund ("Refund issued", "Return
    *  complete"). Optional so older callers/fixtures stay valid. */
   returnHint?: boolean;
+  /** Which Amazon account this order was scraped from (multi-account, D11).
+   *  Optional so older callers/fixtures stay valid. */
+  account?: string;
 }
 
 export interface AmazonCheck {
   status: AmazonStatus;
-  orders: AmazonOrderLite[];
+  orders: AmazonOrderLite[]; // the UNION of every known account's cached orders
+  accounts?: AmazonAccountSummary[]; // all accounts we hold orders for
+  activeAccount?: string | null; // the account signed in during this sync
   diagnostic?: Record<string, number | string>; // redacted counts when parsing found nothing
   sample?: string; // redacted structural skeleton of one order card (no values)
   report?: string; // full copyable diagnostic bundle (counts + JSON schema + skeleton), no values
@@ -68,6 +81,7 @@ export type Message =
       type: "amazon-orders";
       orders: AmazonOrderLite[];
       signedIn: boolean;
+      account?: string | null; // the signed-in account label read from the page
       diag?: { cardCount: number; decrypted: boolean; url: string; waited: number };
     }
   | { type: "amazon-progress"; label: string }

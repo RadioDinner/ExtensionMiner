@@ -6,7 +6,13 @@ vi.mock("webextension-polyfill", () => ({
   },
 }));
 
-import { effectiveLookbackMonths, parseDeepSync } from "../src/shared/deep-sync";
+import {
+  effectiveLookbackMonths,
+  parseDeepSync,
+  parseDeepSyncMap,
+  recordForAccount,
+} from "../src/shared/deep-sync";
+import { DEFAULT_ACCOUNT } from "../src/shared/order-store";
 import { DEFAULT_SETTINGS } from "../src/shared/settings";
 
 const s = (lookbackMonths: number) => ({ ...DEFAULT_SETTINGS, lookbackMonths });
@@ -36,5 +42,28 @@ describe("effectiveLookbackMonths", () => {
 
   it("raising the setting re-triggers a deep fetch", () => {
     expect(effectiveLookbackMonths(s(36), { months: 12, at: 1 })).toBe(36);
+  });
+});
+
+describe("parseDeepSyncMap (per-account, D11)", () => {
+  it("migrates a legacy single record under the default account", () => {
+    expect(parseDeepSyncMap({ months: 24, at: 5 })).toEqual({ [DEFAULT_ACCOUNT]: { months: 24, at: 5 } });
+  });
+
+  it("reads a per-account map and drops invalid entries", () => {
+    const map = parseDeepSyncMap({ Derrick: { months: 24, at: 5 }, Sarah: { months: 12, at: 7 }, Bad: { months: "x" } });
+    expect(map).toEqual({ Derrick: { months: 24, at: 5 }, Sarah: { months: 12, at: 7 } });
+  });
+
+  it("returns an empty map for garbage", () => {
+    expect(parseDeepSyncMap(null)).toEqual({});
+    expect(parseDeepSyncMap("done")).toEqual({});
+  });
+
+  it("each account's depth is independent — one deep account does not mark another done", () => {
+    const map = parseDeepSyncMap({ Derrick: { months: 24, at: 5 } });
+    // Derrick already deep-synced 24 months → fast; Sarah has no record → deep.
+    expect(effectiveLookbackMonths(s(24), recordForAccount(map, "Derrick"))).toBe(3);
+    expect(effectiveLookbackMonths(s(24), recordForAccount(map, "Sarah"))).toBe(24);
   });
 });

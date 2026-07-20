@@ -58,7 +58,7 @@ browser.runtime.onMessage.addListener(
 
     // An amazon.com content script reported its scraped orders.
     if (message.type === "amazon-orders") {
-      resolveAmazonReport(sender.tab?.id, message.orders, message.signedIn, message.diag);
+      resolveAmazonReport(sender.tab?.id, message.orders, message.signedIn, message.account ?? null, message.diag);
       return undefined;
     }
 

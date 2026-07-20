@@ -2,12 +2,16 @@
 
 *Match Amazon orders to Monarch transactions.* Product spec: [`SPEC.md`](./SPEC.md).
 
-**Status: M2+ (v0.7.0).** Builds for Chrome + Firefox. Working today: Monarch
+**Status: M2+ (v0.8.0).** Builds for Chrome + Firefox. Working today: Monarch
 session detection, Amazon order sync with configurable multi-year lookback,
 charge matching, **refund matching** (full refunds auto when unique or singled
 out by the card's return status; partials queue for review), verified notes +
-merchant-rename writes with Undo, and
-auto-match settings. Not yet: splits, categorization (see SPEC.md §6).
+merchant-rename writes with Undo, and auto-match settings. **Multi-account
+(D11):** each Amazon account you sign into is cached separately and the matcher
+runs against all of them — switch accounts on amazon.com and Sync to add your
+household's other account. The injected panel is **draggable** (grab the header)
+and **minimizes** to a floating chip. Not yet: splits, categorization
+(see SPEC.md §6).
 
 ## Develop
 

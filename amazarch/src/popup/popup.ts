@@ -2,6 +2,7 @@ import browser from "webextension-polyfill";
 import type { Message, StatusResponse } from "../shared/messages";
 import { loadSettings, saveSettings, type AmazarchSettings } from "../shared/settings";
 import { clearDeepSync, loadDeepSync } from "../shared/deep-sync";
+import { loadOrderStore, summarizeAccounts } from "../shared/order-store";
 
 const MONARCH_ORIGINS = ["https://app.monarchmoney.com/*", "https://app.monarch.com/*"];
 
@@ -203,5 +204,27 @@ async function initSettings(): Promise<void> {
   lookback.addEventListener("change", onChange);
 }
 
+// --- Amazon accounts (multi-account, D11) -------------------------------------
+
+async function initAccounts(): Promise<void> {
+  const el = document.getElementById("accounts");
+  if (!el) return;
+  try {
+    const accounts = summarizeAccounts(await loadOrderStore(), null);
+    if (accounts.length === 0) {
+      el.textContent = "";
+      return;
+    }
+    const names = accounts.map((a) => `${a.label} (${a.count})`).join(", ");
+    el.textContent =
+      accounts.length === 1
+        ? `Amazon account: ${names}`
+        : `Amazon accounts: ${names} — the panel matches all of them. Switch accounts on amazon.com and Sync to add more.`;
+  } catch {
+    el.textContent = "";
+  }
+}
+
 void refresh();
 void initSettings();
+void initAccounts();

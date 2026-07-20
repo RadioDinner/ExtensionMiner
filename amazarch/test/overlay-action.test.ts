@@ -13,7 +13,16 @@ vi.mock("webextension-polyfill", () => ({
   default: { runtime: { getManifest: () => ({ version: "0.0.0-test" }) } },
 }));
 
-import { actionButton, armUndo, fmtDayDiff, type ApplyOutcome, type ApplyResult } from "../src/content/monarch/overlay";
+import {
+  actionButton,
+  ago,
+  armUndo,
+  clampToViewport,
+  fmtDayDiff,
+  parsePanelUi,
+  type ApplyOutcome,
+  type ApplyResult,
+} from "../src/content/monarch/overlay";
 
 let keyCounter = 0;
 function freshKey(): string {
@@ -282,3 +291,44 @@ describe("fmtDayDiff", () => {
     expect(fmtDayDiff(null)).toBe("");
   });
 });
+
+describe("parsePanelUi", () => {
+  it("defaults to the corner, not minimized", () => {
+    expect(parsePanelUi(undefined)).toEqual({ x: null, y: null, minimized: false });
+    expect(parsePanelUi(null)).toEqual({ x: null, y: null, minimized: false });
+    expect(parsePanelUi("junk")).toEqual({ x: null, y: null, minimized: false });
+  });
+  it("accepts a full position + minimized flag", () => {
+    expect(parsePanelUi({ x: 40, y: 120, minimized: true })).toEqual({ x: 40, y: 120, minimized: true });
+  });
+  it("falls back to the corner when only one coordinate is set", () => {
+    expect(parsePanelUi({ x: 40, minimized: false })).toEqual({ x: null, y: null, minimized: false });
+    expect(parsePanelUi({ y: 120 })).toEqual({ x: null, y: null, minimized: false });
+    expect(parsePanelUi({ x: 40, y: Infinity })).toEqual({ x: null, y: null, minimized: false });
+  });
+});
+
+describe("clampToViewport", () => {
+  it("keeps a box fully on screen with a margin", () => {
+    // Panel 340x400 in a 1000x800 viewport, dragged off the bottom-right.
+    expect(clampToViewport(9999, 9999, 340, 400, 1000, 800, 8)).toEqual({ x: 652, y: 392 });
+    // Dragged off the top-left.
+    expect(clampToViewport(-50, -50, 340, 400, 1000, 800, 8)).toEqual({ x: 8, y: 8 });
+    // A position already inside is unchanged.
+    expect(clampToViewport(100, 100, 340, 400, 1000, 800, 8)).toEqual({ x: 100, y: 100 });
+  });
+  it("does not go negative when the panel is larger than the viewport", () => {
+    expect(clampToViewport(500, 500, 900, 900, 400, 400, 8)).toEqual({ x: 8, y: 8 });
+  });
+});
+
+describe("ago", () => {
+  it("formats relative time compactly", () => {
+    const now = 1_000_000_000;
+    expect(ago(now, now)).toBe("just now");
+    expect(ago(now - 30_000, now)).toBe("just now");
+    expect(ago(now - 5 * 60_000, now)).toBe("5m ago");
+    expect(ago(now - 3 * 3_600_000, now)).toBe("3h ago");
+    expect(ago(now - 2 * 86_400_000, now)).toBe("2d ago");
+  });
+})

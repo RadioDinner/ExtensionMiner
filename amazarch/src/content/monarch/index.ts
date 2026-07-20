@@ -11,8 +11,9 @@ import {
   huntMonarchToken,
 } from "../../shared/monarch-session";
 import { probeMonarchApi, readCookie } from "../../shared/monarch-probe";
-import { readAmazonTransactions } from "../../shared/monarch-read";
+import { readAmazonTransactions, type AmazonTxn } from "../../shared/monarch-read";
 import { matchOrdersToCharges } from "../../shared/matcher";
+import { removeAccount, summarizeAccounts, unionOrders } from "../../shared/order-store";
 import {
   buildMerchantName,
   buildNoteLine,
@@ -26,7 +27,7 @@ import {
 import type { MatchResult } from "../../shared/matcher";
 import { loadSettings } from "../../shared/settings";
 import { planAutoApply, runAutoApply, summarizeAutoApply } from "../../shared/auto-apply";
-import type { ApplyResult } from "./overlay";
+import type { ApplyResult, PanelView } from "./overlay";
 import { armUndo } from "./overlay";
 import type {
   AmazonCheck,
@@ -226,6 +227,27 @@ async function tryConnect(): Promise<boolean> {
     };
   };
 
+  // Kept from the last sync so "Forget account" can re-match against the same
+  // Monarch charges without reopening the Amazon tab.
+  let lastCharges: AmazonTxn[] = [];
+  let lastActiveAccount: string | null = null;
+  let lastBaseView: PanelView | null = null;
+
+  // Forget an Amazon account's cached orders, then re-match + re-render from the
+  // remaining accounts' union (no Amazon fetch — this is local cache surgery).
+  const onForgetAccount = async (label: string): Promise<void> => {
+    const store = await removeAccount(label);
+    const orders = unionOrders(store);
+    const active = lastActiveAccount === label ? null : lastActiveAccount;
+    const accounts = summarizeAccounts(store, active);
+    const matches = matchOrdersToCharges(lastCharges, orders);
+    renderPanel({
+      ...(lastBaseView ?? { txns: [], totalCount: null, capped: false, synced: true, onSync: doSync, onApply, onRename }),
+      orders, matches, accounts, activeAccount: active, onForgetAccount,
+      status: `Forgot ${label} — ${orders.length} order${orders.length === 1 ? "" : "s"} across ${accounts.length} account${accounts.length === 1 ? "" : "s"}. Refresh Monarch if you had applied any of its matches.`,
+    });
+  };
+
   // Heavy work (read charges + open the Amazon tab + match) runs ONLY on demand,
   // so opening Monarch stays fast and the Amazon tab isn't opened every visit.
   const doSync = async (): Promise<void> => {
@@ -264,19 +286,25 @@ async function tryConnect(): Promise<boolean> {
         done = `Amazon fetch error — ${amazonError}`;
       } else if (!check) {
         done = "Amazon fetch returned nothing (no response from background).";
-      } else if (check.status.signedIn === false) {
+      } else if (check.status.signedIn === false && check.orders.length === 0) {
         done = "Amazon needs sign-in — open amazon.com, sign in, then Sync again.";
+      } else if (check.status.signedIn === false) {
+        done = `Not signed in to Amazon — matched against ${check.orders.length} cached orders. Sign in and Sync to refresh.`;
       } else if (check.orders.length === 0) {
         done = `Done — ${read.rows.length} charges, but 0 Amazon orders. ${check.status.note}`;
       } else {
         done = `Done — ${read.rows.length} Amazon charges, ${check.orders.length} orders read.`;
       }
-      const view = {
+      lastCharges = read.rows;
+      lastActiveAccount = check?.activeAccount ?? null;
+      const view: PanelView = {
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,
         orders: check?.orders, amazonNote: check?.status.note, matches,
         synced: true, status: done, onSync: doSync, onApply, onRename,
+        accounts: check?.accounts, activeAccount: check?.activeAccount ?? null, onForgetAccount,
         diagnostic: check?.diagnostic, sample: check?.sample, report: check?.report,
       };
+      lastBaseView = view;
       renderPanel(view);
 
       // Auto match (popup settings): apply the enabled actions to EXACT ("auto")
