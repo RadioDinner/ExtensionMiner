@@ -1,89 +1,104 @@
 SESSION 11 — HANDOFF LOG
 ========================
 Date: 2026-07-20 (UTC). WEB session (Claude-Code-on-the-web).
-Assigned branch: claude/amazarch-commercialization-r2rqew (developed & pushed
-there per harness instruction — NOT main this time). No PR opened.
+Assigned branch: claude/amazarch-commercialization-r2rqew (ALL work developed &
+pushed there per harness instruction — NOT main). No PR opened.
+Commits: 16f70e6 (commercialization plan), 49ca0b3 (v0.7.0 refund matching),
+e927a01 (review fixes), + this log.
 
 MIGRATIONS: none. Miner Supabase migrations unchanged: lowest is still 988 →
 NEXT NEW = 987.
 
 ================================================================================
-WHAT THIS SESSION WAS
+PART A — COMMERCIALIZATION PLAN (prompt 1, advisory)
 ================================================================================
-ADVISORY session, no product code changed. The user asked: what work is needed
-to commercialize Amazarch — Phase 1 (technical: make it sellable, subscription
-or one-time purchase) and Phase 2 (go to market)?
-
-DELIVERABLE: amazarch/COMMERCIALIZATION.md (new) — the full plan, grounded in
-the v0.6.0 codebase + SPEC.md. Also answered in chat. Summary of the plan:
-
-PHASE 1 (~50–80h + 2–4wk beta), in order:
- 1. Close the differentiation gap (~15–25h): build REFUND MATCHING (the
-    headline paid feature; matcher.ts currently only flags refunds), verify
-    deep-lookback live, build the Privacy Central ZIP parser. DEFER splits +
-    AI categorization to v1.1 (official extension's strength, biggest lift).
- 2. Stranger-proofing (~10–20h): onboarding flow, exportable scrubbed
-    diagnostics, REMOTE KILL SWITCH/config JSON (writes-off flag + endpoint
-    names — survival requirement for a paid product on an unofficial API),
-    loud versioned parser failures.
- 3. Licensing (~8–15h): LEAN PATH = merchant-of-record (LemonSqueezy/Paddle)
-    hosted checkout + license-key validation from the extension, offline
-    grace, fail-open. NO custom backend needed for v1. Subscription $3–4/mo
-    or $30–35/yr + 14-day trial + limited lifetime launch tier recommended
-    over one-time (perpetual maintenance on two hostile surfaces).
- 4. Store packaging (~8–12h): extract amazarch/ to its own repo (AMO source
-    review), CWS single-purpose + permission justifications + privacy policy,
-    AMO data_collection_permissions + unlisted beta signing, landing page on
-    Vercel. NOTE: new CWS data-disclosure enforcement starts 2026-08-01 —
-    build the consent/disclosure UI into onboarding from day one.
- 5. Private beta (2–4wk calendar): 10–30 users recruited from official-
-    extension complaint threads; AMO-unlisted + Chrome load-unpacked.
-
-KEY SCOPE DECISION PROPOSED (amends SPEC D15): entitlement-only backend for
-v1 — financial data stays LOCAL (IndexedDB); no cloud sync of purchase/txn
-data. Kills the custody/breach risk (SPEC risk #6), shrinks privacy policy +
-store friction, lowers user trust bar. Cloud sync returns later if demanded.
-
-PHASE 2 (GTM):
- - Positioning: "picks up where the official sync stops" — refunds, full
-   history, Firefox, review queue + undo. Never lead with "better than".
- - Channels ranked: (1) r/MonarchMoney — official extension complaint threads
-   are the pre-qualified lead list; founder-story beta recruit then launch;
-   (2) OSS graveyard (alex-peck/monarch-amazon-sync 24 open issues etc.);
-   (3) honest comparison-page SEO; (4) Monarch-affiliate YouTubers/bloggers;
-   (5) store-listing SEO; (6) PH/HN as amplifier only.
- - Honest ceiling: hundreds→low-thousands of subs = $15–60k/yr side business.
-   Risks: Monarch ships refunds / breaks API / ships public API (the last is
-   GOOD if the GraphQL client stays swappable). Hedge = SPEC D17(d) YNAB
-   multi-app expansion (official API, proven paid demand).
- - Ops: MoR handles sales tax; LLC decision, support inbox with stated SLA,
-   public changelog, 14-day refund policy.
-
-4 DECISION POINTS LEFT WITH THE OWNER (in COMMERCIALIZATION.md §Decision
-points): sub vs one-time; entitlement-only vs full cloud sync; splits at
-launch vs v1.1; contact Monarch pre-launch or not (rec: no).
+DELIVERABLE: amazarch/COMMERCIALIZATION.md — the full Phase 1 (make it
+sellable, ~50–80h + 2–4wk beta) + Phase 2 (go to market) plan. Highlights:
+refund matching is the headline paid feature; lean licensing via
+merchant-of-record (LemonSqueezy/Paddle) license keys, NO custom backend for
+v1; entitlement-only backend proposed (amends SPEC D15 — financial data stays
+local); subscription $3–4/mo recommended over one-time; CWS data-disclosure
+enforcement starts 2026-08-01; GTM beachhead = r/MonarchMoney complaint
+threads + OSS-graveyard issues + honest comparison SEO. 4 decision points
+left with the owner in the doc's last section (sub vs one-time; entitlement-
+only vs cloud sync; splits at launch vs v1.1; contact Monarch or not).
 
 ================================================================================
-FILES CHANGED
+PART B — v0.7.0: REFUND MATCHING (prompt 2 — "lets get to refund matching")
 ================================================================================
- - NEW amazarch/COMMERCIALIZATION.md (the plan)
- - NEW Session log/Session 11/prompt_history.txt (1 prompt)
- - NEW Session log/Session 11/session_log.txt (this file)
-No source, test, manifest, or migration changes. amazarch stays v0.6.0.
+The M3 core / headline paid feature. Money-in Monarch rows (credits) now match
+back to the Amazon order they refund. SHIPPED:
+
+1. matcher.ts — refund matcher. Rules (SPEC §3 rule 4):
+   - FULL: credit == order.totalCents, 0 <= (creditDate - orderDate) <= 120
+     (refundWindowDays, configurable). Unique → "auto". Multiple same-amount
+     candidates: if EXACTLY ONE carries a returnHint → "auto" on it (hint
+     disambiguates, beats date proximity); else "review" (hinted-first, then
+     closest date).
+   - PARTIAL: credit < a RETURN-HINTED order's total in window → "review",
+     NEVER auto. Hint is REQUIRED for partials (totals alone can't evidence a
+     partial amount). Full match always preferred over partial.
+   - No candidate → status "refund" = unmatched credit (listed, not dropped).
+   - MatchResult gained kind:"charge"|"refund" + refundMatch:"full"|"partial";
+     summary's `refund` count now means UNMATCHED refunds only.
+2. returnHint — scraped from order-card text. RETURN_HINT_RE
+   (amazon-order-parse.ts) matches COMPLETED-return phrases only ("Refund
+   issued", "Return complete", "Refunded", "Track your refund", "Item
+   returned"…) and deliberately NOT the "Return or replace items" / "Return
+   eligible through…" text on every delivered card (tested both ways).
+   Hint captured in the DOM path (content/amazon) and HTML path
+   (parseAmazonOrders); background dedupe merges hint=true onto seen orders.
+3. Writes — buildRefundNoteLine ("[Amazarch] Refund — items · #id · link",
+   partial variant "Partial refund — …") + buildRefundMerchantName
+   ("Amazon refund — <summary>"). Refunds flow through the SAME v0.4.11
+   verified-write + undo path and the SAME auto-apply toggles (unique-full
+   refunds auto-apply when autoMatch+autoNote/autoRename on; partials never).
+4. Plumbing — onApply/onRename signatures changed to take the full
+   MatchResult (overlay.ts PanelView, content/monarch/index.ts, auto-apply
+   callback). Armed-undo registry keys unchanged (chargeId:note/rename).
+5. Overlay — matched refunds show ↩ with status color, "refund of <date>
+   order · item (+Nd)" / "partial refund of…"; unmatched: "refund — no order
+   matched in the sync window"; summary line says "N refunds unmatched".
+6. Tests 116 → 136, all green; typecheck + chrome/firefox builds green.
+   Version 0.7.0 (package.json + both manifests). README status updated.
+
+QUALITY PROCESS: adversarial multi-agent workflow on commit 49ca0b3 — 4
+review lenses (matcher correctness, integration/type-flow, scrape/hint, UX
+truthfulness) → 12 raw findings → 3 skeptics each, majority verdict. 1
+CONFIRMED (day-diff rendered "(+-1d)" for charges dated before their order —
+fixed via fmtDayDiff, tested) + 2 copy fixes adopted from rejected-but-fair
+findings (footer said writes are click-only — auto-match writes too; README
+wording). 40 agents, ~2.1M tokens. Fixes in e927a01.
+
+REJECTED-BUT-WORTH-KNOWING (skeptics refuted; noted as design boundaries):
+ - Refunds for orders OLDER than the order-scrape window (3mo after deep
+   sync) list as unmatched — by design; a coincidental same-amount newer
+   order could in rare cases auto-claim such a credit (bounded by exact
+   amount + window + undo + review queue). Future refinement: consume
+   orders once claimed / widen order lookback when credits go unmatched.
+ - Two identical-amount credits can both claim the same order (rare;
+   additive notes + undo make it low-harm). Future: one-refund-per-order.
 
 ================================================================================
 OPEN ITEMS / NEXT SESSION
 ================================================================================
- - STILL OPEN FROM SESSION 10: user must live-confirm v0.4.11 write
-   verification + v0.5.0 auto-match + v0.6.0 deep lookback on their machine
-   (panel header "Amazarch v0.6.0"; watch for the "⚠ Amazon may have ignored
-   the time filter" note — if present, the timeFilter/orderFilter param is
-   wrong for their page).
- - Await owner's calls on the 4 decision points above; then the natural next
-   build session is Phase-1 item 1: refund matching (M3 core).
- - If commercialization proceeds: repo extraction (amazarch/ → own repo) is on
-   the critical path for AMO listing; keep it in mind before the codebase
-   grows more entangled with the miner repo.
+ - USER LIVE-CONFIRM (panel header must say "Amazarch v0.7.0"): (a) a real
+   refund credit shows "↩ refund of <date> order" and its Add note/Rename
+   apply + undo with the confirmed-by-Monarch status; (b) still open from
+   Session 10: deep lookback (watch for "⚠ Amazon may have ignored the time
+   filter") and the v0.4.11/0.5.0 write+auto-match flows.
+ - RETURN_HINT_RE is built from documented Amazon phrasing but UNVERIFIED
+   against the user's real order page (env is egress-blocked) — if hints
+   never appear, partial matching silently yields no candidates; check a
+   known-returned order's card.
+ - Phase 1 continues per COMMERCIALIZATION.md order: next = backfill
+   hardening (live-verify year filters, Privacy Central ZIP parser), then
+   stranger-proofing (onboarding, diagnostics, kill switch), then licensing
+   (MoR license keys), then store packaging. Owner's 4 decision points in
+   COMMERCIALIZATION.md still await answers.
+ - Branch: everything is on claude/amazarch-commercialization-r2rqew, NOT
+   main. Next session: merge to main or continue on a designated branch as
+   instructed.
 
 PROJECT STATE OTHERWISE: miner/dashboard untouched since Session 8. Amazarch
-(v0.6.0, 116 tests green as of Session 10) remains the active workstream.
+v0.7.0 (136 tests green) is the active workstream.
