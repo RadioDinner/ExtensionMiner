@@ -3,7 +3,7 @@ import { planAutoApply, runAutoApply, summarizeAutoApply, type AutoApplyAction }
 import type { MatchResult } from "../src/shared/matcher";
 import type { AmazarchSettings } from "../src/shared/settings";
 
-function match(status: MatchResult["status"], id: string): MatchResult {
+function match(status: MatchResult["status"], id: string, kind: MatchResult["kind"] = "charge"): MatchResult {
   return {
     charge: { id, date: "2026-07-01", amountCents: -1234, merchantName: "Amazon", name: "Amazon", notes: "" },
     order:
@@ -13,6 +13,8 @@ function match(status: MatchResult["status"], id: string): MatchResult {
     candidateCount: 1,
     status,
     dayDiff: 1,
+    kind,
+    refundMatch: kind === "refund" && (status === "auto" || status === "review") ? "full" : null,
   };
 }
 
@@ -48,6 +50,11 @@ describe("planAutoApply", () => {
   it("respects the sub-toggles independently", () => {
     expect(planAutoApply(matches, s({ autoRename: false })).map((a) => a.kind)).toEqual(["note", "note"]);
     expect(planAutoApply(matches, s({ autoNote: false })).map((a) => a.kind)).toEqual(["rename", "rename"]);
+  });
+
+  it("includes exact refund matches (unique full refunds auto-apply too)", () => {
+    const plan = planAutoApply([match("auto", "f1", "refund"), match("review", "p1", "refund")], s({}));
+    expect(plan.map((a) => `${a.match.charge.id}:${a.kind}`)).toEqual(["f1:note", "f1:rename"]);
   });
 });
 

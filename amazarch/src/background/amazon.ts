@@ -108,9 +108,13 @@ export async function fetchAmazonViaTab(
         let added = 0;
         for (const o of r.orders) {
           const key = orderKey(o);
-          if (!all.has(key)) {
+          const existing = all.get(key);
+          if (!existing) {
             all.set(key, o);
             added += 1;
+          } else if (o.returnHint && !existing.returnHint) {
+            // Same order seen again with a return/refund hint — keep the hint.
+            existing.returnHint = true;
           }
         }
         // Stop when a page brings nothing new (last page, or startIndex ignored)

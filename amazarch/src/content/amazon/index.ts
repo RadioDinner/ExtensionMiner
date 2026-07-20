@@ -5,6 +5,7 @@
 import browser from "webextension-polyfill";
 import {
   bestTotalCents,
+  hasReturnHint,
   looksDecrypted,
   orderIdFromSlotId,
   parseOrderDate,
@@ -36,7 +37,13 @@ function scrapeOrders(): AmazonOrderLite[] {
     )
       .map((a) => (a.textContent ?? "").trim())
       .filter((t) => t.length > 2);
-    orders.push({ orderId, date, totalCents, itemTitles: [...new Set(items)].slice(0, 10) });
+    orders.push({
+      orderId,
+      date,
+      totalCents,
+      itemTitles: [...new Set(items)].slice(0, 10),
+      returnHint: hasReturnHint(text),
+    });
   });
   return orders;
 }

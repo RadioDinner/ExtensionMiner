@@ -16,18 +16,20 @@ import { matchOrdersToCharges } from "../../shared/matcher";
 import {
   buildMerchantName,
   buildNoteLine,
+  buildRefundMerchantName,
+  buildRefundNoteLine,
   mergeNotes,
   setTransactionName,
   setTransactionNotes,
   type WriteResult,
 } from "../../shared/monarch-write";
+import type { MatchResult } from "../../shared/matcher";
 import { loadSettings } from "../../shared/settings";
 import { planAutoApply, runAutoApply, summarizeAutoApply } from "../../shared/auto-apply";
 import type { ApplyResult } from "./overlay";
 import { armUndo } from "./overlay";
 import type {
   AmazonCheck,
-  AmazonOrderLite,
   AuthMethod,
   Message,
   MonarchSessionInfo,
@@ -177,8 +179,16 @@ async function tryConnect(): Promise<boolean> {
       setPanelStatus(`${what} accepted (couldn't confirm from the response) — refresh the page to check.`);
     }
   };
-  const onApply = async (chargeId: string, chargeNotes: string, order: AmazonOrderLite): Promise<ApplyResult> => {
-    const merged = mergeNotes(chargeNotes, order, buildNoteLine(order));
+  // Both actions take the full match so refund credits get refund wording
+  // ("[Amazarch] Refund — …", "Amazon refund — …") through the same verified,
+  // undoable write path as charges.
+  const onApply = async (m: MatchResult): Promise<ApplyResult> => {
+    const order = m.order;
+    if (!order) return { ok: false, note: "no matched order" };
+    const chargeId = m.charge.id;
+    const chargeNotes = m.charge.notes;
+    const line = m.kind === "refund" ? buildRefundNoteLine(order, m.refundMatch) : buildNoteLine(order);
+    const merged = mergeNotes(chargeNotes, order, line);
     if (!merged.changed) return { ok: true, note: "already noted" };
     const res = await setTransactionNotes(auth, chargeId, merged.notes);
     if (!res.ok) return { ok: false, note: res.note };
@@ -194,8 +204,12 @@ async function tryConnect(): Promise<boolean> {
       },
     };
   };
-  const onRename = async (chargeId: string, currentName: string, order: AmazonOrderLite): Promise<ApplyResult> => {
-    const target = buildMerchantName(order);
+  const onRename = async (m: MatchResult): Promise<ApplyResult> => {
+    const order = m.order;
+    if (!order) return { ok: false, note: "no matched order" };
+    const chargeId = m.charge.id;
+    const currentName = m.charge.name;
+    const target = m.kind === "refund" ? buildRefundMerchantName(order) : buildMerchantName(order);
     if (currentName === target) return { ok: true, note: "already named" };
     const res = await setTransactionName(auth, chargeId, target);
     if (!res.ok) return { ok: false, note: res.note };
@@ -277,10 +291,7 @@ async function tryConnect(): Promise<boolean> {
           plan,
           async (a) => {
             const m = a.match;
-            const r =
-              a.kind === "note"
-                ? await onApply(m.charge.id, m.charge.notes, m.order!)
-                : await onRename(m.charge.id, m.charge.name, m.order!);
+            const r = a.kind === "note" ? await onApply(m) : await onRename(m);
             armUndo(`${m.charge.id}:${a.kind}`, r);
             return r;
           },

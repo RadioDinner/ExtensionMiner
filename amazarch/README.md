@@ -2,9 +2,11 @@
 
 *Match Amazon orders to Monarch transactions.* Product spec: [`SPEC.md`](./SPEC.md).
 
-**Status: M0 (skeleton).** Builds for Chrome + Firefox; detects your Monarch
-web session (token bridge) and shows a "connected" pill + popup status.
-No Amazon sync, matching, or writes yet — see SPEC.md §6 milestones.
+**Status: M2+ (v0.7.0).** Builds for Chrome + Firefox. Working today: Monarch
+session detection, Amazon order sync with configurable multi-year lookback,
+charge matching, **refund matching** (full refunds auto when unique; partials
+queue for review), verified notes + merchant-rename writes with Undo, and
+auto-match settings. Not yet: splits, categorization (see SPEC.md §6).
 
 ## Develop
 

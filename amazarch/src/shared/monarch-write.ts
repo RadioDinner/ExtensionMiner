@@ -4,6 +4,7 @@
 // category, and splits build on this later.
 import { type MonarchAuth, gqlRequest } from "./monarch-gql";
 import type { AmazonOrderLite } from "./messages";
+import type { RefundMatch } from "./matcher";
 
 const MARKER = "[Amazarch]";
 
@@ -11,6 +12,18 @@ const MARKER = "[Amazarch]";
 export function buildNoteLine(order: AmazonOrderLite): string {
   const items = order.itemTitles.slice(0, 5).join(", ");
   const parts = [`${MARKER} ${items || "Amazon order"}`];
+  if (order.orderId) {
+    parts.push(`#${order.orderId}`);
+    parts.push(`https://www.amazon.com/gp/css/order-details?orderID=${order.orderId}`);
+  }
+  return parts.join(" · ");
+}
+
+/** The note line for a refund credit matched back to its order. */
+export function buildRefundNoteLine(order: AmazonOrderLite, refundMatch: RefundMatch | null): string {
+  const items = order.itemTitles.slice(0, 5).join(", ");
+  const what = refundMatch === "partial" ? "Partial refund" : "Refund";
+  const parts = [`${MARKER} ${what} — ${items || "Amazon order"}`];
   if (order.orderId) {
     parts.push(`#${order.orderId}`);
     parts.push(`https://www.amazon.com/gp/css/order-details?orderID=${order.orderId}`);
@@ -52,6 +65,11 @@ export function shortItemSummary(titles: string[], maxLen = 42): string {
 
 export function buildMerchantName(order: AmazonOrderLite, base = "Amazon"): string {
   return `${base} — ${shortItemSummary(order.itemTitles)}`;
+}
+
+/** Merchant name for a refund credit, e.g. "Amazon refund — USB-C cable +1". */
+export function buildRefundMerchantName(order: AmazonOrderLite): string {
+  return buildMerchantName(order, "Amazon refund");
 }
 
 // --- Writes ------------------------------------------------------------------

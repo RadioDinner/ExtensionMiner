@@ -32,8 +32,8 @@ export interface PanelView {
   syncNote?: string; // body text shown in the light state
   status?: string; // initial status-line text (updated live via setPanelStatus)
   onSync?: () => Promise<void>;
-  onApply?: (chargeId: string, chargeNotes: string, order: AmazonOrderLite) => Promise<ApplyResult>;
-  onRename?: (chargeId: string, currentName: string, order: AmazonOrderLite) => Promise<ApplyResult>;
+  onApply?: (m: MatchResult) => Promise<ApplyResult>;
+  onRename?: (m: MatchResult) => Promise<ApplyResult>;
   diagnostic?: Record<string, number | string>;
   sample?: string;
   report?: string;
@@ -164,25 +164,30 @@ function draw(view: PanelView): void {
     const s = summarize(view.matches);
     body.append(sectionTitle("Proposed matches"));
     body.append(
-      muted(`${s.auto} matched · ${s.review} review · ${s.unmatched} no order · ${s.refund} refunds`),
+      muted(`${s.auto} matched · ${s.review} review · ${s.unmatched} no order · ${s.refund} refunds unmatched`),
     );
     // Show matched/review first, then the rest.
     const ordered = [...view.matches].sort((a, b) => rank(a.status) - rank(b.status));
     for (const m of ordered.slice(0, 60)) {
       const meta = STATUS_META[m.status] ?? STATUS_META.unmatched!;
+      // Matched refunds keep the ↩ marker (their status icon would hide what
+      // kind of match this is); status still drives the row color.
+      const icon = m.kind === "refund" ? "↩" : meta.icon;
+      const label = m.order ? (m.order.itemTitles[0] ?? (m.order.orderId || "order")) : "";
       const sub = m.order
-        ? `${meta.icon} ${m.order.date} · ${m.order.itemTitles[0] ?? (m.order.orderId || "order")}${m.dayDiff !== null ? `  (+${m.dayDiff}d)` : ""}`
-        : `${meta.icon} ${m.status === "refund" ? "refund — matched later" : "no matching order"}`;
+        ? m.kind === "refund"
+          ? `${icon} ${m.refundMatch === "partial" ? "partial refund of" : "refund of"} ${m.order.date} order · ${label}${m.dayDiff !== null ? `  (+${m.dayDiff}d)` : ""}`
+          : `${icon} ${m.order.date} · ${label}${m.dayDiff !== null ? `  (+${m.dayDiff}d)` : ""}`
+        : `${icon} ${m.status === "refund" ? "refund — no order matched in the sync window" : "no matching order"}`;
       body.append(row(m.charge.merchantName, sub, formatCents(m.charge.amountCents), meta.color));
-      // Click-to-apply actions for a matched charge (notes + merchant rename).
+      // Click-to-apply actions for a matched charge or refund (notes + rename).
       if (m.order && (m.status === "auto" || m.status === "review")) {
         const actions = el("div", { display: "flex", gap: "6px", padding: "0 12px 8px", "flex-wrap": "wrap" });
-        const order = m.order;
         if (view.onApply) {
-          actions.append(actionButton("Add note", `${m.charge.id}:note`, () => view.onApply!(m.charge.id, m.charge.notes, order)));
+          actions.append(actionButton("Add note", `${m.charge.id}:note`, () => view.onApply!(m)));
         }
         if (view.onRename) {
-          actions.append(actionButton("Rename merchant", `${m.charge.id}:rename`, () => view.onRename!(m.charge.id, m.charge.name, order)));
+          actions.append(actionButton("Rename merchant", `${m.charge.id}:rename`, () => view.onRename!(m)));
         }
         body.append(actions);
       }

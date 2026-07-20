@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildMerchantName,
   buildNoteLine,
+  buildRefundMerchantName,
+  buildRefundNoteLine,
   mergeNotes,
   mutationDoc,
   readBackFromMutation,
@@ -23,6 +25,30 @@ describe("buildNoteLine", () => {
     expect(line).toContain("USB-C Cable, AA Batteries");
     expect(line).toContain("#114-1234567-7654321");
     expect(line).toContain("orderID=114-1234567-7654321");
+  });
+});
+
+describe("buildRefundNoteLine / buildRefundMerchantName", () => {
+  it("labels a full refund with items, order number, and link", () => {
+    const line = buildRefundNoteLine(order, "full");
+    expect(line).toContain("[Amazarch] Refund — USB-C Cable, AA Batteries");
+    expect(line).toContain("#114-1234567-7654321");
+    expect(line).toContain("orderID=114-1234567-7654321");
+  });
+
+  it("labels a partial refund as partial", () => {
+    expect(buildRefundNoteLine(order, "partial")).toContain("[Amazarch] Partial refund — ");
+  });
+
+  it("stays idempotent through mergeNotes (skips when the order is already noted)", () => {
+    const line = buildRefundNoteLine(order, "full");
+    expect(mergeNotes(line, order, line).changed).toBe(false);
+  });
+
+  it("names the refund merchant 'Amazon refund — <summary>'", () => {
+    expect(buildRefundMerchantName({ ...order, itemTitles: ["Black XL Raincoat"] })).toBe(
+      "Amazon refund — Black XL Raincoat",
+    );
   });
 });
 

@@ -3,9 +3,9 @@
 // data-csa-c-slot-id attribute; date/total/items come from the decrypted,
 // visible text. See SPEC.md §R1 (client-side-encryption correction).
 import { parseAmountToCents } from "./money";
-import { parseOrderDate, parseOrderId, parseOrderTotal } from "./amazon-order-parse";
+import { hasReturnHint, parseOrderDate, parseOrderId, parseOrderTotal } from "./amazon-order-parse";
 
-export { parseOrderDate, parseOrderId, parseOrderTotal };
+export { hasReturnHint, parseOrderDate, parseOrderId, parseOrderTotal };
 
 /** Extract the 3-7-7 order id from data-csa-c-slot-id (or any string). */
 export function orderIdFromSlotId(slotId: string | null | undefined): string | null {

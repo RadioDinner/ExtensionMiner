@@ -10,6 +10,7 @@ export interface AmazonOrder {
   date: string; // ISO YYYY-MM-DD (the "Order placed" date)
   totalCents: number; // positive cents
   itemTitles: string[];
+  returnHint: boolean; // completed return/refund wording seen on the card
 }
 
 export function parseAmazonOrders(html: string): AmazonOrder[] {
@@ -23,6 +24,7 @@ export function parseAmazonOrders(html: string): AmazonOrder[] {
       date,
       totalCents,
       itemTitles: parseItemTitles(block),
+      returnHint: hasReturnHint(block),
     });
   }
   return orders;
@@ -67,6 +69,18 @@ export function parseOrderTotal(block: string): number | null {
 export function parseOrderId(block: string): string | null {
   const m = block.match(/\b(\d{3}-\d{7}-\d{7})\b/);
   return m ? (m[1] ?? null) : null;
+}
+
+// COMPLETED return/refund wording only. Nearly every delivered order card
+// carries "Return or replace items" / "Return eligible through …" button text,
+// so a bare /return|refund/ would flag everything — match the completed-state
+// phrases Amazon renders once a return or refund actually happened.
+const RETURN_HINT_RE =
+  /refund (issued|complete|completed|processed)|refunded|your refund|track (your )?refund|return (complete|completed|received|successful)|items? returned/i;
+
+/** True when a card's text shows a COMPLETED return/refund (refund-match signal). */
+export function hasReturnHint(text: string): boolean {
+  return RETURN_HINT_RE.test(text);
 }
 
 /** Product titles from item links (/dp/ or /gp/product/), deduped. */

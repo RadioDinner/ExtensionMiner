@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  hasReturnHint,
   parseAmazonOrders,
   parseOrderDate,
   parseOrderId,
@@ -32,17 +33,45 @@ describe("parseAmazonOrders", () => {
       date: "2026-07-06",
       totalCents: 4747,
       itemTitles: ["USB-C Cable 6ft & Adapter", "AA Batteries 24-pack"],
+      returnHint: false,
     });
     expect(orders[1]).toEqual({
       orderId: "112-7654321-1234567",
       date: "2026-06-28",
       totalCents: 120499,
       itemTitles: ["Laptop Stand"],
+      returnHint: false,
     });
   });
 
   it("returns nothing for a page with no orders", () => {
     expect(parseAmazonOrders("<html><body>nothing here</body></html>")).toEqual([]);
+  });
+});
+
+describe("hasReturnHint", () => {
+  it("flags COMPLETED return/refund wording", () => {
+    expect(hasReturnHint("Delivered June 5 Refund issued")).toBe(true);
+    expect(hasReturnHint("Return complete")).toBe(true);
+    expect(hasReturnHint("Your refund has been issued")).toBe(true);
+    expect(hasReturnHint("Item returned on July 2")).toBe(true);
+    expect(hasReturnHint("Items returned")).toBe(true);
+    expect(hasReturnHint("Refunded")).toBe(true);
+    expect(hasReturnHint("Track your refund")).toBe(true);
+    expect(hasReturnHint("Return received — refund processing")).toBe(true);
+  });
+  it("does NOT flag the return-offer wording on every delivered order", () => {
+    expect(hasReturnHint("Return or replace items")).toBe(false);
+    expect(hasReturnHint("Return eligible through Aug 5, 2026")).toBe(false);
+    expect(hasReturnHint("Return window closed on Aug 5, 2026")).toBe(false);
+    expect(hasReturnHint("Eligible for Return, Refund or Replacement")).toBe(false);
+    expect(hasReturnHint("Delivered June 5 Buy it again")).toBe(false);
+    expect(hasReturnHint("")).toBe(false);
+  });
+  it("flags a full order card containing a completed-return line", () => {
+    expect(
+      hasReturnHint("Order placed July 6, 2026 Total $47.47 Return complete Return or replace items"),
+    ).toBe(true);
   });
 });
 

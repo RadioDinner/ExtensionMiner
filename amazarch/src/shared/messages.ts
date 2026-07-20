@@ -42,6 +42,9 @@ export interface AmazonOrderLite {
   date: string;
   totalCents: number;
   itemTitles: string[];
+  /** Card text shows a completed return/refund ("Refund issued", "Return
+   *  complete"). Optional so older callers/fixtures stay valid. */
+  returnHint?: boolean;
 }
 
 export interface AmazonCheck {
