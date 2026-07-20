@@ -268,8 +268,9 @@ async function initLicense(): Promise<void> {
   }
   if (license.lastError) setText("license-status", `${statusEl.textContent} — ${license.lastError}`, false);
 
-  // Actions. Start-trial only when the trial hasn't been used and no key is set.
-  if (LICENSE_CONFIG.trialDays > 0 && license.trialEndsAt === null && !license.key) {
+  // Actions. Start-trial only once licensing is live, the trial hasn't been
+  // used, and no key is set.
+  if (isLicensingConfigured() && LICENSE_CONFIG.trialDays > 0 && license.trialEndsAt === null && !license.key) {
     actionsEl.append(
       linkButton(`Start ${LICENSE_CONFIG.trialDays}-day free trial`, async () => {
         await ensureTrialStarted();

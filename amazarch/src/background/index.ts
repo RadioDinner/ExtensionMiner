@@ -14,6 +14,7 @@ import type {
 } from "../shared/messages";
 import { tokenPreview } from "../shared/messages";
 import { fetchAmazonViaTab, resolveAmazonReport } from "./amazon";
+import { revalidateStoredKey } from "../shared/licensing";
 
 const SESSION_KEY = "monarchSession";
 const PROBE_KEY = "monarchProbe";
@@ -27,6 +28,19 @@ const CS_ORIGINS_KEY = "contentScriptOrigins";
 browser.runtime.onConnect.addListener((port) => {
   port.onDisconnect.addListener(() => {});
 });
+
+// Keep a paid license fresh: re-validate the stored key periodically (and at
+// startup) so expiresAt/lastValidatedAt don't go stale — without this the
+// offline-grace window can't bridge a subscription renewal, and a paying user
+// would be blocked at each renewal. No-op when licensing is unconfigured or no
+// key is stored.
+const LICENSE_ALARM = "amazarch-license-revalidate";
+browser.alarms.create(LICENSE_ALARM, { periodInMinutes: 720 }); // twice daily
+browser.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === LICENSE_ALARM) void revalidateStoredKey();
+});
+browser.runtime.onStartup?.addListener(() => void revalidateStoredKey());
+void revalidateStoredKey(); // also on service-worker/event-page spin-up
 
 // storage.session is memory-backed and cleared when the browser closes —
 // the right place for session material (never storage.local).

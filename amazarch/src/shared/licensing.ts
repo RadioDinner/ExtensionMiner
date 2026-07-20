@@ -12,7 +12,7 @@
 // window when the server can't be reached — a paid product must never brick on a
 // network blip. All pure logic is unit-tested; only validateKey does I/O.
 import browser from "webextension-polyfill";
-import { LICENSE_CONFIG } from "./config";
+import { LICENSE_CONFIG, isLicensingConfigured } from "./config";
 
 export type Plan = "monthly" | "yearly" | "lifetime";
 export type EntitlementStatus = "none" | "trial" | "active" | "trial-expired" | "expired";
@@ -83,12 +83,22 @@ export interface ParsedLicense {
 }
 
 function toMs(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v > 1e12 ? v : v * 1000; // ms vs seconds
+  // Non-positive (0, negative) means "no expiry" (lifetime), not epoch/past.
+  if (typeof v === "number" && Number.isFinite(v)) return v > 0 ? (v > 1e12 ? v : v * 1000) : null; // ms vs seconds
   if (typeof v === "string") {
     const t = Date.parse(v);
     return Number.isNaN(t) ? null : t;
   }
   return null;
+}
+
+/** Did the response actually carry a validity verdict? A body without one (an
+ *  error page rendered as JSON, an empty object) must NOT be treated as an
+ *  authoritative "invalid" — that would wrongly revoke a paying user. */
+function hasValiditySignal(raw: unknown): boolean {
+  if (typeof raw !== "object" || raw === null) return false;
+  const o = raw as Record<string, unknown>;
+  return "valid" in o || "activated" in o || "status" in o;
 }
 
 /** Pure: map a provider's validate response to the canonical entitlement. The
@@ -145,30 +155,54 @@ export async function saveLicense(s: LicenseState): Promise<void> {
 
 /** Start the free trial once. Never restarts an already-started (or ended)
  *  trial — trialEndsAt, once set, is immutable (anti-abuse). No-op if a license
- *  key is already present or the trial is disabled. */
+ *  key is already present or the trial is disabled. Only starts the clock once
+ *  licensing is CONFIGURED — otherwise a pre-launch/self-hosted user would burn
+ *  their trial while writes were open, then get zero trial the day enforcement
+ *  turns on. */
 export async function ensureTrialStarted(now: number = Date.now()): Promise<LicenseState> {
   const s = await loadLicense();
-  if (s.trialEndsAt !== null || s.key !== null || LICENSE_CONFIG.trialDays <= 0) return s;
+  if (!isLicensingConfigured() || LICENSE_CONFIG.trialDays <= 0) return s;
+  if (s.trialEndsAt !== null || s.key !== null) return s;
   const next: LicenseState = { ...s, trialEndsAt: now + LICENSE_CONFIG.trialDays * DAY };
   await saveLicense(next);
   return next;
 }
 
 /** Validate a license key against the configured provider endpoint and persist
- *  the result. Fails OPEN: a network/transport error never wipes an existing
- *  entitlement (grace covers it) — it only records lastError. */
+ *  the result. Fails OPEN: only a well-formed response that actually carries a
+ *  validity verdict is authoritative. A 5xx, a non-JSON body, or a body without
+ *  a verdict is treated as a transport error that PRESERVES the prior
+ *  entitlement (grace covers it) — a paying user must never be revoked by a
+ *  provider hiccup. An explicit `valid:false` (revoked/refunded/lapsed) IS
+ *  honored, including on a 4xx that carries it. */
 export async function validateKey(key: string, now: number = Date.now()): Promise<LicenseState> {
   const s = await loadLicense();
   if (!LICENSE_CONFIG.validateUrl) {
-    return { ...s, key, lastError: "Licensing is not configured in this build." };
+    const next: LicenseState = { ...s, key, lastError: "Licensing is not configured in this build." };
+    await saveLicense(next);
+    return next;
   }
+  const preserve = async (reason: string): Promise<LicenseState> => {
+    const next: LicenseState = { ...s, key, lastError: reason };
+    await saveLicense(next);
+    return next;
+  };
   try {
     const res = await fetch(LICENSE_CONFIG.validateUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ key }),
     });
-    const data: unknown = await res.json().catch(() => ({}));
+    if (res.status >= 500) return preserve(`License server error (${res.status}) — keeping your current license.`);
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      return preserve("License server returned an unreadable response — keeping your current license.");
+    }
+    if (!hasValiditySignal(data)) {
+      return preserve("Unexpected response from the license server — keeping your current license.");
+    }
     const parsed = parseLicenseResponse(data);
     const next: LicenseState = {
       ...s,
@@ -182,15 +216,20 @@ export async function validateKey(key: string, now: number = Date.now()): Promis
     await saveLicense(next);
     return next;
   } catch (e) {
-    // Transport failure — keep the prior entitlement (grace), just note it.
-    const next: LicenseState = {
-      ...s,
-      key,
-      lastError: `Could not reach the license server: ${e instanceof Error ? e.message : String(e)}`,
-    };
-    await saveLicense(next);
-    return next;
+    // Network/transport failure — keep the prior entitlement (grace), just note it.
+    return preserve(`Could not reach the license server: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+/** Re-validate the stored key if there is one and licensing is configured.
+ *  Called on a background alarm so expiresAt/lastValidatedAt stay fresh — this
+ *  is what makes the offline grace window actually bridge a renewal we couldn't
+ *  immediately re-verify (without it, expiresAt goes stale and a paying
+ *  subscriber is blocked at every renewal). No-op otherwise. */
+export async function revalidateStoredKey(now: number = Date.now()): Promise<void> {
+  if (!isLicensingConfigured()) return;
+  const s = await loadLicense();
+  if (s.key) await validateKey(s.key, now);
 }
 
 export async function clearLicense(): Promise<void> {

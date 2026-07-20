@@ -107,10 +107,17 @@ requests" and "read-only for an hour, matching still works, fix incoming."
 
 ## Trial, grace, and anti-abuse (already implemented)
 
-- **Trial** auto-starts once, on first Monarch connect (`ensureTrialStarted`).
-  `trialEndsAt` is immutable once set — reinstalling doesn't reset it *within*
-  the same browser profile (storage.local persists); a determined user can
-  clear storage, which is an accepted, low-value abuse for a $3/mo tool.
+- **Trial** auto-starts once, on first Monarch connect **after licensing is
+  configured** (`ensureTrialStarted` no-ops while `validateUrl` is empty, so a
+  pre-launch/self-hosted user doesn't silently burn their trial and then get
+  zero days the moment you enable enforcement). `trialEndsAt` is immutable once
+  set — reinstalling doesn't reset it *within* the same browser profile
+  (storage.local persists); a determined user can clear storage, an accepted,
+  low-value abuse for a $3/mo tool.
+- **Background re-validation:** a twice-daily `browser.alarms` job (and a
+  startup check) re-validates the stored key so `expiresAt`/`lastValidatedAt`
+  stay fresh — this is what lets the grace window bridge a provider-side renewal
+  without locking out a paying subscriber.
 - **Offline grace:** a lapsed-but-recently-validated subscription keeps working
   for `graceDays` (default 5) so a provider outage or a renewal we couldn't
   re-verify yet never locks out a paying user.
