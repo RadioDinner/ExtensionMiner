@@ -100,5 +100,83 @@ OPEN ITEMS / NEXT SESSION
    main. Next session: merge to main or continue on a designated branch as
    instructed.
 
+================================================================================
+PART D — v0.8.0: MULTI-ACCOUNT + MOVABLE PANEL (prompt 4)
+================================================================================
+User request: (1) sign in with different Amazon accounts (household: user +
+spouse) — "make provisions for that"; (2) a movable panel — drag it along the
+bottom, a dropdown to get it out of the way, or minimize to a floating icon
+and pop it back out.
+
+GIT: committed & pushed DIRECT TO MAIN (per prompt 3 "continue merging to main
+for the rest of the session"). Commit 02c33b3. No PR.
+
+MULTI-ACCOUNT (SPEC D11) — the honest design, given Amazon keeps only ONE
+active session at a time (SPEC R1): we cannot fetch two accounts at once, so
+we ACCUMULATE. Each sync scrapes whichever account is active and the matcher
+runs against the UNION of all cached accounts. SHIPPED:
+ 1. src/shared/amazon-account.ts (pure, tested) — parseAmazonAccountLabel reads
+    the "Hello, <Name>" nav greeting (#nav-link-accountList-nav-line-1); null
+    for signed-out/placeholder ("Hello, sign in").
+ 2. src/shared/order-store.ts (pure merge + storage) — persistent per-account
+    order cache in storage.local (key amazarchOrderStore). mergeAccountOrders
+    UNIONs by order key (shallow re-sync never drops deep orders; return hint
+    sticks; orders tagged with account), unionOrders (what the matcher runs
+    against), summarizeAccounts (active-first), forgetAccount, parseOrderStore.
+ 3. deep-sync.ts — now a PER-ACCOUNT map (parseDeepSyncMap + recordForAccount)
+    so each account gets its own deep first sync (spouse's account isn't marked
+    "done" because yours was). Legacy single-record migrates under
+    DEFAULT_ACCOUNT ("Amazon account"). effectiveLookbackMonths/parseDeepSync
+    single-record signatures UNCHANGED (tests intact). recordDeepSync(months,
+    account); loadDeepSync() returns the deepest record for the popup.
+ 4. background/amazon.ts — REWRITTEN fetch flow: always open the default page
+    first (reads the account + recent orders + picks depth for THIS account),
+    page the recent window, then walk year filters if deep. Persists the
+    scrape into the account bucket, records per-account deep-sync (only when
+    signed in, orders>0, no filter warnings), returns unionOrders + accounts
+    summary + activeAccount. Not-signed-in now returns CACHED union orders so
+    matching still works offline-of-Amazon.
+ 5. messages.ts — AmazonOrderLite.account?, amazon-orders msg .account,
+    AmazonCheck.accounts?/activeAccount?, new AmazonAccountSummary.
+    content/amazon reports the account; background/index threads it through
+    resolveAmazonReport.
+ 6. overlay.ts — "Amazon accounts" panel section (active dot, order count,
+    "synced Nh ago", Forget button) + switch-accounts hint. content/monarch
+    wires check.accounts + onForgetAccount (removes bucket, re-matches vs the
+    last Monarch charges WITHOUT reopening Amazon). popup shows the accounts
+    line.
+ 7. manifests — added "unlimitedStorage" (multi-year × multi-account cache).
+
+MOVABLE PANEL (overlay.ts):
+ - PanelUiState {x,y,minimized} persisted in storage.local (key amazarchPanelUi),
+   held in a module var so it survives the frequent full redraws + the 8s guard.
+ - Header is the drag handle (attachDrag; grabs anywhere but the buttons; pointer
+   events; clamped to viewport). Position → left/top when set, else default
+   bottom-right corner. clampAfterAppend re-clamps once real size is known.
+ - "—" minimize button collapses to a floating chip ("◧ Amazarch"); the chip is
+   draggable and a tap restores. parsePanelUi/clampToViewport/ago are pure+tested.
+
+TESTS: 136 → 162 (new: amazon-account, order-store, deep-sync map cases, panel
+UI-state). typecheck + chrome/firefox builds green. Version 0.8.0 (pkg + both
+manifests). README status updated.
+
+NOT LIVE-VERIFIED (env egress-blocked — code reading only), flag for the user:
+ - The nav-greeting selector (#nav-link-accountList-nav-line-1) for the account
+   name. If it returns null, everything degrades gracefully to a single
+   "Amazon account" bucket (no crash) — but multi-account separation needs it.
+   Check: after Sync, the panel's "Amazon accounts" row should show your name.
+ - The rewritten fetch flow (default-page-first + per-account depth) and the
+   drag/minimize UX need a real browser pass.
+
+OPEN / NEXT:
+ - Live-confirm v0.8.0: two accounts each show a bucket with correct counts;
+   Forget works; drag + minimize/restore persist across reloads; deep sync runs
+   per account.
+ - Did NOT tag Monarch notes with the account name (household cards) — deferred
+   as optional; panel shows attribution instead.
+ - Phase 1 continues per COMMERCIALIZATION.md: backfill hardening (Privacy
+   Central ZIP), stranger-proofing (onboarding, diagnostics, kill switch),
+   licensing (MoR keys), store packaging. Owner's 4 decision points still open.
+
 PROJECT STATE OTHERWISE: miner/dashboard untouched since Session 8. Amazarch
-v0.7.0 (136 tests green) is the active workstream.
+v0.8.0 (162 tests green) is the active workstream, now on MAIN.
