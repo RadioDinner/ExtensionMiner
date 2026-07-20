@@ -178,5 +178,83 @@ OPEN / NEXT:
    Central ZIP), stranger-proofing (onboarding, diagnostics, kill switch),
    licensing (MoR keys), store packaging. Owner's 4 decision points still open.
 
+================================================================================
+PART E — v0.9.0: PHASE 1 START — LICENSING GATE + REMOTE KILL-SWITCH (prompt 5)
+================================================================================
+User: "I like the refund system. I want to start getting this ready to sell.
+Phase 1, lets go." Committed direct to MAIN (b273347 feature, 9a2fe21 review
+fixes). No PR.
+
+DECISIONS (AskUserQuestion tool aborted twice on an env error, so I proceeded
+on the COMMERCIALIZATION.md recommendations — all designed low-regret — and
+told the user, inviting a cheap redirect):
+ - Pricing: subscription + lifetime tier — BUT entitlement model supports
+   monthly/yearly/lifetime, so not locked in.
+ - Data custody: entitlement-only, financial data stays LOCAL. No user-data
+   backend.
+ - Billing provider: PROVIDER-AGNOSTIC (configurable endpoint + canonical
+   response shape) — wire LemonSqueezy/Paddle/ExtPay later.
+ >> If the user wants different, it's a cheap change — revisit.
+
+WHAT SHIPPED (all pure logic tested; DORMANT until src/shared/config.ts is
+wired — isLicensingConfigured() false => every feature open, incl. writes, so
+dev/pre-launch is unaffected):
+ 1. config.ts — LICENSE_CONFIG {validateUrl,buyUrl,manageUrl,trialDays:14,
+    graceDays:5} (empty placeholders) + REMOTE_CONFIG_URL + isLicensingConfigured().
+ 2. licensing.ts — LicenseState + evaluateEntitlement (trial/active/lifetime +
+    offline grace), parseLicenseResponse (canonical {valid,plan,expiresAt,error}
+    + aliases), parseLicense, ensureTrialStarted (auto 14-day, one-shot,
+    ONLY once configured), validateKey (FAILS OPEN), revalidateStoredKey.
+ 3. remote-config.ts — kill switch. parseRemoteConfig (FAIL-SAFE: only explicit
+    writesEnabled:false pauses), compareVersions, evaluateRemoteConfig,
+    refreshRemoteConfig (TTL 6h, cached, never blocks on error).
+ 4. write-gate.ts — PURE evaluateWriteGate composing entitlement + kill-switch
+    → {allowed,reason,message,cta,daysLeft}. Kill-switch (update/paused) beats
+    everything; then (only if configured) entitlement. gate-runtime.ts =
+    async resolveWriteGate(version).
+ 5. WHAT'S GATED: only WRITES (note/rename/refund apply, manual + auto). Reads
+    + matching stay FREE (funnel — users see every match before paying).
+    Wiring: onApply/onRename re-check the gate before writing; doSync passes
+    gate to the panel + skips auto-apply when gated; trial starts on connect.
+ 6. UI: overlay gateBanner (trial countdown / paywall / paused) + apply buttons
+    hidden when locked; popup License section (status, start-trial, key entry,
+    subscribe/manage).
+ 7. background/index.ts — twice-daily browser.alarms + startup revalidateStoredKey
+    (keeps expiresAt/lastValidatedAt fresh so grace bridges renewals).
+ 8. LICENSING.md — how to wire LemonSqueezy/Paddle via a serverless proxy
+    (canonical response shape; keeps provider API key server-side), ExtPay
+    alternative, kill-switch JSON schema, pre-launch checklist.
+
+QUALITY: an adversarial review agent (general-purpose) audited the money path
+and found 4 REAL defects, ALL FIXED in 9a2fe21 (+11 I/O tests, the paths were
+untested):
+ 1. MAJOR validateKey didn't check res.ok — a 5xx/HTML reply parsed as
+    "invalid" and WIPED a paying user (fail-CLOSED). Now only a well-formed 2xx
+    body with a real verdict is authoritative; 5xx/non-JSON/verdict-less =>
+    preserve (grace); explicit valid:false still honored.
+ 2. MAJOR nothing re-validated the key => subscriber blocked at every renewal
+    (grace anchored to stale lastValidatedAt). Fixed via the background alarm.
+ 3. MAJOR trial clock started pre-launch => early adopters got zero trial when
+    enforcement turned on. Fixed: ensureTrialStarted no-ops unless configured.
+ 4. MINOR expiresAt:0 (lifetime convention) treated as past epoch. Fixed in toMs.
+ Verified-correct by the review: kill-switch fail-safe, compareVersions,
+ render-gate vs click-gate (click gate is authoritative; no shown-but-writes hole).
+ Tests 190 -> 201, typecheck + both builds green. Version 0.9.0.
+
+OPEN / NEXT (Phase 1 remaining per COMMERCIALIZATION.md):
+ - TO GO LIVE the owner must: pick a provider, deploy a validate proxy + set
+   config.ts (validateUrl/buyUrl), publish the kill-switch JSON + set
+   REMOTE_CONFIG_URL. See LICENSING.md checklist. Until then everything is open.
+ - Remaining Phase 1 items NOT yet done: backfill hardening (Privacy Central
+   ZIP parser; live-verify year filters), stranger-proofing (first-run
+   onboarding, scrubbed diagnostics export — kill switch is now DONE), store
+   packaging (extract amazarch/ to its own repo for AMO, CWS single-purpose +
+   permission justifications + privacy policy, landing page), private beta.
+ - Owner's other decision points from COMMERCIALIZATION.md still open: splits
+   at launch vs v1.1 (rec v1.1); contact Monarch pre-launch (rec no).
+ - LIVE-CONFIRM backlog still stands (v0.7.0 refunds, v0.8.0 multi-account +
+   panel drag/minimize) — env is egress-blocked so none verified against real
+   Amazon/Monarch.
+
 PROJECT STATE OTHERWISE: miner/dashboard untouched since Session 8. Amazarch
-v0.8.0 (162 tests green) is the active workstream, now on MAIN.
+v0.9.0 (201 tests green) is the active workstream, on MAIN.
