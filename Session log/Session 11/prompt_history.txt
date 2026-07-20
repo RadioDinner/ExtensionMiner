@@ -5,3 +5,5 @@
 3. merge all these changes to main and continue merging to main for the rest of the session
 
 4. I want to be able to sign in with different amazon accounts. For instance, my wife and I use two separate accounts. Make provisions for that. Also, I want to be able to click a button and move around the extension window that pops up in the bottom right corner. Ideally, I could slide it back and forth on the bottom half of the screen and click a drop down to get it out of the way. Or maybe "minimize" it to a floating icon and then pop it back out to use it
+
+5. I like the refund system. I want to start getting this ready to sell. Phase 1, lets go

@@ -6,6 +6,7 @@ import { formatCents } from "../../shared/money";
 import type { AmazonTxn } from "../../shared/monarch-read";
 import type { AmazonAccountSummary, AmazonOrderLite } from "../../shared/messages";
 import { summarize, type MatchResult } from "../../shared/matcher";
+import type { WriteGate } from "../../shared/write-gate";
 
 const PANEL_ID = "amazarch-panel";
 
@@ -37,6 +38,9 @@ export interface PanelView {
   accounts?: AmazonAccountSummary[]; // known Amazon accounts (multi-account, D11)
   activeAccount?: string | null; // the account signed in during the last sync
   onForgetAccount?: (label: string) => void; // drop an account's cached orders
+  gate?: WriteGate; // licensing/kill-switch state for the write actions
+  onStartTrial?: () => Promise<void>; // paywall CTA: start the free trial
+  onBuy?: () => void; // paywall CTA: open checkout / manage subscription
   diagnostic?: Record<string, number | string>;
   sample?: string;
   report?: string;
@@ -324,6 +328,10 @@ function draw(view: PanelView): void {
   status.append(timer, label);
   panel.append(status);
 
+  // Licensing / kill-switch banner (trial countdown, paywall, or paused notice).
+  const banner = gateBanner(view);
+  if (banner) panel.append(banner);
+
   // Light state: connected but no sync run yet — do nothing heavy on page load.
   if (view.onSync && !view.synced) {
     const body0 = el("div", { padding: "12px" });
@@ -365,7 +373,9 @@ function draw(view: PanelView): void {
         : `${icon} ${m.status === "refund" ? "refund — no order matched in the sync window" : "no matching order"}`;
       body.append(row(m.charge.merchantName, sub, formatCents(m.charge.amountCents), meta.color));
       // Click-to-apply actions for a matched charge or refund (notes + rename).
-      if (m.order && (m.status === "auto" || m.status === "review")) {
+      // Hidden when writes are gated (paywall/paused) — the banner explains why.
+      const writesAllowed = view.gate ? view.gate.allowed : true;
+      if (writesAllowed && m.order && (m.status === "auto" || m.status === "review")) {
         const actions = el("div", { display: "flex", gap: "6px", padding: "0 12px 8px", "flex-wrap": "wrap" });
         if (view.onApply) {
           actions.append(actionButton("Add note", `${m.charge.id}:note`, () => view.onApply!(m)));
@@ -508,6 +518,46 @@ function row(left: string, sub: string, right: string, subColor = "#9ca3af"): HT
 
 function rank(status: string): number {
   return { auto: 0, review: 1, unmatched: 2, refund: 3 }[status] ?? 4;
+}
+
+// The licensing / kill-switch strip. Nothing when writes are freely allowed
+// (unconfigured or a fully-licensed user); a subtle countdown during the trial;
+// a prominent paywall/paused/update notice when writes are blocked.
+function gateBanner(view: PanelView): HTMLElement | null {
+  const g = view.gate;
+  if (!g) return null;
+  if (g.allowed && (g.reason === "ok" || g.reason === "unconfigured")) return null;
+
+  const blocked = !g.allowed;
+  const bar = el("div", {
+    display: "flex", "align-items": "center", "justify-content": "space-between", gap: "8px",
+    padding: "8px 12px", "font-size": "12px",
+    background: blocked ? "#3f1d1d" : "#1e293b",
+    color: blocked ? "#fecaca" : "#bfdbfe",
+    "border-bottom": "1px solid #1f2937",
+  });
+  const msg = g.message || (g.reason === "trial" ? "Free trial" : "");
+  bar.append(text("span", msg, { "min-width": "0", "line-height": "1.35" }));
+
+  // CTA button, per the gate's requested action.
+  const cta =
+    g.cta === "trial" && view.onStartTrial
+      ? { label: "Start free trial", run: () => void view.onStartTrial!() }
+      : g.cta === "buy" && view.onBuy
+        ? { label: "Subscribe", run: () => view.onBuy!() }
+        : g.reason === "trial" && view.onBuy
+          ? { label: "Subscribe", run: () => view.onBuy!() } // let a trial user upgrade early
+          : null;
+  if (cta) {
+    const btn = el("button", {
+      flex: "0 0 auto", padding: "4px 10px", cursor: "pointer", border: "none",
+      "border-radius": "6px", background: "#2563eb", color: "#fff", font: "11px system-ui,sans-serif",
+    }) as HTMLButtonElement;
+    btn.textContent = cta.label;
+    btn.addEventListener("click", cta.run);
+    bar.append(btn);
+  }
+  return bar;
 }
 
 /** Compact relative time, e.g. "just now", "3h ago", "2d ago". */

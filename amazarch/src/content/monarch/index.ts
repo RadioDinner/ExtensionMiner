@@ -27,6 +27,10 @@ import {
 import type { MatchResult } from "../../shared/matcher";
 import { loadSettings } from "../../shared/settings";
 import { planAutoApply, runAutoApply, summarizeAutoApply } from "../../shared/auto-apply";
+import { ensureTrialStarted } from "../../shared/licensing";
+import { resolveWriteGate } from "../../shared/gate-runtime";
+import { LICENSE_CONFIG } from "../../shared/config";
+import type { WriteGate } from "../../shared/write-gate";
 import type { ApplyResult, PanelView } from "./overlay";
 import { armUndo } from "./overlay";
 import type {
@@ -165,6 +169,10 @@ async function tryConnect(): Promise<boolean> {
   };
   console.info(`${LOG} connected to Monarch API via ${authMethod}`);
 
+  const version = browser.runtime.getManifest().version;
+  // Start the free-trial clock on first connect (no-op once started or licensed).
+  void ensureTrialStarted();
+
   // Click-to-apply actions (append note / rename merchant) — additive, undoable.
   // Each write is verified from the mutation response (see monarch-write.ts) and
   // the result is reported honestly in the status line: Monarch's own UI does
@@ -191,6 +199,8 @@ async function tryConnect(): Promise<boolean> {
     const line = m.kind === "refund" ? buildRefundNoteLine(order, m.refundMatch) : buildNoteLine(order);
     const merged = mergeNotes(chargeNotes, order, line);
     if (!merged.changed) return { ok: true, note: "already noted" };
+    const gate = await resolveWriteGate(version);
+    if (!gate.allowed) return { ok: false, note: gate.message };
     const res = await setTransactionNotes(auth, chargeId, merged.notes);
     if (!res.ok) return { ok: false, note: res.note };
     reportWrite("Note write", res);
@@ -212,6 +222,8 @@ async function tryConnect(): Promise<boolean> {
     const currentName = m.charge.name;
     const target = m.kind === "refund" ? buildRefundMerchantName(order) : buildMerchantName(order);
     if (currentName === target) return { ok: true, note: "already named" };
+    const gate = await resolveWriteGate(version);
+    if (!gate.allowed) return { ok: false, note: gate.message };
     const res = await setTransactionName(auth, chargeId, target);
     if (!res.ok) return { ok: false, note: res.note };
     reportWrite("Rename", res);
@@ -247,6 +259,18 @@ async function tryConnect(): Promise<boolean> {
       status: `Forgot ${label} — ${orders.length} order${orders.length === 1 ? "" : "s"} across ${accounts.length} account${accounts.length === 1 ? "" : "s"}. Refresh Monarch if you had applied any of its matches.`,
     });
   };
+
+  // Paywall CTAs. Start-trial re-renders with the refreshed gate; buy/manage
+  // open the configured hosted pages in a new tab.
+  const openUrl = (url: string): void => {
+    if (url) window.open(url, "_blank", "noopener");
+  };
+  const onStartTrial = async (): Promise<void> => {
+    await ensureTrialStarted();
+    const gate = await resolveWriteGate(version);
+    if (lastBaseView) renderPanel({ ...lastBaseView, gate });
+  };
+  const onBuy = (): void => openUrl(LICENSE_CONFIG.buyUrl || LICENSE_CONFIG.manageUrl);
 
   // Heavy work (read charges + open the Amazon tab + match) runs ONLY on demand,
   // so opening Monarch stays fast and the Amazon tab isn't opened every visit.
@@ -297,11 +321,13 @@ async function tryConnect(): Promise<boolean> {
       }
       lastCharges = read.rows;
       lastActiveAccount = check?.activeAccount ?? null;
+      const gate = await resolveWriteGate(version);
       const view: PanelView = {
         txns: read.rows, totalCount: read.totalCount, capped: read.capped,
         orders: check?.orders, amazonNote: check?.status.note, matches,
         synced: true, status: done, onSync: doSync, onApply, onRename,
         accounts: check?.accounts, activeAccount: check?.activeAccount ?? null, onForgetAccount,
+        gate, onStartTrial, onBuy,
         diagnostic: check?.diagnostic, sample: check?.sample, report: check?.report,
       };
       lastBaseView = view;
@@ -310,9 +336,10 @@ async function tryConnect(): Promise<boolean> {
       // Auto match (popup settings): apply the enabled actions to EXACT ("auto")
       // matches, politely paced, through the SAME onApply/onRename paths as the
       // buttons — then re-render so every auto-applied action shows its armed
-      // Undo. "review" matches always stay manual.
+      // Undo. "review" matches always stay manual. Skipped entirely when writes
+      // are gated (paywall/paused) so a locked user isn't spammed with failures.
       const settings = await loadSettings();
-      const plan = planAutoApply(matches, settings);
+      const plan = gate.allowed ? planAutoApply(matches, settings) : [];
       if (plan.length > 0) {
         console.info(`${LOG} auto-match: ${plan.length} actions queued`);
         const summary = await runAutoApply(

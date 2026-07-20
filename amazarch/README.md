@@ -10,7 +10,11 @@ merchant-rename writes with Undo, and auto-match settings. **Multi-account
 (D11):** each Amazon account you sign into is cached separately and the matcher
 runs against all of them — switch accounts on amazon.com and Sync to add your
 household's other account. The injected panel is **draggable** (grab the header)
-and **minimizes** to a floating chip. Not yet: splits, categorization
+and **minimizes** to a floating chip. **Licensing scaffolding (v0.9.0):** a
+provider-agnostic trial/subscription/lifetime gate on the *write* actions
+(reads + matching stay free) plus a remote **kill-switch** for read-only safe
+mode — both dormant until wired in `src/shared/config.ts` (see
+[`LICENSING.md`](./LICENSING.md)). Not yet: splits, categorization
 (see SPEC.md §6).
 
 ## Develop

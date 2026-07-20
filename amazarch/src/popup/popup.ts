@@ -3,6 +3,9 @@ import type { Message, StatusResponse } from "../shared/messages";
 import { loadSettings, saveSettings, type AmazarchSettings } from "../shared/settings";
 import { clearDeepSync, loadDeepSync } from "../shared/deep-sync";
 import { loadOrderStore, summarizeAccounts } from "../shared/order-store";
+import { ensureTrialStarted, evaluateEntitlement, loadLicense, validateKey } from "../shared/licensing";
+import { resolveWriteGate } from "../shared/gate-runtime";
+import { LICENSE_CONFIG, isLicensingConfigured } from "../shared/config";
 
 const MONARCH_ORIGINS = ["https://app.monarchmoney.com/*", "https://app.monarch.com/*"];
 
@@ -225,6 +228,84 @@ async function initAccounts(): Promise<void> {
   }
 }
 
+// --- License (trial / subscription / kill-switch) -----------------------------
+
+function linkButton(label: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement("button");
+  b.className = "linkish";
+  b.textContent = label;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+async function initLicense(): Promise<void> {
+  const statusEl = document.getElementById("license-status");
+  const actionsEl = document.getElementById("license-actions");
+  if (!statusEl || !actionsEl) return;
+  actionsEl.replaceChildren();
+
+  const version = browser.runtime.getManifest().version;
+  const [gate, license] = await Promise.all([resolveWriteGate(version), loadLicense()]);
+  const ent = evaluateEntitlement(license, Date.now());
+
+  // Kill-switch states take precedence in the status line.
+  if (gate.reason === "paused" || gate.reason === "update-required") {
+    setText("license-status", gate.message, false);
+  } else if (!isLicensingConfigured()) {
+    const trial = license.trialEndsAt !== null && ent.status === "trial" ? ` (trial: ${ent.daysLeft}d left)` : "";
+    setText("license-status", `All features unlocked — licensing isn't enabled in this build${trial}.`, true);
+  } else if (ent.status === "trial") {
+    setText("license-status", `Free trial — ${ent.daysLeft} day${ent.daysLeft === 1 ? "" : "s"} left.`, true);
+  } else if (ent.status === "active") {
+    const until = license.expiresAt ? ` (renews/expires ${new Date(license.expiresAt).toLocaleDateString()})` : "";
+    setText("license-status", `Licensed${license.plan ? ` — ${license.plan}` : ""}${until}.`, true);
+  } else if (ent.status === "trial-expired") {
+    setText("license-status", "Free trial ended — subscribe to keep applying matches.", false);
+  } else if (ent.status === "expired") {
+    setText("license-status", "Subscription lapsed — renew to keep applying matches.", false);
+  } else {
+    setText("license-status", "Start a free trial or enter a license key to apply matches.", false);
+  }
+  if (license.lastError) setText("license-status", `${statusEl.textContent} — ${license.lastError}`, false);
+
+  // Actions. Start-trial only when the trial hasn't been used and no key is set.
+  if (LICENSE_CONFIG.trialDays > 0 && license.trialEndsAt === null && !license.key) {
+    actionsEl.append(
+      linkButton(`Start ${LICENSE_CONFIG.trialDays}-day free trial`, async () => {
+        await ensureTrialStarted();
+        await initLicense();
+      }),
+    );
+  }
+  if (LICENSE_CONFIG.buyUrl) {
+    actionsEl.append(linkButton(ent.status === "active" ? "Manage subscription" : "Subscribe / Buy", () =>
+      browser.tabs.create({ url: ent.status === "active" && LICENSE_CONFIG.manageUrl ? LICENSE_CONFIG.manageUrl : LICENSE_CONFIG.buyUrl }),
+    ));
+  }
+  if (isLicensingConfigured()) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; gap:6px; align-items:center";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "License key";
+    input.value = license.key ?? "";
+    input.style.cssText = "flex:1; min-width:0; font:12px system-ui,sans-serif; padding:3px 6px";
+    const activate = document.createElement("button");
+    activate.className = "linkish";
+    activate.textContent = "Activate";
+    activate.addEventListener("click", async () => {
+      const key = input.value.trim();
+      if (!key) return;
+      activate.textContent = "Checking…";
+      await validateKey(key);
+      await initLicense();
+    });
+    row.append(input, activate);
+    actionsEl.append(row);
+  }
+}
+
 void refresh();
 void initSettings();
 void initAccounts();
+void initLicense();
