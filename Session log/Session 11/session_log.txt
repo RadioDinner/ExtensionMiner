@@ -1,0 +1,89 @@
+SESSION 11 — HANDOFF LOG
+========================
+Date: 2026-07-20 (UTC). WEB session (Claude-Code-on-the-web).
+Assigned branch: claude/amazarch-commercialization-r2rqew (developed & pushed
+there per harness instruction — NOT main this time). No PR opened.
+
+MIGRATIONS: none. Miner Supabase migrations unchanged: lowest is still 988 →
+NEXT NEW = 987.
+
+================================================================================
+WHAT THIS SESSION WAS
+================================================================================
+ADVISORY session, no product code changed. The user asked: what work is needed
+to commercialize Amazarch — Phase 1 (technical: make it sellable, subscription
+or one-time purchase) and Phase 2 (go to market)?
+
+DELIVERABLE: amazarch/COMMERCIALIZATION.md (new) — the full plan, grounded in
+the v0.6.0 codebase + SPEC.md. Also answered in chat. Summary of the plan:
+
+PHASE 1 (~50–80h + 2–4wk beta), in order:
+ 1. Close the differentiation gap (~15–25h): build REFUND MATCHING (the
+    headline paid feature; matcher.ts currently only flags refunds), verify
+    deep-lookback live, build the Privacy Central ZIP parser. DEFER splits +
+    AI categorization to v1.1 (official extension's strength, biggest lift).
+ 2. Stranger-proofing (~10–20h): onboarding flow, exportable scrubbed
+    diagnostics, REMOTE KILL SWITCH/config JSON (writes-off flag + endpoint
+    names — survival requirement for a paid product on an unofficial API),
+    loud versioned parser failures.
+ 3. Licensing (~8–15h): LEAN PATH = merchant-of-record (LemonSqueezy/Paddle)
+    hosted checkout + license-key validation from the extension, offline
+    grace, fail-open. NO custom backend needed for v1. Subscription $3–4/mo
+    or $30–35/yr + 14-day trial + limited lifetime launch tier recommended
+    over one-time (perpetual maintenance on two hostile surfaces).
+ 4. Store packaging (~8–12h): extract amazarch/ to its own repo (AMO source
+    review), CWS single-purpose + permission justifications + privacy policy,
+    AMO data_collection_permissions + unlisted beta signing, landing page on
+    Vercel. NOTE: new CWS data-disclosure enforcement starts 2026-08-01 —
+    build the consent/disclosure UI into onboarding from day one.
+ 5. Private beta (2–4wk calendar): 10–30 users recruited from official-
+    extension complaint threads; AMO-unlisted + Chrome load-unpacked.
+
+KEY SCOPE DECISION PROPOSED (amends SPEC D15): entitlement-only backend for
+v1 — financial data stays LOCAL (IndexedDB); no cloud sync of purchase/txn
+data. Kills the custody/breach risk (SPEC risk #6), shrinks privacy policy +
+store friction, lowers user trust bar. Cloud sync returns later if demanded.
+
+PHASE 2 (GTM):
+ - Positioning: "picks up where the official sync stops" — refunds, full
+   history, Firefox, review queue + undo. Never lead with "better than".
+ - Channels ranked: (1) r/MonarchMoney — official extension complaint threads
+   are the pre-qualified lead list; founder-story beta recruit then launch;
+   (2) OSS graveyard (alex-peck/monarch-amazon-sync 24 open issues etc.);
+   (3) honest comparison-page SEO; (4) Monarch-affiliate YouTubers/bloggers;
+   (5) store-listing SEO; (6) PH/HN as amplifier only.
+ - Honest ceiling: hundreds→low-thousands of subs = $15–60k/yr side business.
+   Risks: Monarch ships refunds / breaks API / ships public API (the last is
+   GOOD if the GraphQL client stays swappable). Hedge = SPEC D17(d) YNAB
+   multi-app expansion (official API, proven paid demand).
+ - Ops: MoR handles sales tax; LLC decision, support inbox with stated SLA,
+   public changelog, 14-day refund policy.
+
+4 DECISION POINTS LEFT WITH THE OWNER (in COMMERCIALIZATION.md §Decision
+points): sub vs one-time; entitlement-only vs full cloud sync; splits at
+launch vs v1.1; contact Monarch pre-launch or not (rec: no).
+
+================================================================================
+FILES CHANGED
+================================================================================
+ - NEW amazarch/COMMERCIALIZATION.md (the plan)
+ - NEW Session log/Session 11/prompt_history.txt (1 prompt)
+ - NEW Session log/Session 11/session_log.txt (this file)
+No source, test, manifest, or migration changes. amazarch stays v0.6.0.
+
+================================================================================
+OPEN ITEMS / NEXT SESSION
+================================================================================
+ - STILL OPEN FROM SESSION 10: user must live-confirm v0.4.11 write
+   verification + v0.5.0 auto-match + v0.6.0 deep lookback on their machine
+   (panel header "Amazarch v0.6.0"; watch for the "⚠ Amazon may have ignored
+   the time filter" note — if present, the timeFilter/orderFilter param is
+   wrong for their page).
+ - Await owner's calls on the 4 decision points above; then the natural next
+   build session is Phase-1 item 1: refund matching (M3 core).
+ - If commercialization proceeds: repo extraction (amazarch/ → own repo) is on
+   the critical path for AMO listing; keep it in mind before the codebase
+   grows more entangled with the miner repo.
+
+PROJECT STATE OTHERWISE: miner/dashboard untouched since Session 8. Amazarch
+(v0.6.0, 116 tests green as of Session 10) remains the active workstream.
