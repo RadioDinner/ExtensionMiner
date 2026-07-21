@@ -309,5 +309,75 @@ PHASE 1 STATUS (COMMERCIALIZATION.md):
    (LICENSING.md checklist); live-confirm 0.7.0–0.10.0 on real accounts (env
    egress-blocked); splits vs v1.1 + contact-Monarch decisions.
 
+================================================================================
+PART G — v0.11.0: PRIVACY-CENTRAL ZIP IMPORT + REPO EXTRACTION PREP (prompt 7)
+================================================================================
+User: "lets move it to its own repo after we backfill harden." So: (A) backfill
+hardening = the Amazon export ZIP import, then (B) prep the repo move.
+Committed to MAIN: c61f057 (v0.11.0), 8603634 (review fix), f7b2887 (extraction
+guide).
+
+(A) v0.11.0 — FULL-HISTORY IMPORT from Amazon "Request My Data" ZIP (SPEC D7,
+the ToS-clean bulk path that beats the official extension's ~3mo limit):
+ 1. src/shared/csv.ts (pure) — RFC-4180-ish CSV parser (quotes, "" escapes,
+    embedded commas/newlines, CRLF, BOM).
+ 2. src/shared/zip.ts (async) — DEPENDENCY-FREE ZIP reader: walks the central
+    directory, inflates DEFLATE via the browser's DecompressionStream
+    ("deflate-raw"). Store + deflate; ignores ZIP64 (order exports are tiny).
+    Reads compSize/offset from the central dir (robust to data-descriptor
+    entries). No lib → trivial AMO source review.
+ 3. src/shared/amazon-export.ts (pure) — parseRetailOrderHistory groups CSV
+    item-rows by Order ID into the SAME AmazonOrderLite the live scraper makes
+    (sums "Total Owed", collects titles, drops cancelled, returnHint from Order
+    Status). parseExportCsvs merges multi-part exports. Feeds the same matcher +
+    order store.
+ 4. src/shared/import-orders.ts — File → zip → csv → recordAccountOrders (union
+    into the chosen account bucket; a later live sync adds to it).
+ 5. Welcome page — "Import full order history" section (account label + .zip
+    picker + link to Amazon Privacy Central).
+ 6. Tests 210 → 228 (csv, amazon-export, zip stored+deflate end-to-end via an
+    in-memory ZIP builder).
+
+QUALITY: adversarial review agent found a REAL MAJOR bug (fixed 8603634): zip.ts
+read the central-directory extra-field/comment LENGTHS from the wrong offsets
+(+32/+34 instead of the correct +30/+32), so any entry with a central extra
+field (most real encoders emit Info-ZIP 'UT' timestamps) drifted the per-entry
+advance and broke the walk after entry 0 → a real Amazon export would import
+only a prefix / throw "no CSV found". Original tests missed it (fixtures had no
+extra fields). Fix + hardened test (fixtures now carry a 9-byte central extra
+field + comment, so the walk breaks on the old offsets). Also: import-orders
+now reports "format may have changed — copy diagnostics" instead of the
+misleading "empty export" when a header drift (renamed total column) drops
+every order. Review-noted SAFE non-issues: per-item-vs-per-order "Total Owed"
+assumption (wrong total just → unmatched/review, never a bad write — UNVERIFIED
+vs a real export); returnHint likely never fires for imports (real Order Status
+is Closed/Shipped, not Returned) so partial refunds on imported orders go to
+review (safe). 228 tests, typecheck + both builds green. Version 0.11.0.
+
+(B) REPO EXTRACTION — PREPARED, not finished (blocker):
+ - The Claude GitHub App integration CANNOT create repos (POST /user/repos →
+   403 "Resource not accessible by integration"). So repo creation is a manual
+   30-sec step for the owner.
+ - Did: `git subtree split --prefix=amazarch` → full history re-rooted to top
+   level; bundled it (git bundle, 43 commits) as amazarch.bundle; VERIFIED the
+   bundle clones cleanly and the standalone repo passes npm test (228),
+   typecheck, and both builds. Sent amazarch.bundle to the user (SendUserFile).
+ - Wrote AMAZARCH_EXTRACTION.md (repo root, committed) with exact steps: create
+   empty private repo RadioDinner/amazarch → clone bundle → push. Keep private
+   pre-launch; flip public/AMO-source at submission.
+ - amazarch/ LEFT IN PLACE in this monorepo (non-destructive) until the new
+   repo is confirmed live. NEXT: once owner creates+pushes the repo, remove
+   amazarch/ here and leave a pointer (offered).
+
+PHASE 1 STATUS: DONE = refunds (0.7), multi-account+panel (0.8), licensing+kill
+switch (0.9), onboarding+diagnostics (0.10), ZIP backfill (0.11). Repo move =
+prepped, awaiting owner's manual repo-create. REMAINING = store packaging (CWS
+single-purpose + permission justifications + privacy policy; AMO
+data_collection_permissions re-validate; landing page — NEEDS OWNER INPUT) and
+private beta (owner action). STILL OPEN: wire a billing provider + kill-switch
+URL to enforce (LICENSING.md); live-confirm 0.7–0.11 on real accounts (env
+egress-blocked — the ZIP "Total Owed" + returnHint assumptions especially).
+
 PROJECT STATE OTHERWISE: miner/dashboard untouched since Session 8. Amazarch
-v0.10.0 (210 tests green) is the active workstream, on MAIN.
+v0.11.0 (228 tests green) is the active workstream, on MAIN; extraction bundle
+sent + guide committed.
