@@ -14,3 +14,5 @@
 
 8. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch\ExtensionMiner-main\amazarch> git clone amazarch.bundle
 fatal: repository 'amazarch.bundle' does not exist
+
+9. [Pasted terminal output] User ran `git init; git add -A; git commit; git branch -M main; git remote add origin https://github.com/RadioDinner/amazarch.git; git push -u origin main` from E:\...\Ventures\Amazarch (the MONOREPO ROOT, not the amazarch subfolder). Result: root-commit b9b1a47, 205 files changed (the WHOLE ExtensionMiner monorepo — .claude, CLAUDE.md, Session log, amazarch/, analysis/, dashboard/, scraper/, supabase/, tests/, etc.). Push succeeded ("* [new branch] main -> main") with redirect notice: "remote: This repository moved. Please use the new location: https://github.com/RadioDinner/Amazarch.git". [~150 LF-will-be-replaced-by-CRLF warnings + full 205-file create list omitted here for brevity.]
