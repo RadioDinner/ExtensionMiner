@@ -256,5 +256,58 @@ OPEN / NEXT (Phase 1 remaining per COMMERCIALIZATION.md):
    panel drag/minimize) — env is egress-blocked so none verified against real
    Amazon/Monarch.
 
+================================================================================
+PART F — v0.10.0: STRANGER-PROOFING — ONBOARDING + DIAGNOSTICS (prompt 6)
+================================================================================
+User: "Lets keep going on COMMERCIALIZATION.md" → next Phase 1 item
+(stranger-proofing). Committed direct to MAIN (af2f9a0). No PR.
+
+SHIPPED:
+ 1. src/shared/onboarding.ts (pure, tested) — computeOnboarding turns live
+    signals (hostAccess / monarchConnected / amazonSignedIn / firstSyncDone)
+    into an ordered 3-step checklist: (1) Allow site access, (2) Open Monarch &
+    sign in, (3) Sign in to Amazon & run first sync. Amazon sign-in is FOLDED
+    into the sync step (can't be detected until a sync runs) with a corrective
+    hint if a sync ran while signed out. Persisted flags (firstSyncDone,
+    welcomedAt) in storage.local.
+ 2. Welcome page src/onboarding/onboarding.html + onboarding.ts — opened
+    automatically on install (background onInstalled, reason==="install"),
+    renders the live checklist, polls every 3s (updates as steps complete in
+    other tabs), per-step action buttons (Grant access via permissions.request,
+    Open Monarch, Open Amazon), + Copy diagnostics.
+ 3. src/shared/diagnostics.ts (pure, tested) buildDiagnosticReport +
+    diagnostics-runtime.ts collectDiagnostics — a copy-pasteable support bundle
+    from COUNTS + connection/permission/gate state ONLY. NEVER order details,
+    amounts, account NAMES, tokens, or license keys; token-shaped substrings in
+    error text are regex-redacted defensively.
+ 4. Popup — a "Finish setup" nudge shown until onboarding complete (opens the
+    welcome page) + a Copy-diagnostics button.
+ 5. doSync marks firstSyncDone when a sync reads orders. build.mjs now bundles
+    onboarding.js + copies both HTML pages (HTML map).
+ 6. Tests 201 → 210 (onboarding, diagnostics). typecheck + both builds green.
+    Version 0.10.0.
+
+NOTE: onboarding uses amazonSignedIn from the last sync's amazon status (null
+until a sync runs); that's why Amazon sign-in is folded into the sync step
+rather than being its own gate.
+
+PHASE 1 STATUS (COMMERCIALIZATION.md):
+ DONE: refund matching (0.7.0), multi-account+panel (0.8.0), licensing gate +
+   kill-switch (0.9.0), onboarding + diagnostics (0.10.0). Kill-switch (a
+   stranger-proofing sub-item) done in 0.9.0.
+ REMAINING:
+   - Backfill hardening: Privacy Central "Request My Data" ZIP parser
+     (Retail.OrderHistory) as the ToS-clean bulk path + live-verify year
+     filters. Pure-parsing, high-value differentiator, big but testable.
+     Needs a file-upload UI (onboarding/popup) to drop the ZIP.
+   - Store packaging: extract amazarch/ to its OWN repo (AMO source review),
+     CWS single-purpose + permission justifications + privacy policy, AMO
+     data_collection_permissions re-validate, landing page (Vercel). NEEDS
+     OWNER INPUT (repo name, privacy policy content, domain).
+   - Private beta (owner action): recruit from r/MonarchMoney complaint threads.
+ STILL OPEN: owner must wire a billing provider + kill-switch URL to enforce
+   (LICENSING.md checklist); live-confirm 0.7.0–0.10.0 on real accounts (env
+   egress-blocked); splits vs v1.1 + contact-Monarch decisions.
+
 PROJECT STATE OTHERWISE: miner/dashboard untouched since Session 8. Amazarch
-v0.9.0 (201 tests green) is the active workstream, on MAIN.
+v0.10.0 (210 tests green) is the active workstream, on MAIN.
