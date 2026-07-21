@@ -43,7 +43,12 @@ export async function importOrderHistoryZip(file: File, accountLabel: string): P
     }
   }
   if (orders.length === 0) {
-    throw new Error("The export was read, but no orders were found in it.");
+    // We found the file(s) but parsed nothing — most likely the export's columns
+    // changed (e.g. the order-total column was renamed, so every order was
+    // dropped). Say so, rather than implying the export was empty.
+    throw new Error(
+      "Found the order-history file(s) but couldn't read any orders — Amazon's export format may have changed. Please use “Copy diagnostics” and report it.",
+    );
   }
 
   await recordAccountOrders(label, orders);

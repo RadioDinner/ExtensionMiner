@@ -38,9 +38,15 @@ async function buildZip(files: { name: string; text: string }[], compress: boole
     records.push({ nameBytes, method, compSize: stored.length, uncompSize: raw.length, localOffset });
   }
 
+  // A non-empty central-directory extra field + comment on every entry — real
+  // encoders emit these (e.g. Info-ZIP 'UT' timestamps). If the reader's
+  // extra/comment offsets are wrong, the per-entry advance drifts and the walk
+  // breaks after entry 0, so this is what pins the offset math.
+  const extra = new Uint8Array([0x55, 0x54, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]); // fake 'UT', 9 bytes
+  const comment = enc.encode("cmt");
   const cdStart = offset;
   for (const r of records) {
-    const ch = new Uint8Array(46 + r.nameBytes.length);
+    const ch = new Uint8Array(46 + r.nameBytes.length + extra.length + comment.length);
     const cdv = new DataView(ch.buffer);
     cdv.setUint32(0, 0x02014b50, true);
     cdv.setUint16(4, 20, true);
@@ -49,8 +55,12 @@ async function buildZip(files: { name: string; text: string }[], compress: boole
     cdv.setUint32(20, r.compSize, true);
     cdv.setUint32(24, r.uncompSize, true);
     cdv.setUint16(28, r.nameBytes.length, true);
+    cdv.setUint16(30, extra.length, true); // extra field length
+    cdv.setUint16(32, comment.length, true); // file comment length
     cdv.setUint32(42, r.localOffset, true);
     ch.set(r.nameBytes, 46);
+    ch.set(extra, 46 + r.nameBytes.length);
+    ch.set(comment, 46 + r.nameBytes.length + extra.length);
     push(ch);
   }
   const cdSize = offset - cdStart;

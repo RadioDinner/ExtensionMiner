@@ -54,6 +54,14 @@ describe("parseRetailOrderHistory", () => {
     expect(parseRetailOrderHistory("")).toEqual([]);
   });
 
+  it("yields no orders when the total column is absent (import surfaces this as a format error)", () => {
+    // Order id + date recognized, but no Total Owed / Item Total / Total column:
+    // every row totals 0 and is dropped. import-orders turns [] into a clear
+    // 'format may have changed' error rather than 'empty export'.
+    const csv = ['"Order ID","Order Date","Product Name"', '"500-0000000-0000000","2024-01-01","Thing"'].join("\n");
+    expect(parseRetailOrderHistory(csv)).toEqual([]);
+  });
+
   it("drops orders that sum to zero (e.g. fully gift-carded / no owed amount)", () => {
     const csv = [
       '"Order ID","Order Date","Total Owed","Product Name"',

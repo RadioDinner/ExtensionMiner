@@ -25,11 +25,13 @@ export async function readZipEntries(data: Uint8Array): Promise<ZipEntry[]> {
 
   for (let i = 0; i < count; i++) {
     if (cd + 46 > data.length || dv.getUint32(cd, true) !== CDIR_SIG) break;
+    // Central-directory file header field offsets (ZIP APPNOTE 4.3.12):
+    // name-len @28, extra-len @30, comment-len @32, local-header-offset @42.
     const method = dv.getUint16(cd + 10, true);
     const compSize = dv.getUint32(cd + 20, true);
     const nameLen = dv.getUint16(cd + 28, true);
-    const extraLen = dv.getUint16(cd + 32, true);
-    const commentLen = dv.getUint16(cd + 34, true);
+    const extraLen = dv.getUint16(cd + 30, true);
+    const commentLen = dv.getUint16(cd + 32, true);
     const localOff = dv.getUint32(cd + 42, true);
     const name = decodeUtf8(data.subarray(cd + 46, cd + 46 + nameLen));
 
