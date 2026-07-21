@@ -11,3 +11,6 @@
 6. Lets keep going on COMMERCIALIZATION.md
 
 7. lets move it to its own repo after we backfill harden
+
+8. PS E:\FileCloud\FileCloud\FileCloud\Ventures\Amazarch\ExtensionMiner-main\amazarch> git clone amazarch.bundle
+fatal: repository 'amazarch.bundle' does not exist
