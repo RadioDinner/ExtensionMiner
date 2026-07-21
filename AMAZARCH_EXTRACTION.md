@@ -5,12 +5,33 @@ own repository before store submission (see `amazarch/SPEC.md`: *"Lives in this
 repo for now; can be extracted to its own repo before store submission."*). AMO
 (Firefox) reviews your source, so a clean, standalone repo makes that painless.
 
-## Status
+## Status: DONE ✅ (2026-07-21)
 
-The extraction is **prepared and verified** — I just can't create the GitHub
-repo for you: the Claude GitHub App integration lacks repo-creation permission
-(`POST /user/repos` → 403 "Resource not accessible by integration"). So the
-one-time repo creation is a 30-second manual step; everything else is done.
+The standalone repo is live: **https://github.com/RadioDinner/Amazarch**, main =
+commit `c2068fc`, the extension at the repo root (76 files: `src/`, `test/`,
+manifests, `package.json`, docs — no monorepo files). It was pushed manually
+from the owner's machine (the Claude GitHub App can't create repos, and its
+access is scoped to `ExtensionMiner` only, so it can't push there either).
+
+### Remaining decision — the `amazarch/` copy in THIS repo
+
+Claude cannot see or push to `RadioDinner/Amazarch` (integration scoped to
+`ExtensionMiner`). So the `amazarch/` folder here is **kept as the working copy
+Claude can edit** until one of:
+
+- **(Recommended) Grant the Claude GitHub App access to `RadioDinner/Amazarch`**
+  (github.com → Settings → Applications → Claude → repo access → add Amazarch,
+  or via claude.ai GitHub settings). Then future Amazarch work happens directly
+  in the new repo and `amazarch/` here is retired to a one-line pointer.
+- **Interim:** keep developing in `amazarch/` here; sync to the new repo by
+  re-running the copy + `git push -f` (or a proper remote workflow).
+
+Until access is granted, **do not delete `amazarch/` here** — it would strand
+Claude's ability to work on the extension.
+
+---
+
+_Original prep notes (for reference):_
 
 You were sent **`amazarch.bundle`** — a git bundle containing the full,
 history-preserving extraction of `amazarch/` re-rooted to the repo top level
