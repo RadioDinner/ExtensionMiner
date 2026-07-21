@@ -381,3 +381,75 @@ egress-blocked — the ZIP "Total Owed" + returnHint assumptions especially).
 PROJECT STATE OTHERWISE: miner/dashboard untouched since Session 8. Amazarch
 v0.11.0 (228 tests green) is the active workstream, on MAIN; extraction bundle
 sent + guide committed.
+
+================================================================================
+PART H — REPO EXTRACTION COMPLETED (prompts 8–11, live troubleshooting)
+================================================================================
+The move is DONE. Standalone repo is LIVE:
+  >> https://github.com/RadioDinner/Amazarch  (capital A; "amazarch" redirects)
+  >> main = commit c2068fc "Amazarch v0.11.0 (standalone extension)"
+  >> 76 files, EXTENSION AT ROOT (src/, test/, manifests, package.json, docs) —
+     no monorepo files.
+
+How it went (for context): the git bundle I sent never got found on the user's
+machine; two local attempts pushed the WRONG thing (a stale v0.8.0 copy, then
+the WHOLE monorepo) before the final correct force-push. Root causes: (a) the
+user's ExtensionMiner ZIP was stale (v0.8.0) — a FRESH github Download-ZIP has
+v0.11.0; (b) git init was run in the parent monorepo folder, not the amazarch
+subfolder. FIX that worked: copy amazarch subfolder to a clean SIBLING dir →
+git init → commit → `git push -f origin main` to Amazarch.git.
+
+CRITICAL FOR NEXT SESSION — ACCESS CONSTRAINT + PENDING DECISION:
+  - Claude's GitHub integration is SCOPED TO radiodinner/extensionminer ONLY.
+    It CANNOT read or push to RadioDinner/Amazarch (verified: get_file_contents
+    → "Access denied ... Allowed repositories: radiodinner/extensionminer").
+  - Therefore amazarch/ IS KEPT in THIS monorepo as the working copy Claude can
+    edit. DO NOT DELETE IT until the constraint is resolved.
+  - OPEN DECISION for the owner (asked end of Session 11, not yet answered):
+      (A RECOMMENDED) Grant the Claude GitHub App access to RadioDinner/Amazarch
+        (GitHub → Settings → Applications → Claude → repo access; or claude.ai
+        GitHub settings), then future Amazarch work happens in the NEW repo and
+        amazarch/ here is retired to a one-line pointer.
+      (B interim) Keep developing in ExtensionMiner/amazarch; owner syncs to the
+        new repo via copy + `git push -f`.
+  - Also: owner should confirm RadioDinner/Amazarch visibility = PRIVATE
+    (couldn't verify from here; the monorepo briefly landed there before the
+    force-push, and unreachable old commit b9b1a47 may linger until GC).
+  - If a NEW SESSION is started ON RadioDinner/Amazarch directly: it starts
+    WITHOUT the miner's CLAUDE.md / NEW_SESSION_INSTRUCTIONS.md / session-start
+    hook / Session log protocol (those live in ExtensionMiner). The new repo has
+    its own README/SPEC/COMMERCIALIZATION/LICENSING but NO session-protocol
+    scaffolding — recreate or relax the protocol there as desired.
+
+================================================================================
+WHERE PHASE 1 STANDS (for the next session)
+================================================================================
+DONE (all on ExtensionMiner MAIN, mirrored to RadioDinner/Amazarch @ v0.11.0):
+  refunds (0.7), multi-account + movable/minimizable panel (0.8), licensing gate
+  + remote kill-switch (0.9), first-run onboarding + scrubbed diagnostics (0.10),
+  Privacy-Central ZIP full-history import (0.11). 228 tests green.
+REMAINING Phase 1:
+  1. STORE PACKAGING (needs owner input: domain, privacy-policy specifics):
+     - Privacy policy (only the license key leaves the machine; financial data
+       stays local — entitlement-only per COMMERCIALIZATION.md).
+     - Chrome Web Store: single-purpose description + PER-PERMISSION written
+       justifications (map to manifest.chrome.json: storage, unlimitedStorage,
+       alarms, tabs, host_permissions monarch+amazon). New CWS data-disclosure
+       enforcement began 2026-08-01.
+     - AMO: re-validate data_collection_permissions; unlisted signing for beta.
+     - Landing page (Vercel).
+     >> Claude OFFERED to draft the privacy policy + CWS/AMO listing copy +
+        permission justifications next — owner hadn't answered when wrapping up.
+  2. WIRE BILLING to ENFORCE: fill src/shared/config.ts (validateUrl/buyUrl) +
+     REMOTE_CONFIG_URL, per amazarch/LICENSING.md checklist. Until then all
+     features are open (licensing dormant).
+  3. PRIVATE BETA (owner action): recruit from r/MonarchMoney complaint threads.
+STILL-OPEN OWNER DECISIONS (COMMERCIALIZATION.md): sub vs one-time (defaulted to
+  sub+lifetime), splits at launch vs v1.1 (rec v1.1), contact Monarch (rec no).
+LIVE-CONFIRM BACKLOG (env is egress-blocked — NONE of 0.7–0.11 verified against
+  real Amazon/Monarch): refund rows; multi-account buckets + panel drag/minimize;
+  licensing/trial UI; onboarding; and ESPECIALLY the ZIP import's "Total Owed"
+  per-item sum + returnHint assumptions vs a REAL Amazon export.
+
+FINAL STATE: ExtensionMiner MAIN @ (this commit). Amazarch v0.11.0, 228 tests
+green, standalone repo live at RadioDinner/Amazarch. Session 11 ends here.
