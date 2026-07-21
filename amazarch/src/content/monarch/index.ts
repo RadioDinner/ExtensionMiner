@@ -28,6 +28,7 @@ import type { MatchResult } from "../../shared/matcher";
 import { loadSettings } from "../../shared/settings";
 import { planAutoApply, runAutoApply, summarizeAutoApply } from "../../shared/auto-apply";
 import { ensureTrialStarted } from "../../shared/licensing";
+import { markFirstSyncDone } from "../../shared/onboarding";
 import { resolveWriteGate } from "../../shared/gate-runtime";
 import { LICENSE_CONFIG } from "../../shared/config";
 import type { WriteGate } from "../../shared/write-gate";
@@ -332,6 +333,9 @@ async function tryConnect(): Promise<boolean> {
       };
       lastBaseView = view;
       renderPanel(view);
+
+      // Onboarding: a sync that read orders completes the last setup step.
+      if ((check?.orders.length ?? 0) > 0) void markFirstSyncDone();
 
       // Auto match (popup settings): apply the enabled actions to EXACT ("auto")
       // matches, politely paced, through the SAME onApply/onRename paths as the

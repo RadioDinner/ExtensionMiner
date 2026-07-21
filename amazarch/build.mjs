@@ -10,6 +10,12 @@ const ENTRIES = {
   "monarch-content.js": "src/content/monarch/index.ts",
   "amazon-content.js": "src/content/amazon/index.ts",
   "popup.js": "src/popup/popup.ts",
+  "onboarding.js": "src/onboarding/onboarding.ts",
+};
+
+const HTML = {
+  "popup.html": "src/popup/popup.html",
+  "onboarding.html": "src/onboarding/onboarding.html",
 };
 
 for (const target of TARGETS) {
@@ -37,6 +43,6 @@ for (const target of TARGETS) {
   }
 
   await cp(`manifest.${target}.json`, `${outdir}/manifest.json`);
-  await cp("src/popup/popup.html", `${outdir}/popup.html`);
+  for (const [outfile, src] of Object.entries(HTML)) await cp(src, `${outdir}/${outfile}`);
   console.log(`built ${outdir}`);
 }

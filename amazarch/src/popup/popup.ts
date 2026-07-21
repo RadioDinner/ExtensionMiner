@@ -6,6 +6,9 @@ import { loadOrderStore, summarizeAccounts } from "../shared/order-store";
 import { ensureTrialStarted, evaluateEntitlement, loadLicense, validateKey } from "../shared/licensing";
 import { resolveWriteGate } from "../shared/gate-runtime";
 import { LICENSE_CONFIG, isLicensingConfigured } from "../shared/config";
+import { computeOnboarding, loadOnboarding } from "../shared/onboarding";
+import { buildDiagnosticReport } from "../shared/diagnostics";
+import { collectDiagnostics } from "../shared/diagnostics-runtime";
 
 const MONARCH_ORIGINS = ["https://app.monarchmoney.com/*", "https://app.monarch.com/*"];
 
@@ -306,7 +309,71 @@ async function initLicense(): Promise<void> {
   }
 }
 
+// --- Setup nudge + diagnostics ------------------------------------------------
+
+const AMAZON_ORIGINS = ["https://www.amazon.com/*"];
+
+async function has(origins: string[]): Promise<boolean> {
+  try {
+    return await browser.permissions.contains({ origins });
+  } catch {
+    return true;
+  }
+}
+
+async function initSetupNudge(): Promise<void> {
+  const nudge = document.getElementById("setup-nudge");
+  if (!nudge) return;
+  let status: StatusResponse | undefined;
+  try {
+    status = (await browser.runtime.sendMessage({ type: "get-status" })) as StatusResponse;
+  } catch {
+    /* background not up */
+  }
+  const [monarchAccess, amazonAccess, ob] = await Promise.all([
+    has(MONARCH_ORIGINS),
+    has(AMAZON_ORIGINS),
+    loadOnboarding(),
+  ]);
+  const board = computeOnboarding({
+    hostAccess: monarchAccess && amazonAccess,
+    monarchConnected: status?.probe?.ok === true,
+    amazonSignedIn: status?.amazon ? status.amazon.signedIn : null,
+    firstSyncDone: ob.firstSyncDone,
+  });
+  if (board.complete) {
+    nudge.style.display = "none";
+    return;
+  }
+  const done = board.steps.filter((s) => s.status === "done").length;
+  nudge.replaceChildren();
+  const label = document.createElement("span");
+  label.textContent = `Setup: ${done} of ${board.steps.length} done`;
+  const btn = document.createElement("button");
+  btn.className = "linkish";
+  btn.textContent = "Finish setup →";
+  btn.addEventListener("click", () => void browser.tabs.create({ url: browser.runtime.getURL("onboarding.html") }));
+  nudge.append(label, btn);
+  nudge.style.display = "flex";
+}
+
+function initDiagnostics(): void {
+  const btn = document.getElementById("diag");
+  const note = document.getElementById("diag-note");
+  btn?.addEventListener("click", async () => {
+    const report = buildDiagnosticReport(await collectDiagnostics());
+    try {
+      await navigator.clipboard.writeText(report);
+      if (note) note.textContent = " ✓ copied (no financial data)";
+    } catch {
+      if (note) note.textContent = " — copy failed; open the welcome page to copy it there";
+    }
+  });
+}
+
 void refresh();
 void initSettings();
 void initAccounts();
 void initLicense();
+void initSetupNudge();
+initDiagnostics();

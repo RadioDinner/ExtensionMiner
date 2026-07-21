@@ -30,6 +30,7 @@
   </head>
   <body>
     <h1>Amazarch <span id="version" style="color:#9ca3af;font-weight:normal;font-size:11px;"></span></h1>
+    <div id="setup-nudge" class="status warn" style="display:none;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;"></div>
     <div id="monarch-status" class="status">Checking Monarch session…</div>
     <div id="probe" class="muted"></div>
     <div id="read" class="muted"></div>
@@ -74,6 +75,10 @@
     <p class="muted">
       Open the Monarch web app and click “Sync now” in the Amazarch panel to
       read your Amazon orders and match them to your charges.
+    </p>
+    <p class="muted">
+      <button id="diag" class="linkish">Copy diagnostics</button>
+      <span id="diag-note"></span>
     </p>
     <script src="popup.js"></script>
   </body>

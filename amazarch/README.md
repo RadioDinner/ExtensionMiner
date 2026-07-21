@@ -14,8 +14,10 @@ and **minimizes** to a floating chip. **Licensing scaffolding (v0.9.0):** a
 provider-agnostic trial/subscription/lifetime gate on the *write* actions
 (reads + matching stay free) plus a remote **kill-switch** for read-only safe
 mode — both dormant until wired in `src/shared/config.ts` (see
-[`LICENSING.md`](./LICENSING.md)). Not yet: splits, categorization
-(see SPEC.md §6).
+[`LICENSING.md`](./LICENSING.md)). **First-run onboarding (v0.10.0):** a welcome
+page (opened on install) with a live setup checklist, a popup setup nudge, and a
+one-click **scrubbed diagnostics** copy (no financial data) for support. Not
+yet: splits, categorization (see SPEC.md §6).
 
 ## Develop
 

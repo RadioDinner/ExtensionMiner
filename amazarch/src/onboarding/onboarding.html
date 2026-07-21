@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Welcome to Amazarch</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font: 15px/1.55 system-ui, sans-serif;
+        margin: 0;
+        padding: 0;
+        color: #111827;
+        background: #f3f4f6;
+      }
+      .wrap { max-width: 620px; margin: 0 auto; padding: 32px 24px 64px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .sub { color: #6b7280; margin: 0 0 24px; }
+      .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 4px 0; }
+      .step { display: flex; gap: 12px; padding: 16px; border-top: 1px solid #f3f4f6; }
+      .step:first-child { border-top: none; }
+      .badge {
+        flex: 0 0 auto; width: 26px; height: 26px; border-radius: 999px;
+        display: grid; place-items: center; font-size: 14px; font-weight: 600;
+        background: #e5e7eb; color: #6b7280;
+      }
+      .step.done .badge { background: #ecfdf5; color: #059669; }
+      .step.current .badge { background: #2563eb; color: #fff; }
+      .step .title { font-weight: 600; }
+      .step.done .title { color: #6b7280; text-decoration: line-through; }
+      .step .detail { color: #6b7280; font-size: 13px; margin-top: 2px; }
+      .step .action { margin-top: 8px; }
+      button {
+        font: 13px system-ui, sans-serif; padding: 6px 12px; border-radius: 8px;
+        border: none; background: #2563eb; color: #fff; cursor: pointer;
+      }
+      button.ghost { background: #eef2ff; color: #3730a3; }
+      .bar { display: flex; gap: 8px; align-items: center; margin: 20px 0 8px; }
+      .done-note { background: #ecfdf5; color: #065f46; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+      .muted { color: #6b7280; font-size: 12px; }
+      textarea { width: 100%; height: 150px; margin-top: 8px; font: 12px/1.4 monospace; }
+      @media (prefers-color-scheme: dark) {
+        body { color: #e5e7eb; background: #0b1220; }
+        .card { background: #111827; border-color: #1f2937; }
+        .step { border-top-color: #1f2937; }
+        .step .detail, .sub, .muted { color: #9ca3af; }
+        .badge { background: #1f2937; color: #9ca3af; }
+        button.ghost { background: #1e293b; color: #bfdbfe; }
+        .done-note { background: #052e2b; color: #a7f3d0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Welcome to Amazarch <span id="version" class="muted"></span></h1>
+      <p class="sub">Match your Amazon orders, refunds, and split shipments to your Monarch Money transactions.</p>
+      <div id="done-note" class="done-note" style="display: none">
+        ✓ Setup complete — Amazarch is matching your orders. You can close this tab.
+      </div>
+      <div id="steps" class="card"></div>
+      <div class="bar">
+        <button id="recheck" class="ghost">Re-check</button>
+        <span id="progress" class="muted"></span>
+      </div>
+      <p class="muted" style="margin-top: 24px">
+        Trouble? <button id="diag" class="ghost">Copy diagnostics</button> and send it to support — it contains no
+        financial data.
+      </p>
+      <textarea id="diag-out" style="display: none" readonly></textarea>
+      <p class="muted">Not affiliated with Amazon or Monarch Money. Amazarch uses unofficial APIs that can change.</p>
+    </div>
+    <script src="onboarding.js"></script>
+  </body>
+</html>

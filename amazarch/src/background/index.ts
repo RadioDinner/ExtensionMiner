@@ -42,6 +42,13 @@ browser.alarms.onAlarm.addListener((alarm) => {
 browser.runtime.onStartup?.addListener(() => void revalidateStoredKey());
 void revalidateStoredKey(); // also on service-worker/event-page spin-up
 
+// First-run onboarding: open the welcome page once, on fresh install.
+browser.runtime.onInstalled.addListener((details) => {
+  if (details.reason === "install") {
+    void browser.tabs.create({ url: browser.runtime.getURL("onboarding.html") }).catch(() => {});
+  }
+});
+
 // storage.session is memory-backed and cleared when the browser closes —
 // the right place for session material (never storage.local).
 async function set(key: string, value: unknown): Promise<void> {
