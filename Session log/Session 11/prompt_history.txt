@@ -9,3 +9,5 @@
 5. I like the refund system. I want to start getting this ready to sell. Phase 1, lets go
 
 6. Lets keep going on COMMERCIALIZATION.md
+
+7. lets move it to its own repo after we backfill harden

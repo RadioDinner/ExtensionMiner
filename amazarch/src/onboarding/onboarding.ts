@@ -14,6 +14,8 @@ import {
 import type { StatusResponse } from "../shared/messages";
 import { buildDiagnosticReport } from "../shared/diagnostics";
 import { collectDiagnostics } from "../shared/diagnostics-runtime";
+import { importOrderHistoryZip } from "../shared/import-orders";
+import { loadOrderStore, summarizeAccounts } from "../shared/order-store";
 
 const MONARCH_ORIGINS = ["https://app.monarchmoney.com/*", "https://app.monarch.com/*"];
 const AMAZON_ORIGINS = ["https://www.amazon.com/*"];
@@ -129,6 +131,36 @@ async function copyDiagnostics(): Promise<void> {
   }
 }
 
+async function initImport(): Promise<void> {
+  const account = document.getElementById("import-account") as HTMLInputElement | null;
+  const fileInput = document.getElementById("import-file") as HTMLInputElement | null;
+  const runBtn = document.getElementById("import-run") as HTMLButtonElement | null;
+  const statusEl = document.getElementById("import-status");
+  if (!account || !fileInput || !runBtn || !statusEl) return;
+
+  // Prefill the account label with an existing account, if any.
+  const accounts = summarizeAccounts(await loadOrderStore(), null);
+  if (accounts[0]) account.value = accounts[0].label;
+
+  runBtn.addEventListener("click", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) {
+      statusEl.textContent = "Choose the ZIP you downloaded from Amazon first.";
+      return;
+    }
+    runBtn.disabled = true;
+    statusEl.textContent = "Reading the export…";
+    try {
+      const r = await importOrderHistoryZip(file, account.value);
+      statusEl.textContent = `✓ Imported ${r.orders} orders into “${r.account}” (from ${r.files} file${r.files === 1 ? "" : "s"}). Open Monarch and Sync to match them.`;
+    } catch (e) {
+      statusEl.textContent = `⚠ ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      runBtn.disabled = false;
+    }
+  });
+}
+
 function init(): void {
   const v = document.getElementById("version");
   if (v) v.textContent = `v${browser.runtime.getManifest().version}`;
@@ -136,6 +168,7 @@ function init(): void {
   document.getElementById("diag")?.addEventListener("click", () => void copyDiagnostics());
   void markWelcomed();
   void render();
+  void initImport();
   // Poll so the checklist reflects steps completed in other tabs.
   setInterval(() => void render(), 3000);
 }

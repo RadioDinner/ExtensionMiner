@@ -61,6 +61,22 @@
         <button id="recheck" class="ghost">Re-check</button>
         <span id="progress" class="muted"></span>
       </div>
+
+      <h2 style="font-size: 16px; margin: 28px 0 6px">Import full order history (optional)</h2>
+      <p class="muted" style="margin-top: 0">
+        The live sync reads recent orders. To match your <strong>entire</strong> history, request your data from
+        <a href="https://www.amazon.com/hz/privacy-central/data-requests/preview.html" target="_blank" rel="noopener">Amazon Privacy Central</a>
+        → “Your Orders”, wait for the email (hours–days), then drop the ZIP here.
+      </p>
+      <div class="card" style="padding: 16px">
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+          <input id="import-account" type="text" placeholder="Account label (e.g. your name)"
+            style="flex: 1; min-width: 160px; font: 13px system-ui, sans-serif; padding: 6px 8px" />
+          <input id="import-file" type="file" accept=".zip" style="font: 12px system-ui, sans-serif" />
+          <button id="import-run">Import</button>
+        </div>
+        <div id="import-status" class="muted" style="margin-top: 8px"></div>
+      </div>
       <p class="muted" style="margin-top: 24px">
         Trouble? <button id="diag" class="ghost">Copy diagnostics</button> and send it to support — it contains no
         financial data.

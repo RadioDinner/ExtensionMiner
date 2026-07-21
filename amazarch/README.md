@@ -16,8 +16,11 @@ provider-agnostic trial/subscription/lifetime gate on the *write* actions
 mode — both dormant until wired in `src/shared/config.ts` (see
 [`LICENSING.md`](./LICENSING.md)). **First-run onboarding (v0.10.0):** a welcome
 page (opened on install) with a live setup checklist, a popup setup nudge, and a
-one-click **scrubbed diagnostics** copy (no financial data) for support. Not
-yet: splits, categorization (see SPEC.md §6).
+one-click **scrubbed diagnostics** copy (no financial data) for support.
+**Full-history import (v0.11.0):** drop your Amazon Privacy Central "Request My
+Data" ZIP on the welcome page to backfill your *entire* order history (parsed
+in-browser, no dependency) — beating the official extension's ~3-month limit.
+Not yet: splits, categorization (see SPEC.md §6).
 
 ## Develop
 
